@@ -29,9 +29,21 @@ La **modalità mock è attiva di default**: gli invii sono simulati sul disposit
 
 ## Bolle inviate (storico)
 
-Dalla schermata del modulo, il pulsante **Bolle inviate** apre l'elenco cronologico degli invii confermati, dal più recente, raggruppati per giorno. Filtri: **periodo** (Oggi, Ultimi 7 giorni, Questo mese, Tutto, oppure un intervallo di date libero) e **cantiere**. In cima il totale del periodo con il dettaglio per commessa.
+Dalla schermata del modulo, il pulsante **Bolle inviate** apre il registro degli invii confermati:
 
-Il registro è **locale al dispositivo** e contiene solo i dati dell'invio (data, cantiere, operatore, `idClient`), non le foto: sopravvive quindi alla potatura delle immagini e resta consultabile a mesi di distanza. Due limiti da conoscere: mostra ciò che *quel* telefono ha inviato — non è la vista condivisa della raccolta — e cambiando dispositivo lo storico non segue. Il filtro per periodo lavora sulla **data di scatto** (`dataInvio`), non sull'istante di consegna al server.
+- **Calendario del mese**, con i giorni che hanno bolle evidenziati e il numero sopra ciascuno. Si tocca un giorno per vederne l'elenco, lo si ritocca (o si usa *Tutto il mese*) per tornare al mese intero; le frecce spostano di mese. All'apertura il calendario si posiziona sul mese dell'ultimo invio.
+- **Elenco** raggruppato per giorno, con ora, cantiere e operatore. **Toccando una riga la bolla si apre a schermo intero.**
+- **Filtro cantiere** e totale del periodo con il dettaglio per commessa.
+
+Delle foto inviate il telefono conserva l'originale solo per le ultime N (impostazione del modulo, default 20); di tutte conserva invece una **miniatura a 800 px** (~70 KB), fino a 300 bolle. Aprendo una riga si vede l'originale se c'è ancora, altrimenti la miniatura, che basta a riconoscere la bolla ma non a leggerne le righe — per quello c'è la raccolta. Oltre le 300, la riga resta nell'elenco senza immagine.
+
+Il registro è **locale al dispositivo**: mostra ciò che quel telefono ha inviato, non è la vista condivisa della raccolta e non segue il cambio di dispositivo. Il raggruppamento per giorno usa la **data di scatto** (`dataInvio`), non l'istante di consegna al server.
+
+## Foto già inviata
+
+Aggiungendo dalla galleria un file **identico** a uno già presente (stessa immagine, non un secondo scatto), l'app lo riconosce dall'impronta SHA-256 del file originale e avvisa: *«Questa foto è già stata inviata il … alle … su …»*. La scelta resta all'operatore — si può confermare e mandarla comunque — ma il doppione per sbaglio non passa più inosservato.
+
+Due scatti diversi della stessa bolla restano invece due invii distinti: nessun confronto di byte può riconoscerli, servirebbe leggere il numero della bolla (OCR), che è fuori perimetro.
 
 ## Impostazioni
 

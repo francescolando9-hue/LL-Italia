@@ -4,12 +4,16 @@
 // errore = invio fallito, resta in coda e si ritenta.
 
 const NOME_DB = 'llitalia-bolle';
-const VERSIONE_DB = 2;
+const VERSIONE_DB = 3;
 const STORE = 'foto';
 // Storico permanente degli invii confermati: solo dati, senza foto. Le foto
 // pesano e vengono potate; il registro invece resta e permette di rispondere a
 // "cosa ho mandato questa settimana" anche a distanza di mesi.
 const STORE_STORICO = 'storico';
+// Miniature separate dalle righe: l'elenco resta leggero perché non carica le
+// immagini, che si leggono una alla volta quando la bolla viene aperta.
+const STORE_MINIATURE = 'miniature';
+const MINIATURE_DA_CONSERVARE = 300;
 const CHIAVE_CONTATORI = 'llitalia.bolle.contatori';
 
 let dbPromise = null;
@@ -25,9 +29,19 @@ function apri() {
           store.createIndex('stato', 'stato');
           store.createIndex('creatoIl', 'creatoIl');
         }
+        let storico;
         if (!db.objectStoreNames.contains(STORE_STORICO)) {
-          const storico = db.createObjectStore(STORE_STORICO, { keyPath: 'idClient' });
+          storico = db.createObjectStore(STORE_STORICO, { keyPath: 'idClient' });
           storico.createIndex('inviatoIl', 'inviatoIl');
+        } else {
+          storico = richiesta.transaction.objectStore(STORE_STORICO);
+        }
+        if (!storico.indexNames.contains('impronta')) {
+          storico.createIndex('impronta', 'impronta');
+        }
+        if (!db.objectStoreNames.contains(STORE_MINIATURE)) {
+          db.createObjectStore(STORE_MINIATURE, { keyPath: 'idClient' })
+            .createIndex('inviatoIl', 'inviatoIl');
         }
       };
       richiesta.onsuccess = () => risolvi(richiesta.result);
@@ -66,13 +80,15 @@ export function timestampDispositivo(data = new Date()) {
 
 // La foto entra in IndexedDB già allo scatto (stato bozza): non si perde
 // nemmeno se l'app viene chiusa prima di premere Invia.
-export function aggiungiBozza(fotoBlob, nomeOriginale) {
+export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impronta = '') {
   const record = {
     id: crypto.randomUUID(),
     stato: 'bozza',
     cantiere: '',
     autore: '',
     foto: fotoBlob,
+    miniatura,
+    impronta,
     nome: nomeOriginale || '',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
@@ -156,26 +172,76 @@ export function incrementaInviate(quante) {
 
 // --- Storico degli invii confermati -----------------------------------------
 
-// Chiamata quando il server conferma: la riga resta anche dopo che la foto è
-// stata potata dal dispositivo.
-export function registraInvio(record) {
-  return transazione(STORE_STORICO, 'readwrite', store => store.put({
+// Chiamata quando il server conferma: riga e miniatura restano anche dopo che
+// la foto a piena risoluzione è stata potata dal dispositivo.
+export async function registraInvio(record) {
+  await transazione(STORE_STORICO, 'readwrite', store => store.put({
     idClient: record.id,
     commessa: record.cantiere,
     operatore: record.autore,
     dataInvio: record.timestampDispositivo,
     inviatoIl: record.inviatoIl || Date.now(),
+    impronta: record.impronta || '',
   }));
+  if (record.miniatura) {
+    await transazione(STORE_MINIATURE, 'readwrite', store => store.put({
+      idClient: record.id,
+      blob: record.miniatura,
+      inviatoIl: record.inviatoIl || Date.now(),
+    }));
+    await potaMiniature();
+  }
 }
 
-// Ordine cronologico decrescente: l'ultimo invio in cima.
+// Ordine cronologico decrescente: l'ultimo invio in cima. Non carica immagini.
 export function elencaStorico() {
   return transazione(STORE_STORICO, 'readonly', store => store.getAll())
     .then(righe => righe.sort((a, b) => b.inviatoIl - a.inviatoIl));
 }
 
+export function leggiMiniatura(idClient) {
+  return transazione(STORE_MINIATURE, 'readonly', store => store.get(idClient))
+    .then(riga => (riga ? riga.blob : null));
+}
+
+// Tetto alle miniature conservate: le righe più vecchie restano nell'elenco,
+// ma senza immagine. Evita che lo storico cresca senza limite sul telefono.
+export async function potaMiniature() {
+  const righe = await transazione(STORE_MINIATURE, 'readonly', store => store.getAll());
+  if (righe.length <= MINIATURE_DA_CONSERVARE) return 0;
+  const daEliminare = righe
+    .sort((a, b) => a.inviatoIl - b.inviatoIl)
+    .slice(0, righe.length - MINIATURE_DA_CONSERVARE);
+  for (const riga of daEliminare) {
+    await transazione(STORE_MINIATURE, 'readwrite', store => store.delete(riga.idClient));
+  }
+  return daEliminare.length;
+}
+
+// Riconosce la stessa identica immagine già presente: stesso file scelto due
+// volte dalla galleria ha la stessa impronta. Cerca sia tra le foto ancora in
+// coda sia tra quelle già inviate.
+export async function cercaPerImpronta(impronta) {
+  if (!impronta) return null;
+  const suDispositivo = (await elenca()).find(r => r.impronta === impronta);
+  if (suDispositivo) {
+    const dove = { bozza: 'bozza', inviata: 'inviata' }[suDispositivo.stato] || 'coda';
+    return {
+      dove,
+      commessa: suDispositivo.cantiere,
+      dataInvio: suDispositivo.timestampDispositivo,
+    };
+  }
+  const righe = await transazione(STORE_STORICO, 'readonly', store => store.getAll());
+  const inviata = righe
+    .filter(r => r.impronta === impronta)
+    .sort((a, b) => b.inviatoIl - a.inviatoIl)[0];
+  if (!inviata) return null;
+  return { dove: 'inviata', commessa: inviata.commessa, dataInvio: inviata.dataInvio };
+}
+
 // Recupero delle foto già confermate prima dell'introduzione dello storico:
-// si eseguono una volta sola, poi le righe esistono già.
+// si esegue una volta sola, poi le righe esistono già.
 export async function allineaStorico() {
   const inviate = (await elenca()).filter(r => r.stato === 'inviata');
   if (inviate.length === 0) return 0;

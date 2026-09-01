@@ -92,11 +92,81 @@
 /* Storico delle bolle inviate */
 .bolle-vai-storico { margin-bottom: 16px; }
 
-.bolle-intervallo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bolle-mese {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bolle-mese h2 { margin: 0; font-size: 1.15rem; text-transform: capitalize; }
+
+.bolle-freccia {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 2px solid var(--bordo);
+  border-radius: 10px;
+  background: var(--carta);
+  color: var(--blu);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bolle-calendario {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.bolle-intestazione {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--testo-tenue);
+  padding-bottom: 4px;
+}
+
+.bolle-giorno-cella {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--testo-tenue);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 2px;
+  cursor: default;
+}
+
+.bolle-giorno-cella .numero { display: block; }
+
+.bolle-giorno-cella.con-bolle {
+  background: var(--blu);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bolle-giorno-cella.con-bolle .quante {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.bolle-giorno-cella.oggi { outline: 2px solid var(--verde); outline-offset: -2px; }
+.bolle-giorno-cella.scelto { background: var(--verde); color: #fff; }
 
 .bolle-riepilogo {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   background: var(--carta);
   border-radius: var(--raggio);
@@ -112,32 +182,72 @@
   font-variant-numeric: tabular-nums;
 }
 
-.bolle-riepilogo .etichetta { color: var(--testo-tenue); }
+.bolle-riepilogo .etichetta { flex: 1; color: var(--testo-tenue); }
 
-.bolle-giorno {
-  margin: 18px 0 6px;
-  font-size: 1rem;
-  text-transform: capitalize;
-}
-
+.bolle-giorno { margin: 18px 0 6px; font-size: 1rem; text-transform: capitalize; }
 .bolle-giorno:first-child { margin-top: 0; }
 
 .bolle-storico { list-style: none; margin: 0; padding: 0; }
+.bolle-storico li { border-bottom: 1px solid var(--bordo); }
+.bolle-storico li:last-child { border-bottom: none; }
 
-.bolle-storico li {
+.bolle-riga {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--bordo);
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 2px;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
 }
 
-.bolle-storico li:last-child { border-bottom: none; }
+.bolle-riga .ora { font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.bolle-riga .cantiere { flex: 1; min-width: 0; }
+.bolle-riga .lente { flex: none; opacity: 0.55; }
 
-.bolle-storico .ora {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  flex: none;
+/* Visore a schermo intero della bolla */
+.bolle-visore {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(10, 14, 30, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
 }
 
-.bolle-storico .cantiere { flex: 1; min-width: 0; }
+.bolle-visore img {
+  max-width: 100%;
+  max-height: 88vh;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+.bolle-visore-messaggio {
+  color: #fff;
+  text-align: center;
+  max-width: 32ch;
+  margin: 12px auto 0;
+}
+
+.bolle-chiudi {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+}

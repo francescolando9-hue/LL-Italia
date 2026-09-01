@@ -2,7 +2,7 @@
 // Flusso felice in 3 tocchi: foto → cantiere (ultimo usato preselezionato) → Invia.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { naviga } from '../../core/router.js';
-import { comprimiInJpeg } from './immagini.js';
+import { comprimiInJpeg, creaMiniatura, impronta } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from './cantieri.js';
 import * as coda from './coda.js';
@@ -121,18 +121,41 @@ async function gestisciFile(evento) {
   const avviso = radice.querySelector('#avviso-foto');
   avviso.innerHTML = `<p class="avviso avviso-info">Elaborazione di ${file.length} foto&hellip;</p>`;
   const errori = [];
+  let saltate = 0;
   for (const singolo of file) {
     try {
+      // Stessa identica immagine già presente: si avvisa, non si blocca —
+      // può esserci un motivo per rimandarla, ma non deve succedere per sbaglio.
+      const marchio = await impronta(singolo);
+      const gia = await coda.cercaPerImpronta(marchio);
+      if (gia && !window.confirm(messaggioDuplicato(gia))) {
+        saltate += 1;
+        continue;
+      }
       const blob = await comprimiInJpeg(singolo);
-      await coda.aggiungiBozza(blob, singolo.name);
+      const miniatura = await creaMiniatura(singolo);
+      await coda.aggiungiBozza(blob, singolo.name, miniatura, marchio);
     } catch (errore) {
       errori.push(`${singolo.name || 'foto'}: ${errore.message}`);
     }
   }
-  avviso.innerHTML = errori.length
-    ? `<p class="avviso avviso-errore">Foto non aggiunte — ${scappaHtml(errori.join('; '))}</p>`
-    : '';
+  const messaggi = [];
+  if (errori.length) messaggi.push(`<p class="avviso avviso-errore">Foto non aggiunte — ${scappaHtml(errori.join('; '))}</p>`);
+  if (saltate) messaggi.push(`<p class="avviso avviso-info">${saltate === 1 ? 'Una foto già presente non è stata aggiunta.' : `${saltate} foto già presenti non sono state aggiunte.`}</p>`);
+  avviso.innerHTML = messaggi.join('');
   await ridisegna();
+}
+
+function messaggioDuplicato(gia) {
+  const quando = String(gia.dataInvio || '');
+  const giorno = quando ? `${quando.slice(8, 10)}/${quando.slice(5, 7)}` : '';
+  const ora = quando ? quando.slice(11, 16) : '';
+  const dove = {
+    bozza: 'è già tra le foto pronte da inviare',
+    coda: 'è già in coda, in attesa di invio',
+    inviata: `è già stata inviata il ${giorno} alle ${ora}${gia.commessa ? ` su ${gia.commessa}` : ''}`,
+  }[gia.dove];
+  return `Questa foto ${dove}.\n\nVuoi aggiungerla di nuovo?`;
 }
 
 async function invia() {
