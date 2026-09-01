@@ -4,7 +4,12 @@
 // errore = invio fallito, resta in coda e si ritenta.
 
 const NOME_DB = 'llitalia-bolle';
+const VERSIONE_DB = 2;
 const STORE = 'foto';
+// Storico permanente degli invii confermati: solo dati, senza foto. Le foto
+// pesano e vengono potate; il registro invece resta e permette di rispondere a
+// "cosa ho mandato questa settimana" anche a distanza di mesi.
+const STORE_STORICO = 'storico';
 const CHIAVE_CONTATORI = 'llitalia.bolle.contatori';
 
 let dbPromise = null;
@@ -12,13 +17,17 @@ let dbPromise = null;
 function apri() {
   if (!dbPromise) {
     dbPromise = new Promise((risolvi, rifiuta) => {
-      const richiesta = indexedDB.open(NOME_DB, 1);
+      const richiesta = indexedDB.open(NOME_DB, VERSIONE_DB);
       richiesta.onupgradeneeded = () => {
         const db = richiesta.result;
         if (!db.objectStoreNames.contains(STORE)) {
           const store = db.createObjectStore(STORE, { keyPath: 'id' });
           store.createIndex('stato', 'stato');
           store.createIndex('creatoIl', 'creatoIl');
+        }
+        if (!db.objectStoreNames.contains(STORE_STORICO)) {
+          const storico = db.createObjectStore(STORE_STORICO, { keyPath: 'idClient' });
+          storico.createIndex('inviatoIl', 'inviatoIl');
         }
       };
       richiesta.onsuccess = () => risolvi(richiesta.result);
@@ -28,10 +37,10 @@ function apri() {
   return dbPromise;
 }
 
-function transazione(modo, operazione) {
+function transazione(nomeStore, modo, operazione) {
   return apri().then(db => new Promise((risolvi, rifiuta) => {
-    const tx = db.transaction(STORE, modo);
-    const store = tx.objectStore(STORE);
+    const tx = db.transaction(nomeStore, modo);
+    const store = tx.objectStore(nomeStore);
     let risultato;
     try {
       risultato = operazione(store);
@@ -72,20 +81,20 @@ export function aggiungiBozza(fotoBlob, nomeOriginale) {
     inviatoIl: null,
     idServer: null,
   };
-  return transazione('readwrite', store => store.add(record)).then(() => record);
+  return transazione(STORE, 'readwrite', store => store.add(record)).then(() => record);
 }
 
 export function elenca() {
-  return transazione('readonly', store => store.getAll())
+  return transazione(STORE, 'readonly', store => store.getAll())
     .then(record => record.sort((a, b) => a.creatoIl - b.creatoIl));
 }
 
 export function aggiorna(record) {
-  return transazione('readwrite', store => store.put(record));
+  return transazione(STORE, 'readwrite', store => store.put(record));
 }
 
 export function elimina(id) {
-  return transazione('readwrite', store => store.delete(id));
+  return transazione(STORE, 'readwrite', store => store.delete(id));
 }
 
 // Invia: tutte le bozze passano in coda con cantiere e autore correnti.
@@ -143,4 +152,39 @@ export function incrementaInviate(quante) {
   const dati = contatoriOggi();
   dati.inviate += quante;
   salvaContatori(dati);
+}
+
+// --- Storico degli invii confermati -----------------------------------------
+
+// Chiamata quando il server conferma: la riga resta anche dopo che la foto è
+// stata potata dal dispositivo.
+export function registraInvio(record) {
+  return transazione(STORE_STORICO, 'readwrite', store => store.put({
+    idClient: record.id,
+    commessa: record.cantiere,
+    operatore: record.autore,
+    dataInvio: record.timestampDispositivo,
+    inviatoIl: record.inviatoIl || Date.now(),
+  }));
+}
+
+// Ordine cronologico decrescente: l'ultimo invio in cima.
+export function elencaStorico() {
+  return transazione(STORE_STORICO, 'readonly', store => store.getAll())
+    .then(righe => righe.sort((a, b) => b.inviatoIl - a.inviatoIl));
+}
+
+// Recupero delle foto già confermate prima dell'introduzione dello storico:
+// si eseguono una volta sola, poi le righe esistono già.
+export async function allineaStorico() {
+  const inviate = (await elenca()).filter(r => r.stato === 'inviata');
+  if (inviate.length === 0) return 0;
+  const noti = new Set((await elencaStorico()).map(r => r.idClient));
+  let aggiunte = 0;
+  for (const record of inviate) {
+    if (noti.has(record.id)) continue;
+    await registraInvio(record);
+    aggiunte += 1;
+  }
+  return aggiunte;
 }

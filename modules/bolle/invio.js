@@ -71,6 +71,9 @@ async function processa() {
           record.inviatoIl = Date.now();
           record.idServer = risposta.id || '';
           await coda.aggiorna(record);
+          // Lo storico si scrive prima della potatura: la riga sopravvive
+          // alla foto, che verrà eliminata dal dispositivo.
+          await coda.registraInvio(record);
           coda.incrementaInviate(1);
           await coda.potaInviate(impostazioniBolle().conservaUltime);
         } catch (errore) {

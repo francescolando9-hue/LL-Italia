@@ -88,3 +88,56 @@
 }
 
 .bolle-azioni { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* Storico delle bolle inviate */
+.bolle-vai-storico { margin-bottom: 16px; }
+
+.bolle-intervallo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.bolle-riepilogo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--carta);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.bolle-riepilogo .totale {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--blu);
+  font-variant-numeric: tabular-nums;
+}
+
+.bolle-riepilogo .etichetta { color: var(--testo-tenue); }
+
+.bolle-giorno {
+  margin: 18px 0 6px;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.bolle-giorno:first-child { margin-top: 0; }
+
+.bolle-storico { list-style: none; margin: 0; padding: 0; }
+
+.bolle-storico li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bordo);
+}
+
+.bolle-storico li:last-child { border-bottom: none; }
+
+.bolle-storico .ora {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.bolle-storico .cantiere { flex: 1; min-width: 0; }
