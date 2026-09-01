@@ -6,6 +6,7 @@ import { comprimiInJpeg } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle } from './impostazioni.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
+import { vistaImpostazioniBolle } from './vista-impostazioni.js';
 
 export default {
   id: 'bolle',
@@ -14,6 +15,7 @@ export default {
   icona: '📷',
   registra(registraRotta) {
     registraRotta('#/bolle', vista);
+    registraRotta('#/bolle/impostazioni', vistaImpostazioniBolle);
     // Invio automatico al ritorno della connettività, anche fuori dalla vista.
     window.addEventListener('online', () => invio.avvia());
     invio.alCambiamento(() => { ridisegna(); });
@@ -89,6 +91,7 @@ async function vista(el) {
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="bolle-coda"></ul>
     </section>
+    <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
   `;
 
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
