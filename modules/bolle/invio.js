@@ -1,8 +1,8 @@
-// Invio della coda del modulo Bolle.
-// Un elemento esce dalla coda SOLO a conferma del server; l'id client univoco
-// (uuid) rende l'invio idempotente: un doppio invio non duplica la bolla.
+// Invio della coda del modulo Bolle verso l'endpoint del magazzino.
+// Un elemento esce dalla coda SOLO a conferma del server (202 Accepted);
+// idClient univoco per invio, che il backend userà per la deduplica.
 import * as coda from './coda.js';
-import { impostazioniBolle } from './impostazioni.js';
+import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
 
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
@@ -103,51 +103,66 @@ function pianificaRetry() {
   ritardoMs = Math.min(ritardoMs * 2, RITARDO_MASSIMO_MS);
 }
 
+// Nome file di comodo: il backend lo IGNORA (lo compone il flow), ma resta
+// utile nei log e nelle diagnosi. Nomenclatura di gruppo, senza separatori.
+export function componiNomeFile(record) {
+  const compatto = String(record.timestampDispositivo).replace(/[-:]/g, '').slice(0, 15).replace('T', '');
+  const operatore = String(record.autore).replace(/\s+/g, '');
+  return `Bolla${record.cantiere}${compatto}${operatore}.jpg`;
+}
+
+// Costruisce il corpo del contratto concordato col backend (già attivo).
+export function corpoInvio(record, impostazioni, contenutoBase64) {
+  return {
+    token: impostazioni.token,
+    commessa: record.cantiere,
+    operatore: record.autore,
+    idClient: record.id,
+    dataInvio: record.timestampDispositivo,
+    nomeFile: componiNomeFile(record),
+    contenutoBase64,
+  };
+}
+
 async function inviaSingola(record) {
   const impostazioni = impostazioniBolle();
   if (impostazioni.mock) return inviaMock(record);
   if (!impostazioni.endpoint) {
     throw new Error('Endpoint non configurato: apri le impostazioni del modulo');
   }
-  // [PROVVISORIO] Contratto endpoint rev. 2, adeguato al vincolo CORS del
-  // trigger HTTP di Power Automate (niente gestione del preflight): richiesta
-  // "semplice" — Content-Type text/plain e chiave nel corpo, nessun header
-  // custom — così il browser la invia senza preflight. Il flow risponde con
-  // header Access-Control-Allow-Origin: *. Campi da specifica: cantiere,
-  // autore, timestamp dispositivo, foto, id client per la deduplica.
-  const base64 = await blobInBase64(record.foto);
+  // Contratto del backend collaudato: POST JSON, un file per richiesta,
+  // risposta 202 Accepted senza corpo. Da non modificare senza aggiornare il flow.
+  const contenutoBase64 = await blobInBase64(record.foto);
   let risposta;
   try {
-    risposta = await fetch(impostazioni.endpoint, {
+    risposta = await fetch(normalizzaEndpoint(impostazioni.endpoint), {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: JSON.stringify({
-        chiave: impostazioni.chiave,
-        id: record.id,
-        cantiere: record.cantiere,
-        autore: record.autore,
-        timestampDispositivo: record.timestampDispositivo,
-        foto: {
-          nome: record.nome || 'bolla.jpg',
-          tipo: 'image/jpeg',
-          base64,
-        },
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64)),
     });
   } catch {
-    throw new Error('Rete non raggiungibile o endpoint non valido');
+    // fetch fallisce senza status sia con rete assente sia quando il browser
+    // blocca la richiesta (CORS): distinguere i due casi aiuta la diagnosi.
+    throw new Error(navigator.onLine
+      ? 'Invio bloccato: nessuna risposta dall’endpoint (rete assente o CORS)'
+      : 'Rete non disponibile');
   }
   if (!risposta.ok) {
-    throw new Error(`Errore del server: ${risposta.status}`);
+    const dettaglio = risposta.status === 400
+      ? ' — verifica api-version nell’URL'
+      : risposta.status === 401 || risposta.status === 403 ? ' — token o firma non validi' : '';
+    throw new Error(`Errore del server: ${risposta.status}${dettaglio}`);
   }
-  const dati = await risposta.json().catch(() => ({}));
-  return { id: dati.id || '' };
+  // 202 Accepted senza corpo: la conferma è lo stato HTTP.
+  return { id: '' };
 }
 
-// Mock end-to-end per sviluppo e demo senza backend: simula latenza, risponde
-// con un id di salvataggio e deduplica sull'id client come farà il flow reale.
+// Mock per sviluppo e demo senza backend: stessa forma del contratto reale,
+// latenza simulata e registro locale degli invii per il collaudo sui numeri.
 async function inviaMock(record) {
   await new Promise(risolvi => setTimeout(risolvi, 700));
+  const impostazioni = impostazioniBolle();
+  const corpo = corpoInvio(record, impostazioni, 'mock');
   let dati;
   try {
     dati = JSON.parse(localStorage.getItem(CHIAVE_MOCK)) || {};
@@ -155,12 +170,12 @@ async function inviaMock(record) {
     dati = {};
   }
   dati.inviati = dati.inviati || {};
-  if (dati.inviati[record.id]) {
-    return { id: dati.inviati[record.id] };
+  if (dati.inviati[corpo.idClient]) {
+    return { id: dati.inviati[corpo.idClient] };
   }
   dati.contatore = (dati.contatore || 0) + 1;
   const id = `mock-${String(dati.contatore).padStart(4, '0')}`;
-  dati.inviati[record.id] = id;
+  dati.inviati[corpo.idClient] = id;
   const chiavi = Object.keys(dati.inviati);
   if (chiavi.length > 500) {
     for (const vecchia of chiavi.slice(0, chiavi.length - 100)) {
