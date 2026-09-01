@@ -21,8 +21,8 @@ La **modalità mock è attiva di default**: gli invii sono simulati sul disposit
 
 1. Aprire il modulo Bolle (l'app ci entra direttamente; la home dei moduli resta raggiungibile dal logo in alto a sinistra).
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
-3. Controllare il **cantiere** (l'ultimo usato è preselezionato) e premere **Invia**.
-4. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). Il mock risponde dopo ~0,7 s con un id di salvataggio e **deduplica sull'id client** (uuid) come farà il flow reale.
+3. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
+4. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). Il mock risponde dopo ~0,7 s simulando la conferma del server.
 5. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
 
 **Collaudo sui numeri, mai sull'esito formale:** i quattro contatori in alto (Scattate oggi / Inviate oggi / In attesa / Errore) sono il riferimento. "Scattate" conta le foto confermate con Invia (le anteprime rimosse prima dell'invio non contano). Un invio "riuscito" si dimostra confrontando scattate vs inviate vs foto atterrate a destinazione: ogni scarto è un difetto da spiegare.
@@ -30,9 +30,7 @@ La **modalità mock è attiva di default**: gli invii sono simulati sul disposit
 ## Impostazioni
 
 - **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore.
-- **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, chiave di accesso, mock on/off, quante foto inviate conservare (ultime N, default 20), elenco cantieri (al lancio: **MAR**; le altre commesse — MNG, SNZ2.1, SNZ2.2, SNU, BRU, TN1 — si aggiungono da qui).
-
-Endpoint e chiave **non stanno nel repo**: vivono solo in localStorage del dispositivo.
+- **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, token, mock on/off, quante foto inviate conservare (ultime N, default 20). L'elenco cantieri non si tocca da qui: vedi sotto.
 
 ## Struttura del repo
 
@@ -50,22 +48,56 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 
 ## Pipeline della foto
 
-Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server**; l'id client univoco rende l'invio idempotente.
+Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server** (202 Accepted); ogni invio porta un `idClient` univoco, su cui il backend potrà deduplicare.
 
-## Contratto endpoint [PROVVISORIO — rev. 2]
+## Contratto con il backend (in vigore)
 
-Adeguato al vincolo CORS del trigger HTTP di Power Automate, che non gestisce il preflight del browser: la richiesta è una "richiesta semplice" (`Content-Type: text/plain`, nessun header custom, chiave nel corpo), che il browser invia senza preflight; il flow risponde con l'header `Access-Control-Allow-Origin: *`. Dettagli in `modules/bolle/invio.js` e nella guida `docs/AppBolleGuidaFlowRicezione….md`:
+Il flow di ricezione è **già attivo e collaudato**: l'app si adegua, il contratto non si modifica dal lato app. Un file per richiesta, POST JSON:
 
 ```
-POST {endpoint}
-Content-Type: text/plain;charset=UTF-8
+POST {endpoint}?api-version=2024-10-01
+Content-Type: application/json
 
-{ "chiave": "…", "id": "<uuid client>", "cantiere": "MAR", "autore": "Nome Cognome",
-  "timestampDispositivo": "2026-09-01T12:41:07+02:00",
-  "foto": { "nome": "…", "tipo": "image/jpeg", "base64": "…" } }
+{ "token": "collaudo",
+  "commessa": "MAR",                       // solo il codice: MAR | SNZ2.2 | MNG
+  "operatore": "Paolo Sanzarello",
+  "idClient": "fe7e5c81-…",                // GUID per invio, per la deduplica futura
+  "dataInvio": "2026-09-01T17:27:53+02:00",
+  "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
+  "contenutoBase64": "…" }
 
-Risposta attesa: 2xx con { "id": "<id salvataggio>" } e header Access-Control-Allow-Origin: *
+Risposta attesa: 202 Accepted senza corpo — è la conferma che fa uscire la foto dalla coda.
 ```
+
+**`api-version=2024-10-01` è obbligatoria**: l'URL mostrato dal designer di Power Automate riporta `api-version=1` e viene rifiutato con 400. L'app corregge da sola il parametro al salvataggio delle impostazioni, lasciando intatta la firma `sig=`.
+
+## Configurazione dell'endpoint (mai nel repo)
+
+L'URL contiene una firma di accesso: il repo è pubblico, quindi l'URL non vi entra mai. Due strade:
+
+- **Sul telefono e sull'app pubblicata** — modulo Bolle → *Impostazioni del modulo Bolle*: si incollano endpoint e token, che restano in `localStorage` di quel dispositivo. È il modo previsto per le squadre.
+- **In sviluppo locale** — copia `core/configurazione.esempio.js` in `core/configurazione.js` (escluso da git tramite `.gitignore`) e inserisci i tuoi valori: all'apertura del modulo su `localhost` l'app li usa per precompilare le impostazioni ancora vuote. Il file non viene mai richiesto dall'app pubblicata.
+
+## Cantieri
+
+L'elenco è in `modules/bolle/cantieri.js` e **non è modificabile dal dispositivo**: un codice commessa errato arriverebbe al magazzino come commessa inesistente. A video l'etichetta estesa, nel payload solo il codice.
+
+| Codice nel payload | Etichetta a video |
+|---|---|
+| `MAR` | MAR - Caselle Torinese |
+| `SNZ2.2` | SNZ2.2 - Settimo Torinese |
+| `MNG` | MNG - via Monginevro 181 |
+
+Al primo utilizzo la scelta è esplicita (`— scegli il cantiere —`, Invia resta disabilitato); poi l'ultimo cantiere usato è preselezionato.
+
+## ⚠️ Punto aperto: CORS sull'endpoint reale
+
+L'app gira in un browser, quindi ogni invio con `Content-Type: application/json` è preceduto da una richiesta **preflight `OPTIONS`**. Perché l'app riceva il 202, il flow deve rispondere al preflight e includere l'header `Access-Control-Allow-Origin` (per l'origine di GitHub Pages o `*`). Verificato in collaudo con endpoint finto:
+
+- endpoint che risponde al preflight → 3 foto scattate, 3 inviate, 3 atterrate, contatore errori 0;
+- endpoint che **non** risponde al preflight → 0 foto atterrate, ma **nessuna perdita**: restano in coda in stato *Errore* con il messaggio «Invio bloccato: nessuna risposta dall'endpoint (rete assente o CORS)» e ripartono col retry appena il flow risponde correttamente.
+
+Se il collaudo del backend è stato fatto con curl o Postman, questo punto non è ancora stato verificato: va provato dal telefono prima di distribuire l'app.
 
 ## Sviluppo locale
 
@@ -78,4 +110,4 @@ A ogni modifica dei file dell'app va incrementata `VERSIONE` in `sw.js` (e aggio
 
 ## Fuori perimetro (in capo a Francesco)
 
-Backend reale e URL/chiave dell'endpoint; meccanismo di sicurezza definitivo; nomenclatura definitiva dei file foto e colonne di BolleInArrivo; hosting di produzione; elenco autori libero o vincolato; OCR, login M365, notifiche push, moduli futuri.
+Deduplica lato backend sull'`idClient`; token definitivo al posto di `collaudo`; elenco autori libero o vincolato; hosting di produzione; OCR, login M365, notifiche push, moduli futuri.
