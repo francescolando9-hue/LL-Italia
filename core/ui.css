@@ -1,0 +1,218 @@
+/* Design system LL Italia — variabili comuni a shell e moduli */
+:root {
+  /* Palette dal logo ufficiale LL Italia: blu #1d3583, tricolore #01963f / #e40513 */
+  --blu: #1d3583;
+  --blu-scuro: #14265e;
+  --verde: #01963f;
+  --sfondo: #f2f4f7;
+  --carta: #ffffff;
+  --testo: #16212c;
+  --testo-tenue: #55636f;
+  --bordo: #d5dce2;
+  --ok: #01963f;
+  --errore: #e40513;
+  --attesa: #a05e00;
+  --info: #1d3583;
+  --raggio: 14px;
+  --tocco: 56px;           /* altezza minima dei target di tocco */
+  --ombra: 0 1px 3px rgba(16, 28, 66, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--testo);
+  background: var(--sfondo);
+  min-height: 100vh;
+}
+
+/* Testata della shell */
+.testata {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--blu);
+  color: #fff;
+  box-shadow: var(--ombra);
+}
+
+.testata-riga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tocco);
+  padding: env(safe-area-inset-top) 12px 0 12px;
+}
+
+/* Banda tricolore del logo, sotto la testata */
+.testata-tricolore {
+  height: 4px;
+  background: linear-gradient(to right,
+    #01963f 0 33.4%, #ffffff 33.4% 66.7%, #e40513 66.7% 100%);
+}
+
+.marchio {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex: none;
+}
+
+.marchio img { width: 100%; height: 100%; display: block; }
+
+.titolo-app {
+  flex: 1;
+  font-size: 1.15rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ingranaggio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 1.5rem;
+}
+
+/* Contenitore delle viste */
+.vista {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 12px calc(32px + env(safe-area-inset-bottom));
+}
+
+.scheda {
+  background: var(--carta);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.scheda h2 { margin: 0 0 8px; font-size: 1.25rem; }
+.scheda p { margin: 8px 0; }
+.tenue { color: var(--testo-tenue); font-size: 0.95rem; }
+
+/* Pulsanti: grandi, ad alto contrasto */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tocco);
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--raggio);
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-primario { background: var(--blu); color: #fff; }
+.btn-successo { background: var(--verde); color: #fff; }
+.btn-secondario { background: var(--carta); color: var(--blu); border: 2px solid var(--blu); }
+.btn-piccolo { min-height: 44px; font-size: 1rem; width: auto; padding: 8px 14px; }
+
+/* Campi modulo */
+.campo { margin: 14px 0; }
+.campo label { display: block; font-weight: 700; margin-bottom: 6px; }
+
+.campo input,
+.campo select,
+.campo textarea {
+  width: 100%;
+  min-height: var(--tocco);
+  padding: 12px;
+  border: 2px solid var(--bordo);
+  border-radius: var(--raggio);
+  font: inherit;
+  font-size: 1.1rem;
+  background: #fff;
+  color: var(--testo);
+}
+
+.campo textarea { min-height: 90px; }
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  outline: none;
+  border-color: var(--blu);
+}
+.campo .aiuto { margin-top: 4px; }
+
+/* Interruttore (checkbox grande) */
+.campo-interruttore {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tocco);
+  font-weight: 700;
+}
+.campo-interruttore input { width: 28px; height: 28px; flex: none; }
+
+/* Tessere dei moduli in home */
+.griglia-moduli { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+.tessera {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--carta);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 18px 16px;
+  min-height: 84px;
+  text-decoration: none;
+  color: var(--testo);
+}
+
+.tessera .icona { font-size: 2.2rem; }
+.tessera .nome { font-size: 1.2rem; font-weight: 800; margin: 0; }
+.tessera .descrizione { margin: 2px 0 0; color: var(--testo-tenue); font-size: 0.95rem; }
+
+/* Badge di stato */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+.badge-coda { background: var(--info); }
+.badge-invio { background: var(--attesa); }
+.badge-inviata { background: var(--ok); }
+.badge-errore { background: var(--errore); }
+
+/* Avvisi */
+.avviso {
+  border-radius: var(--raggio);
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-weight: 600;
+}
+.avviso-info { background: #e8ecf7; color: var(--info); }
+.avviso-errore { background: #fdeaea; color: #b3040f; }
+.avviso-attenzione { background: #fdf3e0; color: var(--attesa); }
+
+.avviso-noscript { padding: 24px; text-align: center; }
+
+.nascosto { display: none !important; }
