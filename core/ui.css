@@ -1,20 +1,21 @@
 /* Design system LL Italia — variabili comuni a shell e moduli */
 :root {
-  --blu: #0e3a5d;          /* colore primario provvisorio (logo ufficiale in arrivo) */
-  --blu-scuro: #0a2b45;
-  --accento: #f2a900;      /* giallo cantiere: massima visibilità al sole */
+  /* Palette dal logo ufficiale LL Italia: blu #1d3583, tricolore #01963f / #e40513 */
+  --blu: #1d3583;
+  --blu-scuro: #14265e;
+  --verde: #01963f;
   --sfondo: #f2f4f7;
   --carta: #ffffff;
   --testo: #16212c;
   --testo-tenue: #55636f;
   --bordo: #d5dce2;
-  --ok: #1b7a44;
-  --errore: #c62828;
+  --ok: #01963f;
+  --errore: #e40513;
   --attesa: #a05e00;
-  --info: #0e5f8a;
+  --info: #1d3583;
   --raggio: 14px;
   --tocco: 56px;           /* altezza minima dei target di tocco */
-  --ombra: 0 1px 3px rgba(10, 30, 50, 0.12);
+  --ombra: 0 1px 3px rgba(16, 28, 66, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -36,30 +37,36 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: var(--tocco);
-  padding: env(safe-area-inset-top) 12px 0 12px;
   background: var(--blu);
   color: #fff;
   box-shadow: var(--ombra);
 }
 
-.marchio {
+.testata-riga {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  min-height: var(--tocco);
+  padding: env(safe-area-inset-top) 12px 0 12px;
+}
+
+/* Banda tricolore del logo, sotto la testata */
+.testata-tricolore {
+  height: 4px;
+  background: linear-gradient(to right,
+    #01963f 0 33.4%, #ffffff 33.4% 66.7%, #e40513 66.7% 100%);
+}
+
+.marchio {
+  display: block;
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #fff;
-  color: var(--blu);
-  font-weight: 800;
-  font-size: 1.1rem;
-  text-decoration: none;
-  letter-spacing: -1px;
+  overflow: hidden;
+  flex: none;
 }
+
+.marchio img { width: 100%; height: 100%; display: block; }
 
 .titolo-app {
   flex: 1;
@@ -121,7 +128,7 @@ body {
 
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn-primario { background: var(--blu); color: #fff; }
-.btn-accento { background: var(--accento); color: #1d1500; }
+.btn-successo { background: var(--verde); color: #fff; }
 .btn-secondario { background: var(--carta); color: var(--blu); border: 2px solid var(--blu); }
 .btn-piccolo { min-height: 44px; font-size: 1rem; width: auto; padding: 8px 14px; }
 
@@ -202,8 +209,8 @@ body {
   margin: 12px 0;
   font-weight: 600;
 }
-.avviso-info { background: #e3f0f7; color: var(--info); }
-.avviso-errore { background: #fdeaea; color: var(--errore); }
+.avviso-info { background: #e8ecf7; color: var(--info); }
+.avviso-errore { background: #fdeaea; color: #b3040f; }
 .avviso-attenzione { background: #fdf3e0; color: var(--attesa); }
 
 .avviso-noscript { padding: 24px; text-align: center; }
