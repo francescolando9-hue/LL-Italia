@@ -76,7 +76,7 @@ Risposta attesa: 202 Accepted senza corpo — è la conferma che fa uscire la fo
 L'URL contiene una firma di accesso: il repo è pubblico, quindi l'URL non vi entra mai. Due strade:
 
 - **Sul telefono e sull'app pubblicata** — modulo Bolle → *Impostazioni del modulo Bolle*: si incollano endpoint e token, che restano in `localStorage` di quel dispositivo. È il modo previsto per le squadre.
-- **In sviluppo locale** — copia `core/configurazione.esempio.js` in `core/configurazione.js` (escluso da git tramite `.gitignore`) e inserisci i tuoi valori: all'apertura del modulo su `localhost` l'app li usa per precompilare le impostazioni ancora vuote. Il file non viene mai richiesto dall'app pubblicata.
+- **In sviluppo locale** — copia `core/configurazione.esempio.js` in `core/configurazione.js` (escluso da git tramite `.gitignore`), inserisci i tuoi valori e apri l'app **una volta** su `http://127.0.0.1:8123/?config=locale`: i valori vengono copiati nelle impostazioni del dispositivo, poi bastano quelle. Senza quel parametro il file non viene mai richiesto, quindi l'app pubblicata non lo cerca e non genera errori.
 
 ## Cantieri
 

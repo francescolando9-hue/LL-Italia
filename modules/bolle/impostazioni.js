@@ -52,11 +52,13 @@ export function salvaImpostazioniBolle(modifiche) {
 
 // Sviluppo locale: se esiste core/configurazione.js (mai versionato) ne prende
 // endpoint e token, senza sovrascrivere quanto già impostato sul dispositivo.
-// Il caricamento avviene solo su localhost: sull'app pubblicata il file non
-// esiste e non viene mai richiesto.
+// Va chiesto esplicitamente aprendo l'app con ?config=locale su localhost —
+// una volta sola, poi i valori restano nelle impostazioni del dispositivo.
+// Così l'app pubblicata non richiede mai un file che non esiste.
 export async function caricaConfigurazioneLocale() {
   const locale = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-  if (!locale) return false;
+  const richiesto = new URLSearchParams(location.search).get('config') === 'locale';
+  if (!locale || !richiesto) return false;
   let modulo;
   try {
     modulo = await import('../../core/configurazione.js');

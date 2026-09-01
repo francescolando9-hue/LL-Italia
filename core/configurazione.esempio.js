@@ -1,6 +1,9 @@
 // Configurazione locale di sviluppo — COPIA questo file in core/configurazione.js
 // (che è escluso da git) e inserisci i tuoi valori.
 //
+// Poi apri l'app una volta su http://127.0.0.1:8123/?config=locale — i valori
+// finiscono nelle impostazioni del dispositivo e da lì in avanti bastano quelle.
+//
 // Serve SOLO per le prove in locale: l'URL dell'endpoint contiene una firma di
 // accesso e non deve mai finire nel repo pubblico. Sul telefono e sull'app
 // pubblicata l'endpoint si inserisce invece dalle Impostazioni del modulo Bolle,
