@@ -6,8 +6,8 @@ Stack: **vanilla JS, HTML, CSS** — nessun framework, nessun build step, nessun
 
 ## Come installarla sul telefono
 
-L'app è pubblicata con GitHub Pages dal branch principale: `https://francescolando9-hue.github.io/LL-Italia/`
-(se il link non risponde, attivare Pages da *Settings → Pages → Deploy from a branch → main, root*).
+L'app è pubblicata su GitHub Pages: `https://francescolando9-hue.github.io/LL-Italia/`
+La pubblicazione è automatica a ogni push su `main` (workflow `.github/workflows/pages.yml`, che attiva Pages da solo alla prima esecuzione).
 
 **Android (Chrome):** aprire il link → menu ⋮ → **Aggiungi a schermata Home** (o "Installa app") → confermare. L'icona LL Italia compare in home e l'app si apre a schermo intero.
 
