@@ -1,5 +1,5 @@
 // Service worker della shell: precache dell'app, cache-first, fallback offline.
-const VERSIONE = '0.1.0';
+const VERSIONE = '0.2.0';
 const CACHE = `llitalia-${VERSIONE}`;
 const RISORSE = [
   './',
@@ -11,6 +11,9 @@ const RISORSE = [
   './core/home.js',
   './core/impostazioni.js',
   './modules/bolle/index.js',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', evento => {
