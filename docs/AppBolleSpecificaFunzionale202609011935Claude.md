@@ -11,7 +11,7 @@
 ## Schermate
 1. **Home / Carica bolle**: picker **Cantiere** (obbligatorio, lista configurabile — al lancio: MAR; poi le altre commesse), pulsante fotocamera/galleria multi-foto, anteprime con rimozione, pulsante **Invia**.
 2. **Coda invii**: elenco invii con stato In coda / Inviato / Fallito (ritenta automaticamente alla connessione; retry manuale). Contatore del giorno: foto scattate / inviate — è il numero per il collaudo.
-3. **Impostazioni** (prima apertura): nome e cognome operatore, memorizzato sul dispositivo e allegato a ogni invio.
+3. **Impostazioni** (prima apertura): nome e cognome operatore, memorizzato sul dispositivo e allegato a ogni invio. **Campo libero** (deciso il 01/09/2026): nessun elenco vincolato di operatori — da rivedere se in raccolta comparissero grafie diverse della stessa persona.
 
 ## Pipeline di invio
 - Compressione client-side: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità della bolla per l'OCR del runbook prevale sul peso); HEIC gestito via canvas.
@@ -40,7 +40,14 @@ Content-Type: application/json
 - Salvataggio in raccolta SharePoint **BolleInArrivo** (sito Cantieri LL); il **nome del file lo compone il flow** (il campo `nomeFile` inviato dall'app è ignorato).
 - **Nome file (deciso il 01/09/2026):** `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` — es. `BollaSNZ2.2202609011946FrancescoLando8f3a.jpg`. Niente secondi, come da nomenclatura di gruppo; le 4 cifre dell'`idClient` sostituiscono il progressivo `[n]` ed evitano che due bolle inviate nello stesso minuto si sovrascrivano (accaduto nel collaudo del 01/09: due invii alle 17:46:57 e 17:46:58). **Le cifre di data e ora vanno prese dal campo `dataInvio`**, non dall'orologio del flow: altrimenti il nome porta l'ora di arrivo invece di quella della consegna — divergenza rilevante per le foto accodate offline e inviate ore dopo.
 - **Risposta: 202 Accepted senza corpo.** È lo stato HTTP a fare da conferma: solo alla sua ricezione la foto esce dalla coda dell'app.
-- **Deduplica su `idClient`: prevista, non ancora attiva.** Finché non lo è, evitare rinvii manuali dello stesso scatto.
+- **Deduplica su `idClient`: attivata il 01/09/2026.** Prima del salvataggio il flow cerca in raccolta un file con lo stesso `IdClient` (azione *Get files (properties only)*, Filter Query su `IdClient`, Top Count 1) e salva solo se non lo trova. Richiede che la colonna `IdClient` sia compilata e indicizzata.
+- **Token:** sostituito il valore di collaudo con un token riservato il 01/09/2026. Vive nel flow e nelle impostazioni dei dispositivi, mai nel repo. Un token errato fa terminare il flow con stato Failed, visibile in cronologia.
+
+## ⚠️ Cosa significa «Inviata» nell'app
+Senza un'azione *Response* esplicita, Power Automate risponde **202 Accepted automaticamente all'arrivo della richiesta**, prima di eseguire il flow. L'app registra quindi l'avvenuta **accettazione**, non l'avvenuto **salvataggio**: un token errato o un fallimento nel salvataggio SharePoint non retroagiscono sullo stato mostrato.
+Conseguenze operative:
+- il collaudo resta **sui numeri** — scattate nell'app contro file atterrati nella raccolta — e la cronologia del flow è l'unico luogo dove i fallimenti sono visibili;
+- per rendere «Inviata» equivalente a «salvata» serve un'azione *Response* finale, che l'app è già in grado di gestire; in quel caso va riverificato il comportamento CORS, oggi garantito dalla risposta automatica.
 
 ## ⚠️ Punto aperto — CORS (da verificare dal telefono)
 Il collaudo del backend è avvenuto senza browser (curl/Postman). Dal browser ogni POST `application/json` è preceduta da un preflight `OPTIONS`: perché l'app riceva il 202, il trigger deve accettare anche `OPTIONS` e la Response deve includere l'header `Access-Control-Allow-Origin` (`*` o l'origine di GitHub Pages). Verificato in laboratorio su endpoint finto: senza quell'header non atterra nulla e le foto **restano in coda** in stato Errore, senza perdite, e ripartono appena il flow risponde correttamente.
