@@ -1,0 +1,90 @@
+/* Stili del modulo Bolle (caricati dal modulo, isolati dalla shell) */
+
+.bolle-contatori {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.bolle-chip {
+  background: var(--carta);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 10px 4px;
+  text-align: center;
+}
+
+.bolle-chip .valore { display: block; font-size: 1.5rem; font-weight: 800; }
+.bolle-chip .etichetta { display: block; font-size: 0.75rem; color: var(--testo-tenue); }
+.bolle-chip.errore .valore { color: var(--errore); }
+
+.bolle-fotografa { margin: 12px 0 8px; min-height: 76px; font-size: 1.3rem; }
+.bolle-galleria { margin-bottom: 4px; }
+
+/* Anteprime delle foto in attesa di Invia */
+.bolle-anteprime {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.bolle-anteprima {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bordo);
+}
+
+.bolle-anteprima img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.bolle-rimuovi {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 28, 36, 0.75);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Coda invii */
+.bolle-coda { list-style: none; margin: 0; padding: 0; }
+
+.bolle-voce {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bordo);
+}
+
+.bolle-voce:last-child { border-bottom: none; }
+
+.bolle-miniatura {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bordo);
+}
+
+.bolle-dettagli { flex: 1; min-width: 0; }
+.bolle-dettagli .riga { font-weight: 700; }
+.bolle-dettagli .errore-msg {
+  color: var(--errore);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bolle-azioni { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
