@@ -27,6 +27,12 @@ La **modalità mock è attiva di default**: gli invii sono simulati sul disposit
 
 **Collaudo sui numeri, mai sull'esito formale:** i quattro contatori in alto (Scattate oggi / Inviate oggi / In attesa / Errore) sono il riferimento. "Scattate" conta le foto confermate con Invia (le anteprime rimosse prima dell'invio non contano). Un invio "riuscito" si dimostra confrontando scattate vs inviate vs foto atterrate a destinazione: ogni scarto è un difetto da spiegare.
 
+## Bolle inviate (storico)
+
+Dalla schermata del modulo, il pulsante **Bolle inviate** apre l'elenco cronologico degli invii confermati, dal più recente, raggruppati per giorno. Filtri: **periodo** (Oggi, Ultimi 7 giorni, Questo mese, Tutto, oppure un intervallo di date libero) e **cantiere**. In cima il totale del periodo con il dettaglio per commessa.
+
+Il registro è **locale al dispositivo** e contiene solo i dati dell'invio (data, cantiere, operatore, `idClient`), non le foto: sopravvive quindi alla potatura delle immagini e resta consultabile a mesi di distanza. Due limiti da conoscere: mostra ciò che *quel* telefono ha inviato — non è la vista condivisa della raccolta — e cambiando dispositivo lo storico non segue. Il filtro per periodo lavora sulla **data di scatto** (`dataInvio`), non sull'istante di consegna al server.
+
 ## Impostazioni
 
 - **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore.

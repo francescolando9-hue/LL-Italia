@@ -8,6 +8,7 @@ import { CANTIERI, etichettaCantiere } from './cantieri.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
+import { vistaStorico } from './storico.js';
 
 export default {
   id: 'bolle',
@@ -17,6 +18,7 @@ export default {
   registra(registraRotta) {
     registraRotta('#/bolle', vista);
     registraRotta('#/bolle/impostazioni', vistaImpostazioniBolle);
+    registraRotta('#/bolle/storico', vistaStorico);
     // Invio automatico al ritorno della connettività, anche fuori dalla vista.
     window.addEventListener('online', () => invio.avvia());
     invio.alCambiamento(() => { ridisegna(); });
@@ -92,6 +94,7 @@ async function vista(el) {
       <div id="avviso-cantiere"></div>
       <button id="invia" class="btn btn-successo" disabled>Invia</button>
     </section>
+    <a class="btn btn-secondario bolle-vai-storico" href="#/bolle/storico">Bolle inviate</a>
     <section class="scheda">
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>

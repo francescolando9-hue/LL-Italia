@@ -11,7 +11,8 @@
 ## Schermate
 1. **Home / Carica bolle**: picker **Cantiere** (obbligatorio, lista configurabile — al lancio: MAR; poi le altre commesse), pulsante fotocamera/galleria multi-foto, anteprime con rimozione, pulsante **Invia**.
 2. **Coda invii**: elenco invii con stato In coda / Inviato / Fallito (ritenta automaticamente alla connessione; retry manuale). Contatore del giorno: foto scattate / inviate — è il numero per il collaudo.
-3. **Impostazioni** (prima apertura): nome e cognome operatore, memorizzato sul dispositivo e allegato a ogni invio. **Campo libero** (deciso il 01/09/2026): nessun elenco vincolato di operatori — da rivedere se in raccolta comparissero grafie diverse della stessa persona.
+3. **Bolle inviate** (aggiunta il 01/09/2026): elenco cronologico decrescente degli invii confermati, raggruppati per giorno, con filtro per **periodo** (oggi, ultimi 7 giorni, mese corrente, tutto, intervallo libero) e per **cantiere**; totale del periodo con dettaglio per commessa. Registro locale del dispositivo, con i soli dati dell'invio: sopravvive alla potatura delle foto. Non è la vista condivisa della raccolta e non segue il cambio di dispositivo — se servirà, va aggiunto un endpoint di lettura.
+4. **Impostazioni** (prima apertura): nome e cognome operatore, memorizzato sul dispositivo e allegato a ogni invio. **Campo libero** (deciso il 01/09/2026): nessun elenco vincolato di operatori — da rivedere se in raccolta comparissero grafie diverse della stessa persona.
 
 ## Pipeline di invio
 - Compressione client-side: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità della bolla per l'OCR del runbook prevale sul peso); HEIC gestito via canvas.
