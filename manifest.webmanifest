@@ -1,0 +1,12 @@
+{
+  "name": "LL Italia",
+  "short_name": "LL Italia",
+  "description": "App di cantiere del gruppo LL Italia — modulo Bolle: foto delle bolle di consegna verso il magazzino.",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f4f7",
+  "theme_color": "#0e3a5d"
+}
