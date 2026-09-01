@@ -2,7 +2,7 @@
 
 App contenitore a moduli del gruppo MLP / LL Italia. Primo modulo attivo: **Bolle** — fotografare le bolle di consegna in cantiere e inviarle al sistema di magazzino (endpoint HTTP → raccolta SharePoint BolleInArrivo). I moduli futuri si aggiungeranno senza rifare la base.
 
-Stack: **vanilla JS, HTML, CSS** — nessun framework, nessun build step, nessuna dipendenza a runtime. PWA con Service Worker (offline e installazione) e IndexedDB (coda del modulo). Fonte di verità del modulo Bolle: `docs/AppBolleSpecificaFunzionale202609011148Claude.md` (prevale su tutto), poi `docs/AppLLItaliaKickoffClaudeCode202609011205.md` e `CLAUDE.md`.
+Stack: **vanilla JS, HTML, CSS** — nessun framework, nessun build step, nessuna dipendenza a runtime. PWA con Service Worker (offline e installazione) e IndexedDB (coda del modulo). Fonte di verità del modulo Bolle: la specifica funzionale in `docs/` (`AppBolleSpecificaFunzionale….md`, prevale su tutto), poi il kickoff `AppLLItaliaKickoffClaudeCode….md` e `CLAUDE.md`.
 
 ## Come installarla sul telefono
 
