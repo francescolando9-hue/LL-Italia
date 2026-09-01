@@ -109,20 +109,20 @@ async function inviaSingola(record) {
   if (!impostazioni.endpoint) {
     throw new Error('Endpoint non configurato: apri le impostazioni del modulo');
   }
-  // [PROVVISORIO] Contratto endpoint da riconciliare quando Francesco definisce
-  // il backend reale (tecnologia, URL, meccanismo chiave): POST JSON con foto
-  // in base64 e chiave nell'header Authorization. Campi da specifica:
-  // cantiere, autore, timestamp dispositivo, foto, id client per la deduplica.
+  // [PROVVISORIO] Contratto endpoint rev. 2, adeguato al vincolo CORS del
+  // trigger HTTP di Power Automate (niente gestione del preflight): richiesta
+  // "semplice" — Content-Type text/plain e chiave nel corpo, nessun header
+  // custom — così il browser la invia senza preflight. Il flow risponde con
+  // header Access-Control-Allow-Origin: *. Campi da specifica: cantiere,
+  // autore, timestamp dispositivo, foto, id client per la deduplica.
   const base64 = await blobInBase64(record.foto);
   let risposta;
   try {
     risposta = await fetch(impostazioni.endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(impostazioni.chiave ? { Authorization: `Bearer ${impostazioni.chiave}` } : {}),
-      },
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify({
+        chiave: impostazioni.chiave,
         id: record.id,
         cantiere: record.cantiere,
         autore: record.autore,
