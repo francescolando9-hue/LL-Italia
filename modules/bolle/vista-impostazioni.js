@@ -19,7 +19,7 @@ export function vistaImpostazioniBolle(el) {
           <label for="chiave">Chiave di accesso</label>
           <input id="chiave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
                  value="${scappaHtml(impostazioni.chiave)}">
-          <p class="aiuto tenue">Inviata nell'header Authorization a ogni invio.</p>
+          <p class="aiuto tenue">Inviata dentro il corpo di ogni invio (campo chiave); il flow la verifica.</p>
         </div>
         <div class="campo">
           <label class="campo-interruttore" for="mock">

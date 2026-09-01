@@ -52,20 +52,19 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 
 Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server**; l'id client univoco rende l'invio idempotente.
 
-## Contratto endpoint [PROVVISORIO]
+## Contratto endpoint [PROVVISORIO — rev. 2]
 
-Da riconciliare quando Francesco definisce tecnologia e URL dell'endpoint reale (vedi `modules/bolle/invio.js`):
+Adeguato al vincolo CORS del trigger HTTP di Power Automate, che non gestisce il preflight del browser: la richiesta è una "richiesta semplice" (`Content-Type: text/plain`, nessun header custom, chiave nel corpo), che il browser invia senza preflight; il flow risponde con l'header `Access-Control-Allow-Origin: *`. Dettagli in `modules/bolle/invio.js` e nella guida `docs/AppBolleGuidaFlowRicezione….md`:
 
 ```
 POST {endpoint}
-Authorization: Bearer {chiave}
-Content-Type: application/json
+Content-Type: text/plain;charset=UTF-8
 
-{ "id": "<uuid client>", "cantiere": "MAR", "autore": "Nome Cognome",
+{ "chiave": "…", "id": "<uuid client>", "cantiere": "MAR", "autore": "Nome Cognome",
   "timestampDispositivo": "2026-09-01T12:41:07+02:00",
   "foto": { "nome": "…", "tipo": "image/jpeg", "base64": "…" } }
 
-Risposta attesa: 2xx con { "id": "<id salvataggio>" }
+Risposta attesa: 2xx con { "id": "<id salvataggio>" } e header Access-Control-Allow-Origin: *
 ```
 
 ## Sviluppo locale
