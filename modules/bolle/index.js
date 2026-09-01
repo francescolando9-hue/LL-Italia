@@ -5,6 +5,7 @@ import { naviga } from '../../core/router.js';
 import { comprimiInJpeg } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle } from './impostazioni.js';
 import * as coda from './coda.js';
+import * as invio from './invio.js';
 
 export default {
   id: 'bolle',
@@ -13,6 +14,9 @@ export default {
   icona: '📷',
   registra(registraRotta) {
     registraRotta('#/bolle', vista);
+    // Invio automatico al ritorno della connettività, anche fuori dalla vista.
+    window.addEventListener('online', () => invio.avvia());
+    invio.alCambiamento(() => { ridisegna(); });
   },
 };
 
@@ -60,8 +64,13 @@ async function vista(el) {
     return `<option value="${scappaHtml(c)}"${selezionato}>${scappaHtml(c)}</option>`;
   }).join('');
 
+  const bannerMock = impostazioni.mock
+    ? '<p class="avviso avviso-attenzione">Modalità mock attiva: invii simulati, nessun dato lascia il dispositivo.</p>'
+    : '';
+
   el.innerHTML = `
     <div id="bolle-contatori" class="bolle-contatori"></div>
+    ${bannerMock}
     <section class="scheda">
       <div class="campo">
         <label for="cantiere">Cantiere</label>
@@ -87,6 +96,8 @@ async function vista(el) {
   el.querySelector('#invia').addEventListener('click', invia);
 
   await ridisegna();
+  // Invio automatico a ogni apertura del modulo.
+  invio.avvia();
 }
 
 async function gestisciFile(evento) {
@@ -121,6 +132,7 @@ async function invia() {
     salvaImpostazioniBolle({ ultimoCantiere: cantiere });
   }
   await ridisegna();
+  invio.avvia();
 }
 
 async function eliminaBozza(id) {
@@ -161,6 +173,17 @@ async function ridisegna() {
   pulsanteInvia.disabled = bozze.length === 0;
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia (${bozze.length})` : 'Invia';
 
+  const azioni = radice.querySelector('#coda-azioni');
+  azioni.innerHTML = inErrore.length > 0
+    ? '<button id="riprova-tutti" class="btn btn-secondario btn-piccolo">Riprova tutti</button>'
+    : '';
+  const riprovaTutti = azioni.querySelector('#riprova-tutti');
+  if (riprovaTutti) {
+    riprovaTutti.addEventListener('click', async () => {
+      for (const record of inErrore) await invio.riprova(record.id);
+    });
+  }
+
   const inCoda = record.filter(r => r.stato !== 'bozza').sort((a, b) => b.creatoIl - a.creatoIl);
   const lista = radice.querySelector('#lista-coda');
   if (inCoda.length === 0) {
@@ -190,5 +213,8 @@ async function ridisegna() {
         </li>
       `;
     }).join('');
+    for (const pulsante of lista.querySelectorAll('.bolle-riprova')) {
+      pulsante.addEventListener('click', () => invio.riprova(pulsante.dataset.id));
+    }
   }
 }
