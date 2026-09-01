@@ -38,6 +38,7 @@ Content-Type: application/json
 ## Ricezione (flow Power Automate) — costruita e collaudata
 - Validazioni: token, tipo file (jpeg), dimensione massima, campi obbligatori.
 - Salvataggio in raccolta SharePoint **BolleInArrivo** (sito Cantieri LL); il **nome del file lo compone il flow** (il campo `nomeFile` inviato dall'app è ignorato).
+- **Nome file (deciso il 01/09/2026):** `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` — es. `BollaSNZ2.2202609011946FrancescoLando8f3a.jpg`. Niente secondi, come da nomenclatura di gruppo; le 4 cifre dell'`idClient` sostituiscono il progressivo `[n]` ed evitano che due bolle inviate nello stesso minuto si sovrascrivano (accaduto nel collaudo del 01/09: due invii alle 17:46:57 e 17:46:58). **Le cifre di data e ora vanno prese dal campo `dataInvio`**, non dall'orologio del flow: altrimenti il nome porta l'ora di arrivo invece di quella della consegna — divergenza rilevante per le foto accodate offline e inviate ore dopo.
 - **Risposta: 202 Accepted senza corpo.** È lo stato HTTP a fare da conferma: solo alla sua ricezione la foto esce dalla coda dell'app.
 - **Deduplica su `idClient`: prevista, non ancora attiva.** Finché non lo è, evitare rinvii manuali dello stesso scatto.
 
