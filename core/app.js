@@ -12,7 +12,9 @@ registraRotta('#/', () => {
     naviga('#/benvenuto', true);
     return;
   }
-  naviga('#/home', true);
+  // Con un solo modulo l'app apre direttamente su di esso;
+  // la home/launcher resta raggiungibile dal marchio in testata (#/home).
+  naviga(moduli.length === 1 ? `#/${moduli[0].id}` : '#/home', true);
 });
 registraRotta('#/home', el => vistaHome(el, moduli));
 registraRotta('#/benvenuto', vistaBenvenuto);
