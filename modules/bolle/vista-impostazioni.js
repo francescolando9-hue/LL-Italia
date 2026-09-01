@@ -1,10 +1,17 @@
-// Impostazioni del modulo Bolle: endpoint, chiave, mock, foto conservate, cantieri.
+// Impostazioni del modulo Bolle: endpoint, token, mock, foto conservate.
+// L'elenco cantieri non è modificabile dal dispositivo: sta in cantieri.js,
+// perché un codice commessa errato arriverebbe al magazzino come inesistente.
 import { scappaHtml } from '../../core/impostazioni.js';
-import { impostazioniBolle, salvaImpostazioniBolle } from './impostazioni.js';
+import {
+  impostazioniBolle, salvaImpostazioniBolle, normalizzaEndpoint,
+  endpointDaCorreggere, API_VERSION,
+} from './impostazioni.js';
+import { CANTIERI } from './cantieri.js';
 import * as coda from './coda.js';
 
 export function vistaImpostazioniBolle(el) {
   const impostazioni = impostazioniBolle();
+  const elencoCantieri = CANTIERI.map(c => scappaHtml(c.etichetta)).join(' · ');
   el.innerHTML = `
     <section class="scheda">
       <h2>Impostazioni Bolle</h2>
@@ -13,13 +20,13 @@ export function vistaImpostazioniBolle(el) {
           <label for="endpoint">Endpoint di invio (URL)</label>
           <input id="endpoint" type="url" inputmode="url" placeholder="https://&hellip;"
                  value="${scappaHtml(impostazioni.endpoint)}">
-          <p class="aiuto tenue">Lo comunica Francesco. Vive solo su questo dispositivo, mai nel repo.</p>
+          <p class="aiuto tenue">Lo comunica Francesco. Contiene una firma di accesso: vive solo su questo dispositivo, mai nel repo. La versione API viene corretta in automatico a <code>${API_VERSION}</code> (il designer di Power Automate mostra <code>api-version=1</code>, che il servizio rifiuta con 400).</p>
         </div>
         <div class="campo">
-          <label for="chiave">Chiave di accesso</label>
-          <input id="chiave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-                 value="${scappaHtml(impostazioni.chiave)}">
-          <p class="aiuto tenue">Inviata dentro il corpo di ogni invio (campo chiave); il flow la verifica.</p>
+          <label for="token">Token</label>
+          <input id="token" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+                 value="${scappaHtml(impostazioni.token)}">
+          <p class="aiuto tenue">Inviato nel corpo di ogni richiesta; in collaudo vale <code>collaudo</code>.</p>
         </div>
         <div class="campo">
           <label class="campo-interruttore" for="mock">
@@ -33,36 +40,34 @@ export function vistaImpostazioniBolle(el) {
                  value="${impostazioni.conservaUltime}">
           <p class="aiuto tenue">Le foto confermate dal server oltre le ultime N vengono eliminate dal dispositivo.</p>
         </div>
-        <div class="campo">
-          <label for="cantieri">Cantieri (uno per riga)</label>
-          <textarea id="cantieri">${scappaHtml(impostazioni.cantieri.join('\n'))}</textarea>
-          <p class="aiuto tenue">Al lancio: MAR. Le altre commesse (MNG, SNZ2.1, SNZ2.2, SNU, BRU, TN1) si aggiungono quando servono.</p>
-        </div>
         <button class="btn btn-primario" type="submit">Salva</button>
       </form>
-      <p id="conferma" class="avviso avviso-info nascosto">Impostazioni salvate.</p>
+      <p id="conferma" class="avviso avviso-info nascosto"></p>
+      <p class="tenue">Cantieri disponibili: ${elencoCantieri}.</p>
       <a class="btn btn-secondario" href="#/bolle">Torna a Bolle</a>
     </section>
   `;
 
   el.querySelector('#modulo-imp-bolle').addEventListener('submit', async evento => {
     evento.preventDefault();
-    const cantieri = [...new Set(
-      el.querySelector('#cantieri').value
-        .split(/[\n,;]+/)
-        .map(voce => voce.trim())
-        .filter(Boolean)
-    )];
+    const endpointInserito = el.querySelector('#endpoint').value.trim();
+    const corretto = endpointDaCorreggere(endpointInserito);
     const conserva = parseInt(el.querySelector('#conserva').value, 10);
     const nuove = salvaImpostazioniBolle({
-      endpoint: el.querySelector('#endpoint').value.trim(),
-      chiave: el.querySelector('#chiave').value.trim(),
+      endpoint: endpointInserito,
+      token: el.querySelector('#token').value.trim() || 'collaudo',
       mock: el.querySelector('#mock').checked,
-      conservaUltime: Number.isInteger(conserva) && conserva >= 0 ? conserva : impostazioniBolle().conservaUltime,
-      cantieri: cantieri.length > 0 ? cantieri : impostazioniBolle().cantieri,
+      conservaUltime: Number.isInteger(conserva) && conserva >= 0
+        ? conserva : impostazioniBolle().conservaUltime,
     });
+    if (endpointInserito) el.querySelector('#endpoint').value = normalizzaEndpoint(endpointInserito);
+    el.querySelector('#token').value = nuove.token;
     // Il nuovo limite di conservazione si applica subito.
     await coda.potaInviate(nuove.conservaUltime);
-    el.querySelector('#conferma').classList.remove('nascosto');
+    const conferma = el.querySelector('#conferma');
+    conferma.textContent = corretto
+      ? `Impostazioni salvate. Versione API dell'endpoint corretta a ${API_VERSION}.`
+      : 'Impostazioni salvate.';
+    conferma.classList.remove('nascosto');
   });
 }

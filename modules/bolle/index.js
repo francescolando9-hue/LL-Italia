@@ -3,7 +3,8 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { naviga } from '../../core/router.js';
 import { comprimiInJpeg } from './immagini.js';
-import { impostazioniBolle, salvaImpostazioniBolle } from './impostazioni.js';
+import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
+import { CANTIERI, etichettaCantiere } from './cantieri.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -60,10 +61,14 @@ async function vista(el) {
   }
   assicuraStile();
   radice = el;
+  await caricaConfigurazioneLocale();
   const impostazioni = impostazioniBolle();
-  const opzioniCantiere = impostazioni.cantieri.map(c => {
-    const selezionato = c === impostazioni.ultimoCantiere ? ' selected' : '';
-    return `<option value="${scappaHtml(c)}"${selezionato}>${scappaHtml(c)}</option>`;
+  // Ultimo cantiere preselezionato; al primo utilizzo la scelta è esplicita.
+  const noto = CANTIERI.some(c => c.codice === impostazioni.ultimoCantiere);
+  const segnaposto = noto ? '' : '<option value="" selected>— scegli il cantiere —</option>';
+  const opzioniCantiere = segnaposto + CANTIERI.map(c => {
+    const selezionato = c.codice === impostazioni.ultimoCantiere ? ' selected' : '';
+    return `<option value="${scappaHtml(c.codice)}"${selezionato}>${scappaHtml(c.etichetta)}</option>`;
   }).join('');
 
   const bannerMock = impostazioni.mock
@@ -84,6 +89,7 @@ async function vista(el) {
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
       <div id="avviso-foto"></div>
       <div id="anteprime" class="bolle-anteprime"></div>
+      <div id="avviso-cantiere"></div>
       <button id="invia" class="btn btn-successo" disabled>Invia</button>
     </section>
     <section class="scheda">
@@ -94,6 +100,7 @@ async function vista(el) {
     <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
   `;
 
+  el.querySelector('#cantiere').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
@@ -172,9 +179,14 @@ async function ridisegna() {
     pulsante.addEventListener('click', () => eliminaBozza(pulsante.dataset.id));
   }
 
+  const selezione = radice.querySelector('#cantiere');
+  const cantiereScelto = selezione ? selezione.value : '';
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0;
+  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia (${bozze.length})` : 'Invia';
+  const avvisoCantiere = radice.querySelector('#avviso-cantiere');
+  avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
+    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
@@ -205,7 +217,7 @@ async function ridisegna() {
         <li class="bolle-voce">
           <img class="bolle-miniatura" src="${urlFoto(r.foto)}" alt="">
           <div class="bolle-dettagli">
-            <div class="riga">${scappaHtml(r.cantiere)} &middot; ${ora}</div>
+            <div class="riga">${scappaHtml(etichettaCantiere(r.cantiere))} &middot; ${ora}</div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${messaggioErrore}
           </div>

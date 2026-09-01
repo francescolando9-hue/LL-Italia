@@ -1,3 +1,5 @@
+> **Stato: superata.** Il flow di ricezione è stato costruito e collaudato: il contratto in vigore è quello del README (POST JSON con `token`, `commessa`, `operatore`, `idClient`, `contenutoBase64`, risposta 202). Questo documento resta come riferimento sulla struttura del flow, sul ragionamento CORS e sui passi di collaudo.
+
 # App LL Italia — Guida al flow di ricezione bolle (Power Automate)
 
 > Costruisce il ricevente dell'app: raccolta SharePoint **BolleInArrivo** (passo 0) e flow Power Automate con trigger HTTP che valida, deduplica e salva le foto con i metadata. Contratto allineato all'app rev. 2 (`modules/bolle/invio.js`, README). Tempo stimato: 30–40 minuti. Interfaccia Power Automate in inglese (standard di gruppo).
