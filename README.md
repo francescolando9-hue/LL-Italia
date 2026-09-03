@@ -69,7 +69,7 @@ La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va a
 
 ## Informazioni e aggiornamenti
 
-Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico. C'è anche un pulsante **Cerca aggiornamenti**.
+Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico, numero progressivo raggiunto. C'è anche un pulsante **Cerca aggiornamenti**.
 
 La versione non è scritta a mano da nessuna parte: si legge dal nome della cache che il Service Worker ha davvero attiva, quindi non può divergere dal codice pubblicato.
 
@@ -101,6 +101,20 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 
 Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server** (202 Accepted); ogni invio porta un `idClient` univoco, su cui il backend potrà deduplicare.
 
+### Numero progressivo del dispositivo
+
+Ogni foto **accodata** riceve un intero incrementale, conservato in IndexedDB: parte da 1 alla prima installazione, non si azzera mai e sopravvive agli aggiornamenti dell'app. Viaggia nel payload come campo `progressivo` e compare a video accanto a ogni bolla — in *Coda invii* e nello storico — così l'operatore può leggerlo a voce quando serve un riscontro dall'ufficio. In *Informazioni sull'app* si vede il numero raggiunto.
+
+Serve a rendere misurabile il tratto fra il telefono e la raccolta: **ordinando le bolle per operatore, un numero mancante nella sequenza significa una foto scattata e mai arrivata.** Oggi quel tratto non sarebbe visibile in alcun altro modo.
+
+Perché il segnale resti affidabile, il numero si assegna **all'accodamento** (alla pressione di *Invia*), non allo scatto e non al tentativo di invio:
+
+- una foto **scartata dalle anteprime** prima di inviare non brucia un numero: altrimenti si aprirebbero buchi finti, indistinguibili da una bolla persa;
+- i **retry** riusano lo stesso numero, esattamente come `idClient`: il numero è dell'immagine, non della richiesta;
+- il numero è assegnato anche **offline**, prima di qualunque rete: si vede in coda subito ed è già quello che arriverà al server.
+
+La sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1, e un telefono reinstallato riparte da 1. Il campo va quindi sempre letto **insieme a `operatore` e `idClient`**, mai da solo.
+
 ## Contratto con il backend (in vigore)
 
 Il flow di ricezione è **già attivo e collaudato**: l'app si adegua, il contratto non si modifica dal lato app. Un file per richiesta, POST JSON:
@@ -112,7 +126,8 @@ Content-Type: application/json
 { "token": "collaudo",
   "commessa": "MAR",                       // solo il codice: MAR | SNZ2.2 | MNG
   "operatore": "Paolo Sanzarello",
-  "idClient": "fe7e5c81-…",                // GUID per invio, per la deduplica futura
+  "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
+  "progressivo": 137,                      // intero: sequenza di quel dispositivo
   "dataInvio": "2026-09-01T17:27:53+02:00",
   "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
   "contenutoBase64": "…" }
