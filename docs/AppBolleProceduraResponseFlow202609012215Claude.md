@@ -60,3 +60,54 @@ Il criterio che decide resta il confronto **sui numeri**: scattate nell'app cont
 - **Stato della deduplica (03/09/2026): controllo inerte, lasciato in essere.** Dopo la correzione a confronto numerico la Condition continua a valutare falso e il ramo del duplicato non viene mai eseguito; la causa non è stata determinata (il `$filter` è corretto e in un run precedente la ricerca aveva restituito un elemento). **Non è un blocco:** il nome del file è deterministico — stessa bolla, stesso `dataInvio`, stesso `idClient`, stesso nome — quindi un reinvio sovrascrive il file esistente e non genera un doppione in raccolta. Il controllo serviva solo a evitare l'upload inutile e le versioni sul file. Da riprendere solo se in raccolta comparissero doppioni reali.
 - **Verifica corretta della deduplica:** non contare i file (l'omonimia li sovrascrive e maschera il difetto), ma guardare il run: `Create file` deve risultare **skipped** e `Response 1` con `Terminate 1` verdi.
 - **`Response` skipped su Resubmit**: comportamento normale, non un difetto — il chiamante HTTP originale non esiste più.
+
+---
+
+# Aggiunta del 03/09/2026 — colonna `Progressivo`
+
+L'app manda ora un campo in più: **`progressivo`**, un intero che ogni telefono incrementa di 1 a ogni bolla accodata (dal n. 1 della prima installazione). Serve al controllo di continuità: ordinando le bolle per operatore, **un numero mancante è una foto scattata e mai arrivata in raccolta**. Finché la colonna non esiste, il campo arriva nel corpo della richiesta e viene buttato: il controllo non è possibile.
+
+Due interventi, in quest'ordine.
+
+## 1. La colonna in raccolta
+
+Raccolta **BolleInArrivo** → *Aggiungi colonna*:
+
+| Campo | Valore |
+|---|---|
+| Tipo | **Numero** |
+| Nome | `Progressivo` |
+| Numero di decimali | `0` |
+| Valore predefinito | *lasciare vuoto* |
+| Obbligatoria | No |
+
+Vuota, non zero: una bolla senza numero è una bolla arrivata da una versione precedente dell'app, e va distinta da una che porta il numero 0 (che non esiste — la sequenza parte da 1).
+
+## 2. La mappatura nel flow
+
+Flow `BolleInArrivoRicevitore` → azione **Update file properties** → campo `Progressivo`:
+
+```
+triggerBody()?['progressivo']
+```
+
+Nient'altro: nessuna conversione, nessun `int()`. L'app manda già un intero JSON.
+
+## Verifica (sui numeri, come sempre)
+
+Tre foto di fila dallo stesso telefono, senza scartarne nessuna dalle anteprime:
+
+| Cosa si vede | Cosa significa |
+|---|---|
+| In raccolta tre numeri consecutivi (es. 12, 13, 14) | Fatto |
+| Colonna `Progressivo` vuota su tutte | Mappatura assente in *Update file properties* |
+| Numeri non consecutivi | **Una bolla non è arrivata**: è esattamente il difetto che il campo serve a scoprire — da spiegare, non da ignorare |
+
+Il numero mostrato dall'app accanto a ogni bolla (in *Coda invii* e nello storico) è lo stesso che arriva in raccolta: l'operatore può leggerlo a voce per un riscontro immediato dall'ufficio.
+
+## Come leggerlo, a valle
+
+- La sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1. Il campo va letto **sempre insieme a `Operatore` e `IdClient`**, mai da solo.
+- Un telefono **reinstallato riparte da 1**: evento atteso, il controllo deve tollerarlo.
+- Il numero si assegna all'accodamento e non cambia tra un retry e l'altro, e una foto scartata dalle anteprime non ne consuma uno: **non esistono buchi legittimi**.
+

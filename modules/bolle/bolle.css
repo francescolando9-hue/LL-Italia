@@ -305,3 +305,17 @@
   background: #fff;
   color: var(--testo);
 }
+
+/* Numero progressivo del dispositivo: si legge a voce, quindi va distinguibile */
+.bolle-progressivo {
+  display: inline-block;
+  background: #eef0f7;
+  color: var(--blu);
+  border-radius: 6px;
+  padding: 0 6px;
+  margin-right: 4px;
+  font-size: 0.85em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

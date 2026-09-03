@@ -264,7 +264,10 @@ async function ridisegna() {
         <li class="bolle-voce">
           <img class="bolle-miniatura" src="${urlFoto(r.foto)}" alt="">
           <div class="bolle-dettagli">
-            <div class="riga">${scappaHtml(etichettaCantiere(r.cantiere))} &middot; ${ora}</div>
+            <div class="riga">
+              ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
+              ${scappaHtml(etichettaCantiere(r.cantiere))} &middot; ${ora}
+            </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${messaggioErrore}
           </div>

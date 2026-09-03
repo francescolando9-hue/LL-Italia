@@ -4,7 +4,7 @@
 // errore = invio fallito, resta in coda e si ritenta.
 
 const NOME_DB = 'llitalia-bolle';
-const VERSIONE_DB = 3;
+const VERSIONE_DB = 4;
 const STORE = 'foto';
 // Storico permanente degli invii confermati: solo dati, senza foto. Le foto
 // pesano e vengono potate; il registro invece resta e permette di rispondere a
@@ -14,6 +14,12 @@ const STORE_STORICO = 'storico';
 // immagini, che si leggono una alla volta quando la bolla viene aperta.
 const STORE_MINIATURE = 'miniature';
 const MINIATURE_DA_CONSERVARE = 300;
+// Progressivo per dispositivo: serve al runbook per accorgersi di una foto
+// scattata e mai arrivata in raccolta (un numero mancante nella sequenza).
+// Non si azzera mai; su un dispositivo reinstallato riparte da 1, quindi va
+// sempre letto insieme a operatore e idClient.
+const STORE_CONTATORE = 'contatore';
+const CHIAVE_PROGRESSIVO = 'progressivo';
 const CHIAVE_CONTATORI = 'llitalia.bolle.contatori';
 
 let dbPromise = null;
@@ -42,6 +48,9 @@ function apri() {
         if (!db.objectStoreNames.contains(STORE_MINIATURE)) {
           db.createObjectStore(STORE_MINIATURE, { keyPath: 'idClient' })
             .createIndex('inviatoIl', 'inviatoIl');
+        }
+        if (!db.objectStoreNames.contains(STORE_CONTATORE)) {
+          db.createObjectStore(STORE_CONTATORE, { keyPath: 'chiave' });
         }
       };
       richiesta.onsuccess = () => risolvi(richiesta.result);
@@ -115,13 +124,47 @@ export function elimina(id) {
   return transazione(STORE, 'readwrite', store => store.delete(id));
 }
 
+// Riserva uno o più progressivi in un'unica transazione: leggere e scrivere
+// separatamente esporrebbe a due invii simultanei che prendono lo stesso numero.
+export function riservaProgressivi(quanti = 1) {
+  return apri().then(db => new Promise((risolvi, rifiuta) => {
+    const tx = db.transaction(STORE_CONTATORE, 'readwrite');
+    const store = tx.objectStore(STORE_CONTATORE);
+    let primo = 1;
+    const lettura = store.get(CHIAVE_PROGRESSIVO);
+    lettura.onsuccess = () => {
+      const ultimo = Number(lettura.result && lettura.result.valore) || 0;
+      primo = ultimo + 1;
+      store.put({ chiave: CHIAVE_PROGRESSIVO, valore: ultimo + quanti });
+    };
+    tx.oncomplete = () => risolvi(primo);
+    tx.onerror = () => rifiuta(tx.error);
+    tx.onabort = () => rifiuta(tx.error);
+  }));
+}
+
+// Quanti progressivi sono stati assegnati finora su questo dispositivo.
+export function progressivoRaggiunto() {
+  return transazione(STORE_CONTATORE, 'readonly', store => store.get(CHIAVE_PROGRESSIVO))
+    .then(riga => Number(riga && riga.valore) || 0);
+}
+
 // Invia: tutte le bozze passano in coda con cantiere e autore correnti.
+// Il progressivo si assegna QUI, all'accodamento, non allo scatto: una foto
+// scartata dalle anteprime non deve bruciare un numero, perché il buco nella
+// sequenza è proprio il segnale che il runbook legge come "bolla persa".
+// Assegnato una volta, non cambia più: i retry riusano lo stesso numero.
 export async function confermaBozze(cantiere, autore) {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
+  if (bozze.length === 0) return 0;
+  const primo = await riservaProgressivi(bozze.length);
+  let numero = primo;
   for (const record of bozze) {
     record.stato = 'in_coda';
     record.cantiere = cantiere;
     record.autore = autore;
+    record.progressivo = numero;
+    numero += 1;
     await aggiorna(record);
   }
   return bozze.length;
@@ -135,6 +178,7 @@ export async function confermaSingola(id, cantiere, autore) {
   record.stato = 'in_coda';
   record.cantiere = cantiere;
   record.autore = autore;
+  record.progressivo = await riservaProgressivi(1);
   await aggiorna(record);
   return true;
 }
@@ -196,6 +240,7 @@ export async function registraInvio(record) {
     dataInvio: record.timestampDispositivo,
     inviatoIl: record.inviatoIl || Date.now(),
     impronta: record.impronta || '',
+    progressivo: record.progressivo || null,
   }));
   if (record.miniatura) {
     await transazione(STORE_MINIATURE, 'readwrite', store => store.put({

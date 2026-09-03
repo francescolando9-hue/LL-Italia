@@ -189,7 +189,8 @@ function disegnaElenco() {
         <li>
           <button class="bolle-riga" data-id="${scappaHtml(riga.idClient)}">
             <span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
-            <span class="cantiere">${scappaHtml(etichettaCantiere(riga.commessa))}</span>
+            <span class="cantiere">${Number.isInteger(riga.progressivo)
+              ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}</span>
             <span class="tenue">${scappaHtml(riga.operatore)}</span>
             <span class="lente" aria-hidden="true">&#128269;</span>
           </button>

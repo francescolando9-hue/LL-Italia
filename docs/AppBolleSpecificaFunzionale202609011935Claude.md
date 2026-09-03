@@ -1,6 +1,6 @@
 # App LL Italia — Specifica funzionale upload bolle (rev. 2, capture-only)
 
-> **Revisione 2 del 01/09/2026 ore 19:35** — allinea la specifica al **flow di ricezione realmente costruito e collaudato**, che prevale: il token viaggia **nel corpo** (non nell'header) e i campi si chiamano `token`, `commessa`, `operatore`, `idClient`, `dataInvio`, `nomeFile`, `contenutoBase64`; la risposta è **202 Accepted senza corpo**; l'URL richiede `api-version=2024-10-01`. Discrepanza rispetto alla rev. 1 ratificata da Francesco il 01/09/2026. La rev. 1 resta nella storia del repo (commit precedenti).
+> **Revisione 2 del 01/09/2026 ore 19:35** — allinea la specifica al **flow di ricezione realmente costruito e collaudato**, che prevale: il token viaggia **nel corpo** (non nell'header) e i campi si chiamano `token`, `commessa`, `operatore`, `idClient`, `dataInvio`, `nomeFile`, `contenutoBase64`; la risposta è **202 Accepted senza corpo**; l'URL richiede `api-version=2024-10-01`. Discrepanza rispetto alla rev. 1 ratificata da Francesco il 01/09/2026. La rev. 1 resta nella storia del repo (commit precedenti). **Aggiornata il 03/09/2026** con il campo `progressivo` (paragrafo dedicato).
 
 > Bozza per lo sviluppo con **Claude Code** (repo GitHub dedicato). Decisione e alternative scartate: `RelazioneDecisioneAppLLItaliaTrasportoBolle….md` in `L:\123\Claude\Relazioni\`. Perimetro: **solo raccolta e invio**; nessun riconoscimento bolle in-app.
 
@@ -27,7 +27,8 @@ Content-Type: application/json
 { "token": "collaudo",
   "commessa": "MAR",            // solo il codice: MAR | SNZ2.2 | MNG
   "operatore": "Paolo Sanzarello",
-  "idClient": "fe7e5c81-…",     // GUID per invio, per la deduplica
+  "idClient": "fe7e5c81-…",     // GUID della bolla, per la deduplica
+  "progressivo": 137,           // intero: sequenza del dispositivo (vedi sotto)
   "dataInvio": "2026-09-01T17:27:53+02:00",
   "nomeFile": "…",              // IGNORATO dal backend: il nome lo compone il flow
   "contenutoBase64": "…" }
@@ -37,10 +38,20 @@ Content-Type: application/json
 - L'URL contiene una firma di accesso: non entra mai nel repo pubblico (impostazioni sul dispositivo, oppure `core/configurazione.js` escluso da git in sviluppo locale).
 - Il base64 dentro JSON regge senza problemi file da 155 KB: collaudato.
 
+## Progressivo per dispositivo (aggiunto il 03/09/2026)
+Campo `progressivo`, intero, obbligatorio nel payload. Serve a **rendere misurabile il tratto telefono → raccolta**, che oggi non è verificabile in alcun altro modo: ordinando le bolle per operatore, un numero mancante nella sequenza significa una foto scattata e mai arrivata.
+
+- **Dove vive:** contatore in IndexedDB (store `contatore`, DB versione 4), parte da 1 alla prima installazione, non si azzera mai, sopravvive agli aggiornamenti dell'app.
+- **Quando si assegna:** **all'accodamento**, cioè alla pressione di *Invia* — non allo scatto e non al tentativo di invio. Una foto scartata dalle anteprime non brucia un numero (altrimenti si aprirebbero buchi finti, indistinguibili da una bolla persa) e i retry riusano lo stesso numero, come `idClient`: il numero è dell'immagine, non della richiesta. Vale anche offline: assegnato prima di qualunque rete.
+- **Come si legge:** la sequenza è **per dispositivo, non globale**. Due telefoni hanno entrambi il proprio n. 1; un telefono reinstallato riparte da 1. Il runbook deve tollerarlo e leggere il campo **sempre insieme a `operatore` e `idClient`**, mai da solo.
+- **A video:** accanto a ogni bolla in *Coda invii* e nello storico, così l'operatore può dirlo a voce; il numero raggiunto è in *Informazioni sull'app*.
+- **Lato flow (in capo a Francesco):** senza una colonna `Progressivo` (numero) in `BolleInArrivo` mappata in *Update file properties*, il campo arriva ma non viene conservato — e il controllo non è possibile.
+
 ## Ricezione (flow Power Automate) — costruita e collaudata
 - Validazioni: token, tipo file (jpeg), dimensione massima, campi obbligatori.
 - Salvataggio in raccolta SharePoint **BolleInArrivo** (sito Cantieri LL); il **nome del file lo compone il flow** (il campo `nomeFile` inviato dall'app è ignorato).
 - **Nome file (deciso il 01/09/2026):** `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` — es. `BollaSNZ2.2202609011946FrancescoLando8f3a.jpg`. Niente secondi, come da nomenclatura di gruppo; le 4 cifre dell'`idClient` sostituiscono il progressivo `[n]` ed evitano che due bolle inviate nello stesso minuto si sovrascrivano (accaduto nel collaudo del 01/09: due invii alle 17:46:57 e 17:46:58). **Le cifre di data e ora vanno prese dal campo `dataInvio`**, non dall'orologio del flow: altrimenti il nome porta l'ora di arrivo invece di quella della consegna — divergenza rilevante per le foto accodate offline e inviate ore dopo.
+- **Colonna `Progressivo` (numero):** da aggiungere in raccolta e mappare in *Update file properties* per conservare il campo `progressivo` del payload (vedi sopra).
 - **Risposta: 202 Accepted senza corpo.** È lo stato HTTP a fare da conferma: solo alla sua ricezione la foto esce dalla coda dell'app.
 - **Deduplica su `idClient`: attivata il 01/09/2026.** Prima del salvataggio il flow cerca in raccolta un file con lo stesso `IdClient` (azione *Get files (properties only)*, Filter Query su `IdClient`, Top Count 1) e salva solo se non lo trova. Richiede che la colonna `IdClient` sia compilata e indicizzata.
 - **Token:** sostituito il valore di collaudo con un token riservato il 01/09/2026. Vive nel flow e nelle impostazioni dei dispositivi, mai nel repo. Un token errato fa terminare il flow con stato Failed, visibile in cronologia.
@@ -59,6 +70,7 @@ Il collaudo del backend è avvenuto senza browser (curl/Postman). Dal browser og
 
 ## Collaudo (sui numeri, mai sull'esito formale)
 - Giornaliero in training: contatore app (scattate/inviate) vs file in raccolta vs foto lavorate dal runbook. Ogni scarto è un difetto da spiegare.
+- **Continuità della sequenza:** per ogni coppia (operatore, dispositivo) i `Progressivo` in raccolta devono essere consecutivi. Un buco è una bolla scattata e mai arrivata, e va spiegato uno per uno; una ripartenza da 1 è invece attesa dopo una reinstallazione.
 
 ## Fuori perimetro (rinviato)
 OCR/riconoscimento in-app; login M365; notifiche push; altri moduli LL Italia (SAL squadre, presenze). L'architettura non li preclude.

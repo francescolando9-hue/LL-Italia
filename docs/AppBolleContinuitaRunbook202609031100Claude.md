@@ -14,23 +14,29 @@ L'operatore fa tre tocchi: fotografa la bolla, controlla il cantiere (resta l'ul
 
 Ogni invio porta un **`idClient`** (GUID generato dal telefono) che non cambia tra un tentativo e l'altro: è l'identità di quella bolla lungo tutta la catena.
 
-**2. Invio.** POST JSON all'endpoint del flow, un file per richiesta, con questi campi: `token`, `commessa` (solo il codice: MAR | SNZ2.2 | MNG), `operatore` (nome e cognome digitati alla prima apertura), `idClient`, `dataInvio` (ISO 8601 con fuso, ora reale del telefono), `nomeFile` (ignorato dal backend), `contenutoBase64`.
+Ogni foto accodata porta anche un **`progressivo`**: un intero che quel telefono incrementa di 1 a ogni bolla messa in coda, dal n. 1 della prima installazione in avanti. Come `idClient`, è dell'immagine e non della richiesta: non cambia tra un retry e l'altro, e una foto scartata dalle anteprime prima di inviare non consuma un numero. Serve al controllo descritto sotto.
+
+**2. Invio.** POST JSON all'endpoint del flow, un file per richiesta, con questi campi: `token`, `commessa` (solo il codice: MAR | SNZ2.2 | MNG), `operatore` (nome e cognome digitati alla prima apertura), `idClient`, `progressivo` (intero, sequenza di quel dispositivo), `dataInvio` (ISO 8601 con fuso, ora reale del telefono), `nomeFile` (ignorato dal backend), `contenutoBase64`.
 
 **3. Flow di ricezione** (`BolleInArrivoRicevitore`, Power Automate). Controlla il token, cerca eventuali duplicati, salva il file e scrive i metadati, poi risponde. La foto esce dalla coda del telefono **solo** quando riceve `200`, e quel `200` arriva dopo il salvataggio: se il salvataggio fallisce, l'app resta rossa e riprova.
 
-**4. Raccolta SharePoint `BolleInArrivo`** (sito Cantieri LL). Cartelle `AAAA/AAAAMM` calcolate sulla data di scatto. Nome file: `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg`. Colonne: `Commessa`, `Operatore`, `DataInvio`, `IdClient`.
+**4. Raccolta SharePoint `BolleInArrivo`** (sito Cantieri LL). Cartelle `AAAA/AAAAMM` calcolate sulla data di scatto. Nome file: `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg`. Colonne: `Commessa`, `Operatore`, `DataInvio`, `IdClient`, `Progressivo`.
 
 ## Cosa cambia per il runbook, rispetto a prima
 
 - **La commessa non va più indovinata.** Prima si deduceva da chi mandava la foto o da dove finiva; ora la colonna `Commessa` arriva certa dalla fonte, scelta dall'operatore in cantiere. Stesso discorso per `Operatore` e per `DataInvio`, che è l'ora reale dello scatto e non quella di arrivo. **Il runbook deve leggere le colonne, non interpretare il nome del file.**
 - **`DataInvio` è una colonna di testo**, non una data SharePoint: contiene la stringa ISO così com'è (`2026-09-03T09:17:25+02:00`). Scelta deliberata, per evitare le conversioni di fuso che SharePoint applicava. Va trattata come stringa; l'ordinamento cronologico funziona lo stesso perché in ISO 8601 l'ordine alfabetico coincide con quello temporale.
 - **`IdClient` è la chiave stabile** per riconoscere una bolla, molto più del nome file.
+- **`Progressivo` rende misurabile il tratto telefono → raccolta.** Ordinando le bolle per operatore e leggendo la sequenza, **un numero mancante è una foto scattata e mai arrivata**: prima di questo campo quel tratto non era verificabile in alcun modo. Tre avvertenze nell'usarlo:
+  - la sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1, quindi il campo va letto **sempre insieme a `Operatore` e `IdClient`**, mai da solo;
+  - un telefono **reinstallato riparte da 1**: il controllo deve tollerarlo e trattare la ripartenza come evento atteso, non come anomalia;
+  - il numero è assegnato all'accodamento, quindi **non ci sono buchi legittimi**: ogni salto va spiegato uno per uno.
 
 ## Cosa NON è ancora risolto a valle — il lavoro di questa sessione
 
 1. **Manca la marcatura del lavorato.** In raccolta non c'è nulla che distingua una bolla già processata da una nuova. Se il runbook gira ogni sera sulla stessa cartella, o rilavora tutto o rischia di saltare qualcosa. Da decidere: una colonna `Stato` che il runbook aggiorna, oppure lo spostamento dei file lavorati in una sottocartella. È il punto più urgente.
 2. **Manca la gestione degli scarti**: bolle illeggibili, foto che non sono bolle, doppioni reali (stessa bolla fotografata due volte, che nessun sistema automatico può riconoscere senza OCR).
-3. **Il collaudo si ferma a metà.** Finora misuriamo "scattate nell'app → atterrate in raccolta". La catena vera è "scattate → atterrate → **lavorate**", e l'ultimo tratto non è mai stato misurato. Serve un conteggio confrontabile ogni sera.
+3. **Il collaudo si ferma a metà.** La catena vera è "scattate → atterrate → **lavorate**". Il primo tratto ora è misurabile in modo indipendente dal telefono, grazie a `Progressivo` — ma **richiede che la colonna esista in raccolta e sia mappata nel flow**, altrimenti il campo arriva e viene buttato. L'ultimo tratto, da atterrate a lavorate, non è mai stato misurato: serve un conteggio confrontabile ogni sera.
 
 ## Vincoli e principi da rispettare
 
