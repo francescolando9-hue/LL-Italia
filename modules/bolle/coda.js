@@ -258,6 +258,30 @@ export function incrementaInviate(quante) {
   salvaContatori(dati);
 }
 
+// Riparte il conteggio del giorno da zero. Serve quando l'ufficio cancella da
+// SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: senza
+// azzerare, il contatore somma invii veri e invii annullati e il collaudo
+// "scattate contro atterrate" non torna più.
+// NON tocca il progressivo, che è la sequenza su cui si scoprono le bolle
+// perse: azzerarlo aprirebbe un buco falso in raccolta.
+export function azzeraContatoriOggi() {
+  const prima = contatoriOggi();
+  salvaContatori({ giorno: giornoOggi(), scattate: 0, inviate: 0 });
+  return prima;
+}
+
+// Toglie dalla coda a video le foto già confermate dal server, che restano solo
+// come promemoria. Le bolle non ancora confermate (bozza, in coda, in errore)
+// non si toccano MAI: una foto non arrivata non deve poter sparire da qui.
+// Lo storico resta intatto: è il registro del dispositivo, non un contatore.
+export async function rimuoviInviate() {
+  const inviate = (await elenca()).filter(r => r.stato === 'inviata');
+  for (const record of inviate) {
+    await elimina(record.id);
+  }
+  return inviate.length;
+}
+
 // --- Storico degli invii confermati -----------------------------------------
 
 // Chiamata quando il server conferma: riga e miniatura restano anche dopo che

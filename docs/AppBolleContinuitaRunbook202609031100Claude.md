@@ -1,6 +1,6 @@
 # App Bolle — Documento unico di continuità per il runbook magazzino
 
-> **Rev. 3 del 03/09/2026 ore 20:10.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 4 del 03/09/2026 ore 21:30.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ---
 
@@ -68,6 +68,8 @@ Le tre azioni *Response* portano l'header `Access-Control-Allow-Origin: *`, obbl
   - **si raggruppa per `IdDispositivo`, mai per `Operatore`**: quello è testo libero, e basta una grafia diversa del nome per spezzare una sequenza, o due telefoni della stessa persona per fonderne due;
   - un telefono **reinstallato riparte da 1** con un `IdDispositivo` nuovo: evento atteso, e riconoscibile proprio perché l'identificativo cambia;
   - il numero è assegnato all'accodamento, quindi **non esistono buchi legittimi**: ogni salto va spiegato uno per uno.
+
+  Nota per il caso «bolla mandata per sbaglio»: quando l'ufficio cancella da SharePoint una bolla e questa viene rimandata, l'operatore può azzerare i contatori del giorno sul telefono, ma **la numerazione progressiva prosegue e non si azzera mai**. La bolla rimandata porta quindi un numero nuovo, e il numero della bolla cancellata resta scoperto in raccolta: è un buco che il controllo di continuità segnalerà. **Le cancellazioni fatte dall'ufficio vanno annotate**, altrimenti si presentano come bolle perse.
 - **La deduplica lato flow è un controllo inerte.** La Condition sui duplicati esiste ma non scatta mai (causa non determinata, chiusa per decisione il 03/09/2026). Non è un blocco: il nome del file è deterministico — stessa bolla, stesso `dataInvio`, stesso `idClient`, stesso nome — quindi un reinvio **sovrascrive** il file esistente e non genera un doppione in raccolta. Conseguenza per il runbook: **non contare i file per stimare i doppioni**, l'omonimia li maschera.
 
 ## 3. Interventi aperti su SharePoint e sul flow (prerequisiti, non lavoro di runbook)
