@@ -216,3 +216,47 @@ body {
 .avviso-noscript { padding: 24px; text-align: center; }
 
 .nascosto { display: none !important; }
+
+/* Avviso di aggiornamento: sempre visibile, non copre i comandi principali */
+.barra-aggiornamento {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--blu);
+  color: #fff;
+  border-radius: var(--raggio);
+  box-shadow: 0 4px 14px rgba(16, 28, 66, 0.3);
+  padding: 12px 14px;
+}
+
+.barra-aggiornamento span { flex: 1; font-weight: 600; }
+
+.barra-aggiornamento button {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--blu);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Elenco della pagina Informazioni */
+.info-elenco { margin: 0 0 16px; }
+.info-elenco dt {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--testo-tenue);
+  margin-top: 12px;
+}
+.info-elenco dd { margin: 2px 0 0; }
