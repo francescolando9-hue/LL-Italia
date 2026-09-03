@@ -25,12 +25,24 @@ Ogni foto accodata porta anche un **`progressivo`**: un intero che quel telefono
 ## Cosa cambia per il runbook, rispetto a prima
 
 - **La commessa non va più indovinata.** Prima si deduceva da chi mandava la foto o da dove finiva; ora la colonna `Commessa` arriva certa dalla fonte, scelta dall'operatore in cantiere. Stesso discorso per `Operatore` e per `DataInvio`, che è l'ora reale dello scatto e non quella di arrivo. **Il runbook deve leggere le colonne, non interpretare il nome del file.**
-- **`DataInvio` è una colonna di testo**, non una data SharePoint: contiene la stringa ISO così com'è (`2026-09-03T09:17:25+02:00`). Scelta deliberata, per evitare le conversioni di fuso che SharePoint applicava. Va trattata come stringa; l'ordinamento cronologico funziona lo stesso perché in ISO 8601 l'ordine alfabetico coincide con quello temporale.
+- **`DataInvio` va trattata come testo**, non come data SharePoint: deve contenere la stringa ISO così com'è (`2026-09-03T09:17:25+02:00`). Scelta deliberata del 03/09/2026, per evitare le conversioni di fuso che SharePoint applicava (l'ora arrivava indietro di 7 ore pur essendo corretti sia il fuso del sito sia quello del profilo). Va letta come stringa; l'ordinamento cronologico regge perché in ISO 8601 l'ordine alfabetico coincide con quello temporale. **Il cambio di tipo della colonna è tra gli interventi aperti qui sotto: da verificare prima di fidarsi del valore.**
 - **`IdClient` è la chiave stabile** per riconoscere una bolla, molto più del nome file.
 - **`Progressivo` rende misurabile il tratto telefono → raccolta.** Ordinando le bolle per operatore e leggendo la sequenza, **un numero mancante è una foto scattata e mai arrivata**: prima di questo campo quel tratto non era verificabile in alcun modo. Tre avvertenze nell'usarlo:
   - la sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1, quindi il campo va letto **sempre insieme a `Operatore` e `IdClient`**, mai da solo;
   - un telefono **reinstallato riparte da 1**: il controllo deve tollerarlo e trattare la ripartenza come evento atteso, non come anomalia;
   - il numero è assegnato all'accodamento, quindi **non ci sono buchi legittimi**: ogni salto va spiegato uno per uno.
+
+## Interventi aperti su SharePoint e sul flow (prerequisiti, non lavoro di runbook)
+
+Tre cose sono decise ma da eseguire (o da verificare) sulla raccolta `BolleInArrivo` e sul flow `BolleInArrivoRicevitore`. Finché non sono fatte, i dati corrispondenti non sono affidabili.
+
+1. **Colonna `Progressivo`** — raccolta → *Aggiungi colonna*: tipo **Numero**, nome `Progressivo`, **0** decimali, valore predefinito **vuoto** (non zero: la sequenza parte da 1, quindi uno 0 sarebbe un dato falso; vuoto = bolla arrivata da una versione precedente dell'app).
+2. **Mappatura del progressivo** — flow → azione *Update file properties* → campo `Progressivo`, espressione `triggerBody()?['progressivo']`. Nessuna conversione, nessun `int()`: l'app manda già un intero JSON. Senza questa mappatura il campo arriva nel corpo della richiesta e viene buttato.
+3. **`DataInvio` come colonna di testo** — da *Data e ora* a **Riga di testo singola**, col flow che scrive `triggerBody()?['dataInvio']` verbatim. **Da verificare se è già stato fatto:** se la colonna è ancora di tipo data, i valori in raccolta possono essere sfasati di alcune ore e non vanno usati come ora dello scatto.
+
+Verifica dei punti 1-2, sui numeri: tre foto di fila dallo stesso telefono senza scartarne nessuna dalle anteprime → in raccolta tre numeri consecutivi. Colonna vuota su tutte = mappatura assente. Numeri non consecutivi = una bolla non è arrivata, ed è esattamente il difetto che il campo serve a scoprire.
+
+Procedura completa, con le tabelle campo per campo: `docs/AppBolleProceduraResponseFlow….md` nel repo dell'app.
 
 ## Cosa NON è ancora risolto a valle — il lavoro di questa sessione
 
