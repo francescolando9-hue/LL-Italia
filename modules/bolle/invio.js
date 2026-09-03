@@ -4,6 +4,7 @@
 // per installazione, che dà un titolare certo alla sequenza dei progressivi.
 import * as coda from './coda.js';
 import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
+import { versioneApp } from '../../core/versione.js';
 
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
@@ -121,7 +122,7 @@ export function componiNomeFile(record) {
 }
 
 // Costruisce il corpo del contratto concordato col backend (già attivo).
-export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo) {
+export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo, versione = '') {
   return {
     token: impostazioni.token,
     commessa: record.cantiere,
@@ -130,6 +131,7 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo)
     idDispositivo,
     progressivo: record.progressivo,
     dataInvio: record.timestampDispositivo,
+    versioneApp: versione,
     nomeFile: componiNomeFile(record),
     contenutoBase64,
   };
@@ -145,12 +147,15 @@ async function inviaSingola(record) {
   // risposta 202 Accepted senza corpo. Da non modificare senza aggiornare il flow.
   const contenutoBase64 = await blobInBase64(record.foto);
   const dispositivo = await coda.idDispositivo();
+  // La versione viene dalla cache attiva del service worker, quindi è quella
+  // che sta davvero girando sul telefono, non quella che dovrebbe girare.
+  const versione = await versioneApp();
   let risposta;
   try {
     risposta = await fetch(normalizzaEndpoint(impostazioni.endpoint), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo)),
+      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo, versione)),
     });
   } catch {
     // fetch fallisce senza status sia con rete assente sia quando il browser
@@ -174,7 +179,7 @@ async function inviaSingola(record) {
 async function inviaMock(record) {
   await new Promise(risolvi => setTimeout(risolvi, 700));
   const impostazioni = impostazioniBolle();
-  const corpo = corpoInvio(record, impostazioni, 'mock', await coda.idDispositivo());
+  const corpo = corpoInvio(record, impostazioni, 'mock', await coda.idDispositivo(), await versioneApp());
   let dati;
   try {
     dati = JSON.parse(localStorage.getItem(CHIAVE_MOCK)) || {};
