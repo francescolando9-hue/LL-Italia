@@ -61,6 +61,11 @@ async function processa() {
           falliti = daInviare.length > 0;
           break;
         }
+        // Foto accodate da una versione precedente al contatore: si assegna
+        // il numero adesso, così il campo è sempre un intero.
+        if (!Number.isInteger(record.progressivo)) {
+          record.progressivo = await coda.riservaProgressivi(1);
+        }
         record.stato = 'invio';
         record.ultimoErrore = '';
         await coda.aggiorna(record);
@@ -121,6 +126,7 @@ export function corpoInvio(record, impostazioni, contenutoBase64) {
     commessa: record.cantiere,
     operatore: record.autore,
     idClient: record.id,
+    progressivo: record.progressivo,
     dataInvio: record.timestampDispositivo,
     nomeFile: componiNomeFile(record),
     contenutoBase64,

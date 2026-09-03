@@ -6,11 +6,12 @@ import * as coda from '../modules/bolle/coda.js';
 export async function vistaInformazioni(el) {
   el.innerHTML = '<section class="scheda"><h2>Informazioni</h2><p class="tenue">Lettura in corso&hellip;</p></section>';
 
-  const [versione, spazio, record, storico] = await Promise.all([
+  const [versione, spazio, record, storico, progressivo] = await Promise.all([
     versioneInUso(),
     spazioUsato(),
     coda.elenca().catch(() => []),
     coda.elencaStorico().catch(() => []),
+    coda.progressivoRaggiunto().catch(() => 0),
   ]);
 
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio').length;
@@ -32,6 +33,7 @@ export async function vistaInformazioni(el) {
         <dt>Foto da inviare</dt><dd>${bozze}</dd>
         <dt>In coda o in errore</dt><dd>${inAttesa} in attesa, ${inErrore} in errore</dd>
         <dt>Bolle nello storico</dt><dd>${storico.length}</dd>
+        <dt>Numero progressivo raggiunto</dt><dd>${progressivo || '—'}</dd>
       </dl>
       <button id="cerca-aggiornamenti" class="btn btn-secondario">Cerca aggiornamenti</button>
       <p id="esito-aggiornamento" class="tenue"></p>
