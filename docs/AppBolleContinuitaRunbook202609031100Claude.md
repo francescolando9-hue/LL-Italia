@@ -96,4 +96,4 @@ Verifica dei punti 1-2, sui numeri: tre foto di fila dallo stesso telefono senza
 
 ---
 
-*Approfondimenti nel repo dell'app, non necessari per questa sessione: `README.md`, `docs/AppBolleSpecificaFunzionale….md`, `docs/AppBolleProceduraResponseFlow….md` (procedure campo per campo sul flow ed esiti dei collaudi).*
+*Approfondimenti nel repo dell'app, non necessari per questa sessione: `README.md`, `docs/AppBolleSpecificaFunzionale….md`, `docs/AppBolleFlowRicezione….md` (struttura del flow, procedure campo per campo, esiti dei collaudi).*

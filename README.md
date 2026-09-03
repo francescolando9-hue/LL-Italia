@@ -2,7 +2,7 @@
 
 App contenitore a moduli del gruppo MLP / LL Italia. Primo modulo attivo: **Bolle** — fotografare le bolle di consegna in cantiere e inviarle al sistema di magazzino (endpoint HTTP → raccolta SharePoint BolleInArrivo). I moduli futuri si aggiungeranno senza rifare la base.
 
-Stack: **vanilla JS, HTML, CSS** — nessun framework, nessun build step, nessuna dipendenza a runtime. PWA con Service Worker (offline e installazione) e IndexedDB (coda del modulo). Fonte di verità del modulo Bolle: la specifica funzionale in `docs/` (`AppBolleSpecificaFunzionale….md`, prevale su tutto), poi il kickoff `AppLLItaliaKickoffClaudeCode….md` e `CLAUDE.md`.
+Stack: **vanilla JS, HTML, CSS** — nessun framework, nessun build step, nessuna dipendenza a runtime. PWA con Service Worker (offline e installazione) e IndexedDB (coda del modulo). Fonte di verità del modulo Bolle: la specifica funzionale in `docs/` (`AppBolleSpecificaFunzionale….md`, prevale su tutto), poi `CLAUDE.md`.
 
 ## Come installarla sul telefono
 
@@ -90,7 +90,11 @@ icons/                icone dal logo ufficiale (logo.png = sorgente)
 core/                 shell: router hash, home/launcher, impostazioni app, design system CSS
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
-docs/                 specifica funzionale e kickoff
+docs/                 4 documenti, tutti correnti:
+                      AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
+                      AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
+                      AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
+                      AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
 ```
 
 **Una deroga da ratificare:** `core/vendor/qrcode.mjs` è codice di terzi incluso nel repo — il generatore di QR `qrcode-generator` di Kazuhiko Arase, licenza MIT, copiato senza modifiche. Non è una dipendenza installata (nessun npm, nessun build step) e viene caricato **solo** dalla schermata di condivisione della configurazione, quindi non pesa sull'avvio. Scriverne uno da zero avrebbe significato implementare correzione d'errore Reed-Solomon e mascheratura: un QR sbagliato è peggio di nessun QR. La verifica è per decodifica: il collaudo rilegge col riconoscitore il codice generato e confronta il testo con il link atteso.
@@ -156,14 +160,13 @@ L'elenco è in `modules/bolle/cantieri.js` e **non è modificabile dal dispositi
 
 Al primo utilizzo la scelta è esplicita (`— scegli il cantiere —`, Invia resta disabilitato); poi l'ultimo cantiere usato è preselezionato.
 
-## ⚠️ Punto aperto: CORS sull'endpoint reale
+## CORS: risolto il 03/09/2026
 
-L'app gira in un browser, quindi ogni invio con `Content-Type: application/json` è preceduto da una richiesta **preflight `OPTIONS`**. Perché l'app riceva il 202, il flow deve rispondere al preflight e includere l'header `Access-Control-Allow-Origin` (per l'origine di GitHub Pages o `*`). Verificato in collaudo con endpoint finto:
+L'app gira in un browser, quindi ogni invio con `Content-Type: application/json` è preceduto da una richiesta **preflight `OPTIONS`**: perché l'app riceva la conferma, il flow deve rispondere al preflight e includere l'header `Access-Control-Allow-Origin`. Le tre azioni *Response* del flow lo portano, e da quel momento il verde dell'app significa **salvata** e non più soltanto **accettata** (senza Response esplicite Power Automate risponde `202` all'arrivo della richiesta, prima di eseguire il flow).
 
-- endpoint che risponde al preflight → 3 foto scattate, 3 inviate, 3 atterrate, contatore errori 0;
-- endpoint che **non** risponde al preflight → 0 foto atterrate, ma **nessuna perdita**: restano in coda in stato *Errore* con il messaggio «Invio bloccato: nessuna risposta dall'endpoint (rete assente o CORS)» e ripartono col retry appena il flow risponde correttamente.
+Verificato in laboratorio con endpoint finto, prima di toccare il flow reale: endpoint che risponde al preflight → 3 foto scattate, 3 inviate, 3 atterrate, 0 errori; endpoint che **non** risponde → 0 atterrate e **nessuna perdita**, le foto restano in coda in stato *Errore* con il messaggio «Invio bloccato: nessuna risposta dall'endpoint (rete assente o CORS)» e ripartono col retry appena il flow risponde correttamente. Poi verificato sul flow reale dal telefono: con token errato l'app riceve `401` e la foto **non** risulta inviata.
 
-Se il collaudo del backend è stato fatto con curl o Postman, questo punto non è ancora stato verificato: va provato dal telefono prima di distribuire l'app.
+Dettaglio delle azioni e degli esiti: `docs/AppBolleFlowRicezione….md`.
 
 ## Sviluppo locale
 
@@ -176,4 +179,4 @@ A ogni modifica dei file dell'app va incrementata `VERSIONE` in `sw.js` (e aggio
 
 ## Fuori perimetro (in capo a Francesco)
 
-Deduplica lato backend sull'`idClient`; token definitivo al posto di `collaudo`; elenco autori libero o vincolato; hosting di produzione; OCR, login M365, notifiche push, moduli futuri.
+Sul flow e sulla raccolta: colonna `Progressivo` e sua mappatura, `DataInvio` come colonna di testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori a campo libero, deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
