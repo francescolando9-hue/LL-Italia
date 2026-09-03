@@ -49,3 +49,12 @@ Una sola foto dal telefono, subito dopo il salvataggio del flow:
 Poi il duplicato: cronologia → esecuzione riuscita → **Resubmit** → deve restare un solo file, esecuzione verde.
 
 Il criterio che decide resta il confronto **sui numeri**: scattate nell'app contro file atterrati in raccolta.
+
+## Esiti del collaudo del 03/09/2026
+
+- **Response**: le tre azioni funzionano. Con token errato l'app riceve `401` e la foto **non** risulta inviata: la conferma dell'app è diventata reale (prima, col 202 automatico, mostrava «Inviata» pur essendo scartata).
+- **Nome file**: corretto — `BollaMAR202609030917FrancescoLandod5e1.jpg`, ora reale del dispositivo, senza secondi, con le 4 cifre dell'`idClient`.
+- **Fuso di SharePoint**: la colonna `DataInvio` mostrava 7 ore in meno dell'ora reale (09:17 → 02:17). Il valore salvato è corretto — lo dimostra il nome file, che nasce dallo stesso campo — mentre il **fuso del sito** era impostato su un fuso americano. Si corregge in *Impostazioni sito → Impostazioni internazionali → Fuso orario* → `(UTC+01:00) … Rome`; anche le impostazioni personali dell'utente possono sovrascriverlo. Nessuna modifica al flow.
+- **Deduplica non scattata**: al Resubmit il flow è passato dal ramo False e ha rieseguito `Create file`. Il file unico in raccolta **non** era merito della deduplica: essendo il nome identico (stesso `dataInvio`, stesso `idClient`), SharePoint ha sovrascritto l'esistente. Causa attesa: il confronto `empty(...)` **is equal to** `false` non combacia, perché `false` digitato a mano è testo e non il booleano. **Correzione:** confronto numerico — sinistra `length(outputs('CercaDuplicati')?['body/value'])`, operatore **is greater than**, destra `0`.
+- **Verifica corretta della deduplica:** non contare i file (l'omonimia li sovrascrive e maschera il difetto), ma guardare il run: `Create file` deve risultare **skipped** e `Response 1` con `Terminate 1` verdi.
+- **`Response` skipped su Resubmit**: comportamento normale, non un difetto — il chiamante HTTP originale non esiste più.
