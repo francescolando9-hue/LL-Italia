@@ -20,6 +20,9 @@ const MINIATURE_DA_CONSERVARE = 300;
 // sempre letto insieme a operatore e idClient.
 const STORE_CONTATORE = 'contatore';
 const CHIAVE_PROGRESSIVO = 'progressivo';
+// Identificativo stabile dell'installazione: dà un titolare certo alla sequenza
+// dei progressivi, che altrimenti andrebbe raggruppata per nome dell'operatore.
+const CHIAVE_DISPOSITIVO = 'idDispositivo';
 const CHIAVE_CONTATORI = 'llitalia.bolle.contatori';
 
 let dbPromise = null;
@@ -138,6 +141,33 @@ export function riservaProgressivi(quanti = 1) {
       store.put({ chiave: CHIAVE_PROGRESSIVO, valore: ultimo + quanti });
     };
     tx.oncomplete = () => risolvi(primo);
+    tx.onerror = () => rifiuta(tx.error);
+    tx.onabort = () => rifiuta(tx.error);
+  }));
+}
+
+// Identità del dispositivo: generata alla prima lettura e mai più cambiata.
+// Il progressivo da solo non basta al runbook: raggruppare le sequenze per
+// "operatore" — che è testo libero — le spezza a ogni grafia diversa del nome
+// e ne fonde due se la stessa persona usa due telefoni. Con l'idDispositivo
+// la sequenza ha un titolare stabile, che non cambia se l'operatore corregge
+// il proprio nome. Riparte solo con una reinstallazione, insieme al contatore.
+export function idDispositivo() {
+  return apri().then(db => new Promise((risolvi, rifiuta) => {
+    const tx = db.transaction(STORE_CONTATORE, 'readwrite');
+    const store = tx.objectStore(STORE_CONTATORE);
+    let id = '';
+    const lettura = store.get(CHIAVE_DISPOSITIVO);
+    lettura.onsuccess = () => {
+      id = (lettura.result && lettura.result.valore) || '';
+      // Lettura e scrittura nella stessa transazione: due viste che aprono
+      // insieme l'app non devono poter generare due identità diverse.
+      if (!id) {
+        id = crypto.randomUUID();
+        store.put({ chiave: CHIAVE_DISPOSITIVO, valore: id });
+      }
+    };
+    tx.oncomplete = () => risolvi(id);
     tx.onerror = () => rifiuta(tx.error);
     tx.onabort = () => rifiuta(tx.error);
   }));

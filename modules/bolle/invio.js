@@ -1,6 +1,7 @@
 // Invio della coda del modulo Bolle verso l'endpoint del magazzino.
-// Un elemento esce dalla coda SOLO a conferma del server (202 Accepted);
-// idClient univoco per invio, che il backend userà per la deduplica.
+// Un elemento esce dalla coda SOLO a conferma del server; idClient univoco
+// per bolla, che il backend userà per la deduplica, e idDispositivo stabile
+// per installazione, che dà un titolare certo alla sequenza dei progressivi.
 import * as coda from './coda.js';
 import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
 
@@ -120,12 +121,13 @@ export function componiNomeFile(record) {
 }
 
 // Costruisce il corpo del contratto concordato col backend (già attivo).
-export function corpoInvio(record, impostazioni, contenutoBase64) {
+export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo) {
   return {
     token: impostazioni.token,
     commessa: record.cantiere,
     operatore: record.autore,
     idClient: record.id,
+    idDispositivo,
     progressivo: record.progressivo,
     dataInvio: record.timestampDispositivo,
     nomeFile: componiNomeFile(record),
@@ -142,12 +144,13 @@ async function inviaSingola(record) {
   // Contratto del backend collaudato: POST JSON, un file per richiesta,
   // risposta 202 Accepted senza corpo. Da non modificare senza aggiornare il flow.
   const contenutoBase64 = await blobInBase64(record.foto);
+  const dispositivo = await coda.idDispositivo();
   let risposta;
   try {
     risposta = await fetch(normalizzaEndpoint(impostazioni.endpoint), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64)),
+      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo)),
     });
   } catch {
     // fetch fallisce senza status sia con rete assente sia quando il browser
@@ -171,7 +174,7 @@ async function inviaSingola(record) {
 async function inviaMock(record) {
   await new Promise(risolvi => setTimeout(risolvi, 700));
   const impostazioni = impostazioniBolle();
-  const corpo = corpoInvio(record, impostazioni, 'mock');
+  const corpo = corpoInvio(record, impostazioni, 'mock', await coda.idDispositivo());
   let dati;
   try {
     dati = JSON.parse(localStorage.getItem(CHIAVE_MOCK)) || {};

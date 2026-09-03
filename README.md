@@ -77,7 +77,7 @@ Quando si pubblica una versione nuova, sui telefoni già installati compare in b
 
 ## Impostazioni
 
-- **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore.
+- **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore; sotto, il riquadro *Questo dispositivo* con l'identificativo in sola lettura e il pulsante per copiarlo.
 - **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, token, mock on/off, quante foto inviate conservare (ultime N, default 20). L'elenco cantieri non si tocca da qui: vedi sotto.
 
 ## Struttura del repo
@@ -105,11 +105,13 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 
 Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server** (202 Accepted); ogni invio porta un `idClient` univoco, su cui il backend potrà deduplicare.
 
-### Numero progressivo del dispositivo
+### Identificativo del dispositivo e numero progressivo
 
 Ogni foto **accodata** riceve un intero incrementale, conservato in IndexedDB: parte da 1 alla prima installazione, non si azzera mai e sopravvive agli aggiornamenti dell'app. Viaggia nel payload come campo `progressivo` e compare a video accanto a ogni bolla — in *Coda invii* e nello storico — così l'operatore può leggerlo a voce quando serve un riscontro dall'ufficio. In *Informazioni sull'app* si vede il numero raggiunto.
 
-Serve a rendere misurabile il tratto fra il telefono e la raccolta: **ordinando le bolle per operatore, un numero mancante nella sequenza significa una foto scattata e mai arrivata.** Oggi quel tratto non sarebbe visibile in alcun altro modo.
+Il titolare di quella sequenza è l'**`idDispositivo`**: un GUID generato alla prima apertura e salvato accanto al contatore, che identifica l'installazione e non la persona. Non cambia se l'operatore corregge il proprio nome; riparte solo con una reinstallazione, insieme al contatore. Si legge in *Impostazioni app → Questo dispositivo*, in sola lettura, con un pulsante per copiarlo.
+
+Insieme rendono misurabile il tratto fra il telefono e la raccolta: **raggruppando le bolle per dispositivo, un numero mancante nella sequenza significa una foto scattata e mai arrivata.** Senza questi due campi quel tratto non sarebbe visibile in alcun modo. Raggruppare per `operatore` non basterebbe: è testo libero, quindi una grafia diversa del nome spezza una sequenza e due telefoni della stessa persona ne fondono due.
 
 Perché il segnale resti affidabile, il numero si assegna **all'accodamento** (alla pressione di *Invia*), non allo scatto e non al tentativo di invio:
 
@@ -117,7 +119,7 @@ Perché il segnale resti affidabile, il numero si assegna **all'accodamento** (a
 - i **retry** riusano lo stesso numero, esattamente come `idClient`: il numero è dell'immagine, non della richiesta;
 - il numero è assegnato anche **offline**, prima di qualunque rete: si vede in coda subito ed è già quello che arriverà al server.
 
-La sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1, e un telefono reinstallato riparte da 1. Il campo va quindi sempre letto **insieme a `operatore` e `idClient`**, mai da solo.
+La sequenza è **per dispositivo, non globale**: due telefoni hanno entrambi il proprio n. 1, e un telefono reinstallato riparte da 1 con un `idDispositivo` nuovo — evento atteso, e riconoscibile proprio perché l'identificativo cambia.
 
 ## Contratto con il backend (in vigore)
 
@@ -131,6 +133,7 @@ Content-Type: application/json
   "commessa": "MAR",                       // solo il codice: MAR | SNZ2.2 | MNG
   "operatore": "Paolo Sanzarello",
   "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
+  "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
   "progressivo": 137,                      // intero: sequenza di quel dispositivo
   "dataInvio": "2026-09-01T17:27:53+02:00",
   "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
@@ -179,4 +182,4 @@ A ogni modifica dei file dell'app va incrementata `VERSIONE` in `sw.js` (e aggio
 
 ## Fuori perimetro (in capo a Francesco)
 
-Sul flow e sulla raccolta: colonna `Progressivo` e sua mappatura, `DataInvio` come colonna di testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori a campo libero, deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
+Sul flow e sulla raccolta: colonne `Progressivo` e `IdDispositivo` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori a campo libero, deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
