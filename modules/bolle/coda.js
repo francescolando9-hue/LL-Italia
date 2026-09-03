@@ -80,7 +80,7 @@ export function timestampDispositivo(data = new Date()) {
 
 // La foto entra in IndexedDB già allo scatto (stato bozza): non si perde
 // nemmeno se l'app viene chiusa prima di premere Invia.
-export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impronta = '') {
+export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impronta = '', qualita = 'ok', motivoQualita = '') {
   const record = {
     id: crypto.randomUUID(),
     stato: 'bozza',
@@ -89,6 +89,8 @@ export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impront
     foto: fotoBlob,
     miniatura,
     impronta,
+    qualita,
+    motivoQualita,
     nome: nomeOriginale || '',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
@@ -123,6 +125,18 @@ export async function confermaBozze(cantiere, autore) {
     await aggiorna(record);
   }
   return bozze.length;
+}
+
+// Conferma una sola bozza: usata dalla correzione del cantiere, dove non si
+// possono coinvolgere le altre foto in attesa, che vanno su un altro cantiere.
+export async function confermaSingola(id, cantiere, autore) {
+  const record = (await elenca()).find(r => r.id === id && r.stato === 'bozza');
+  if (!record) return false;
+  record.stato = 'in_coda';
+  record.cantiere = cantiere;
+  record.autore = autore;
+  await aggiorna(record);
+  return true;
 }
 
 // Le foto inviate restano consultabili: si conservano le ultime N, le più

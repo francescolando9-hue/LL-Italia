@@ -1,9 +1,10 @@
 // Bolle inviate: calendario del mese, elenco del giorno o del mese scelto,
 // apertura della foto. Legge il registro locale del dispositivo, che
 // sopravvive alla potatura delle immagini a piena risoluzione.
-import { scappaHtml } from '../../core/impostazioni.js';
+import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { CANTIERI, etichettaCantiere } from './cantieri.js';
 import * as coda from './coda.js';
+import * as invio from './invio.js';
 
 const GIORNI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
@@ -221,8 +222,59 @@ async function apriBolla(idClient) {
   }
   const url = URL.createObjectURL(immagine);
   urlAperti.push(url);
+  const riga = righe.find(r => r.idClient === idClient);
   contenuto.innerHTML = `<img src="${url}" alt="Bolla inviata">
-    ${record ? '' : '<p class="bolle-visore-messaggio">Anteprima ridotta conservata sul telefono.</p>'}`;
+    ${record ? '' : '<p class="bolle-visore-messaggio">Anteprima ridotta conservata sul telefono.</p>'}
+    ${record ? riquadroCorrezione(riga) : ''}`;
+  if (record) collegaCorrezione(record, riga);
+}
+
+// Correzione del cantiere: possibile solo se la foto originale è ancora sul
+// dispositivo, perché rimandare la miniatura significherebbe consegnare al
+// magazzino una bolla meno leggibile dell'originale.
+function riquadroCorrezione(riga) {
+  const attuale = riga ? riga.commessa : '';
+  const altri = CANTIERI.filter(c => c.codice !== attuale);
+  if (altri.length === 0) return '';
+  return `
+    <div class="bolle-correzione">
+      <p class="titolo">Cantiere sbagliato?</p>
+      <p class="tenue">Rimanda la stessa foto sul cantiere giusto.</p>
+      <select id="cantiere-corretto">
+        ${altri.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('')}
+      </select>
+      <button id="rimanda" class="btn btn-secondario btn-piccolo">Rimanda</button>
+      <p id="esito-correzione" class="tenue"></p>
+    </div>
+  `;
+}
+
+function collegaCorrezione(record, riga) {
+  const pulsante = radice.querySelector('#rimanda');
+  if (!pulsante) return;
+  pulsante.addEventListener('click', async () => {
+    const scelto = radice.querySelector('#cantiere-corretto').value;
+    const esito = radice.querySelector('#esito-correzione');
+    const conferma = window.confirm(
+      `Rimandare questa bolla su ${scelto}?\n\n`
+      + `Attenzione: quella già inviata${riga ? ` su ${riga.commessa}` : ''} resta in magazzino `
+      + 'e va annullata dall\'ufficio.');
+    if (!conferma) return;
+    pulsante.disabled = true;
+    esito.textContent = 'Invio in corso…';
+    try {
+      const nuova = await coda.aggiungiBozza(
+        record.foto, record.nome, record.miniatura, record.impronta, record.qualita, record.motivoQualita);
+      await coda.confermaSingola(nuova.id, scelto, impostazioniApp.autore || record.autore);
+      coda.incrementaScattate(1);
+      invio.avvia();
+      esito.textContent = `In coda per ${scelto}: la trovi nella coda invii, dove diventa verde a consegna avvenuta.`
+        + ' Avvisa l\'ufficio di annullare quella sbagliata.';
+    } catch {
+      esito.textContent = 'Non è stato possibile rimandarla: riprova.';
+      pulsante.disabled = false;
+    }
+  });
 }
 
 function chiudiVisore() {

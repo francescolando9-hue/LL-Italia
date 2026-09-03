@@ -40,6 +40,23 @@
 
 .bolle-anteprima img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+/* Anteprima segnalata come poco leggibile */
+.bolle-anteprima.poco-leggibile { outline: 3px solid var(--attesa); outline-offset: -3px; }
+
+.bolle-marchio-qualita {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(160, 94, 0, 0.92);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 3px 4px;
+  text-align: center;
+}
+
 .bolle-rimuovi {
   position: absolute;
   top: 4px;
@@ -250,4 +267,41 @@
   color: #fff;
   font-size: 1.4rem;
   cursor: pointer;
+}
+
+/* Codice di configurazione da far inquadrare */
+.bolle-qr {
+  background: #fff;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  padding: 10px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.bolle-qr svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+
+/* Correzione del cantiere, dentro il visore della bolla */
+.bolle-correzione {
+  background: var(--carta);
+  border-radius: var(--raggio);
+  padding: 14px 16px;
+  margin: 14px auto 0;
+  max-width: 420px;
+  text-align: left;
+}
+
+.bolle-correzione .titolo { font-weight: 700; margin: 0; }
+.bolle-correzione p { margin: 4px 0; }
+
+.bolle-correzione select {
+  width: 100%;
+  min-height: 48px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 2px solid var(--bordo);
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+  color: var(--testo);
 }
