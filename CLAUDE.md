@@ -7,10 +7,11 @@ Shell (core/): manifest e branding "LL Italia", Service Worker, home/launcher co
 Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni (per Bolle: endpoint, chiave, mock).
 Con un solo modulo attivo, la home può portare direttamente a Bolle, ma la struttura a launcher resta.
 Fonte di verità (per il modulo Bolle)
-AppBolleSpecificaFunzionale….md — specifica ufficiale (verrà allegata da Francesco: prevale su tutto).
-Il kickoff AppLLItaliaKickoffClaudeCode….md.
-Questo file.
-Le parti marcate [PROVVISORIO] si implementano dietro configurazione, mai cablate. Non inventare nomi di campi SharePoint, percorsi, formati non documentati: se un'informazione manca, fermarsi e chiedere.
+docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale su tutto.
+docs/AppBolleFlowRicezione….md — il flow di ricezione e la raccolta BolleInArrivo (struttura, procedure, esiti dei collaudi).
+docs/AppBolleContinuitaRunbook….md — documento unico per il lavoro a valle, dalla raccolta in poi.
+Questo file. Il kickoff del 01/09/2026 è superato dalla specifica rev. 2 e resta nella storia del repo.
+Non inventare nomi di campi SharePoint, percorsi, formati non documentati: se un'informazione manca, fermarsi e chiedere.
 Stack vincolato
 Vanilla JS, HTML, CSS. Nessun framework, nessun build step, nessuna dipendenza npm a runtime. (Standard del gruppo; stesso stack del repo archiviowhatsapp.)
 Service Worker per offline e install; IndexedDB per le code dei moduli; manifest PWA a nome "LL Italia".
