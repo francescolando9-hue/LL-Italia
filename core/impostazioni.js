@@ -68,6 +68,7 @@ export function vistaImpostazioniApp(el) {
       </form>
       <p id="conferma" class="avviso avviso-info nascosto">Impostazioni salvate.</p>
     </section>
+    <p style="text-align:center"><a class="tenue" href="#/informazioni">Informazioni sull'app</a></p>
   `;
   el.querySelector('#modulo-impostazioni').addEventListener('submit', evento => {
     evento.preventDefault();

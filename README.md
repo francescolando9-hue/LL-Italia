@@ -45,6 +45,14 @@ Aggiungendo dalla galleria un file **identico** a uno già presente (stessa imma
 
 Due scatti diversi della stessa bolla restano invece due invii distinti: nessun confronto di byte può riconoscerli, servirebbe leggere il numero della bolla (OCR), che è fuori perimetro.
 
+## Informazioni e aggiornamenti
+
+Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico. C'è anche un pulsante **Cerca aggiornamenti**.
+
+La versione non è scritta a mano da nessuna parte: si legge dal nome della cache che il Service Worker ha davvero attiva, quindi non può divergere dal codice pubblicato.
+
+Quando si pubblica una versione nuova, sui telefoni già installati compare in basso una barra **«È disponibile una versione aggiornata dell'app»** con il pulsante *Aggiorna*: nessuno deve svuotare cache o reinstallare.
+
 ## Impostazioni
 
 - **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore.
