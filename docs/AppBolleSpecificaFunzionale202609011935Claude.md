@@ -64,6 +64,13 @@ Senza un'azione *Response* esplicita, Power Automate risponde **202 Accepted all
 **Risolto il 03/09/2026** aggiungendo tre azioni *Response* al flow — una per ogni via d'uscita (token errato 401, duplicato 200, salvataggio riuscito 200) — con l'header `Access-Control-Allow-Origin: *`, che soddisfa anche il preflight CORS del browser. Verificato dal telefono: con token errato l'app riceve `401` e la foto **non** risulta inviata, resta in coda e ritenta. Da quel momento «Inviata» equivale a «salvata».
 Il collaudo resta comunque **sui numeri** — scattate nell'app contro file atterrati in raccolta — e la cronologia del flow è il luogo dove i fallimenti sono visibili. Procedura ed esiti: `docs/AppBolleFlowRicezione….md`.
 
+## Azzeramento del conteggio del giorno (aggiunto il 03/09/2026)
+Quando l'ufficio cancella da SharePoint bolle mandate per sbaglio e queste vengono rimandate, i contatori del giorno sommano invii veri e invii annullati: il confronto "scattate contro atterrate", che è il criterio di collaudo, smette di tornare. Il pulsante **Azzera i contatori di oggi** fa ripartire il conteggio.
+
+- **Dove:** pagina *Informazioni sull'app*, in fondo — non nella schermata di lavoro. Conferma in due passaggi, con i numeri che si stanno per azzerare in chiaro. È un'azione rara e non reversibile, e in cantiere si lavora coi guanti.
+- **Cosa azzera:** i contatori scattate/inviate del giorno; toglie inoltre dall'elenco della coda le bolle già confermate dal server, che restano solo come promemoria.
+- **Cosa non tocca, per principio:** le foto in stato bozza, in coda o in errore (nessuna bolla non arrivata può sparire da lì); lo storico degli invii; il `progressivo` e l'`idDispositivo`. **Azzerare la numerazione aprirebbe in raccolta un buco falso**, indistinguibile da una bolla persa: è esattamente il segnale che il campo esiste per dare.
+
 ## Sicurezza
 - Il token nell'app pubblicata è un segreto debole: difese reali nel flow (validazioni, throttling, dimensioni). Rischio residuo accettato: upload spuri in ingresso; nessun dato in uscita dall'endpoint.
 

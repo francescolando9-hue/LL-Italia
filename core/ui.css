@@ -260,3 +260,11 @@ body {
   margin-top: 12px;
 }
 .info-elenco dd { margin: 2px 0 0; }
+
+/* Coppia annulla/conferma per le azioni che non si tornano indietro */
+.azioni-riga {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.azioni-riga .btn { flex: 1; }

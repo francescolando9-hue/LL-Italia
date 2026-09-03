@@ -14,6 +14,7 @@ export async function vistaInformazioni(el) {
     coda.progressivoRaggiunto().catch(() => 0),
   ]);
 
+  const oggi = coda.contatoriOggi();
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio').length;
   const inErrore = record.filter(r => r.stato === 'errore').length;
   const bozze = record.filter(r => r.stato === 'bozza').length;
@@ -38,8 +39,44 @@ export async function vistaInformazioni(el) {
       <button id="cerca-aggiornamenti" class="btn btn-secondario">Cerca aggiornamenti</button>
       <p id="esito-aggiornamento" class="tenue"></p>
     </section>
+    <section class="scheda">
+      <h2>Riparti col conteggio di oggi</h2>
+      <p class="tenue">Da usare quando l'ufficio ha tolto da SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: i contatori di oggi contano anche gli invii annullati, e non si capisce più quanti siano quelli veri.</p>
+      <p class="tenue">Azzera <strong>solo i contatori del giorno</strong> e toglie dall'elenco le bolle già confermate dal server. <strong>Non</strong> tocca le foto ancora da inviare o in errore, lo storico delle bolle inviate, la numerazione progressiva.</p>
+      <button id="azzera-giorno" class="btn btn-secondario">Azzera i contatori di oggi</button>
+      <div id="conferma-azzeramento" class="avviso avviso-attenzione nascosto">
+        <p><strong>Confermi?</strong> I contatori di oggi (${oggi.scattate} scattate, ${oggi.inviate} inviate) ripartono da zero.</p>
+        <div class="azioni-riga">
+          <button id="annulla-azzeramento" class="btn btn-secondario">Annulla</button>
+          <button id="conferma-azzera" class="btn btn-primario">Sì, azzera</button>
+        </div>
+      </div>
+      <p id="esito-azzeramento" class="tenue"></p>
+    </section>
     <a class="btn btn-secondario" href="#/">Torna all'app</a>
   `;
+
+  // Due passaggi, non uno: il pulsante sta in una pagina secondaria e chiede
+  // conferma, così non si preme per sbaglio con i guanti.
+  const riquadro = el.querySelector('#conferma-azzeramento');
+  const esitoAzzera = el.querySelector('#esito-azzeramento');
+  el.querySelector('#azzera-giorno').addEventListener('click', () => {
+    riquadro.classList.remove('nascosto');
+    esitoAzzera.textContent = '';
+  });
+  el.querySelector('#annulla-azzeramento').addEventListener('click', () => {
+    riquadro.classList.add('nascosto');
+  });
+  el.querySelector('#conferma-azzera').addEventListener('click', async () => {
+    riquadro.classList.add('nascosto');
+    const prima = coda.azzeraContatoriOggi();
+    const tolte = await coda.rimuoviInviate().catch(() => 0);
+    const rimaste = (await coda.elenca().catch(() => []))
+      .filter(r => r.stato !== 'inviata').length;
+    esitoAzzera.textContent =
+      `Conteggio ripartito da zero (erano ${prima.scattate} scattate e ${prima.inviate} inviate). `
+      + `Tolte dall'elenco ${tolte} bolle già confermate; ${rimaste} foto restano sul telefono.`;
+  });
 
   el.querySelector('#cerca-aggiornamenti').addEventListener('click', async () => {
     const esito = el.querySelector('#esito-aggiornamento');

@@ -71,6 +71,18 @@ La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va a
 
 Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico, numero progressivo raggiunto. C'è anche un pulsante **Cerca aggiornamenti**.
 
+### Riparti col conteggio di oggi
+
+Sulla stessa pagina, in fondo, il pulsante **Azzera i contatori di oggi**. Serve quando l'ufficio ha tolto da SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: i contatori del giorno sommano invii veri e invii annullati, e non si capisce più quanti siano quelli buoni — proprio il numero su cui si regge il collaudo.
+
+Azzera i contatori del giorno e toglie dall'elenco le bolle già confermate dal server. **Non** tocca:
+
+- le foto ancora da inviare o in errore — nessuna bolla non arrivata può sparire da lì;
+- lo storico delle bolle inviate, che è il registro del dispositivo e non un contatore;
+- la **numerazione progressiva**, che deve proseguire: azzerarla aprirebbe in raccolta un buco falso, indistinguibile da una bolla persa.
+
+Sta in una pagina secondaria e chiede conferma in due passaggi, con davanti i numeri che si stanno per azzerare: con i guanti un tocco per sbaglio ci sta.
+
 La versione non è scritta a mano da nessuna parte: si legge dal nome della cache che il Service Worker ha davvero attiva, quindi non può divergere dal codice pubblicato.
 
 Quando si pubblica una versione nuova, sui telefoni già installati compare in basso una barra **«È disponibile una versione aggiornata dell'app»** con il pulsante *Aggiorna*: nessuno deve svuotare cache o reinstallare.
