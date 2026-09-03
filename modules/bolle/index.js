@@ -9,6 +9,7 @@ import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
 import { vistaStorico } from './storico.js';
+import { vistaConfigura, vistaCondividi } from './configurazione.js';
 
 export default {
   id: 'bolle',
@@ -19,6 +20,8 @@ export default {
     registraRotta('#/bolle', vista);
     registraRotta('#/bolle/impostazioni', vistaImpostazioniBolle);
     registraRotta('#/bolle/storico', vistaStorico);
+    registraRotta('#/bolle/configura', vistaConfigura);
+    registraRotta('#/bolle/condividi', vistaCondividi);
     // Invio automatico al ritorno della connettività, anche fuori dalla vista.
     window.addEventListener('online', () => invio.avvia());
     invio.alCambiamento(() => { ridisegna(); });
@@ -190,7 +193,11 @@ async function eliminaBozza(id) {
 
 // Ridisegna le parti dinamiche: contatori, anteprime, coda.
 async function ridisegna() {
-  if (!radice || !radice.isConnected) return;
+  // Tutte le viste condividono lo stesso contenitore, quindi "è ancora nel
+  // documento" non dice nulla: la guardia giusta è la presenza degli elementi
+  // di questa vista. Senza, un invio che si conclude mentre l'utente sta
+  // guardando lo storico proverebbe a ridisegnare contatori inesistenti.
+  if (!radice || !radice.querySelector('#bolle-contatori')) return;
   revocaUrl();
   const record = await coda.elenca();
   const bozze = record.filter(r => r.stato === 'bozza');

@@ -44,8 +44,13 @@ export function vistaImpostazioniBolle(el) {
       </form>
       <p id="conferma" class="avviso avviso-info nascosto"></p>
       <p class="tenue">Cantieri disponibili: ${elencoCantieri}.</p>
-      <a class="btn btn-secondario" href="#/bolle">Torna a Bolle</a>
     </section>
+    <section class="scheda">
+      <h2>Altri telefoni</h2>
+      <p class="tenue">Passa indirizzo e codice a un altro telefono facendogli inquadrare un codice, senza digitare nulla.</p>
+      <a class="btn btn-secondario" href="#/bolle/condividi">Configura un altro telefono</a>
+    </section>
+    <a class="btn btn-secondario" href="#/bolle">Torna a Bolle</a>
   `;
 
   el.querySelector('#modulo-imp-bolle').addEventListener('submit', async evento => {

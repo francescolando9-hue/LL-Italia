@@ -268,3 +268,40 @@
   font-size: 1.4rem;
   cursor: pointer;
 }
+
+/* Codice di configurazione da far inquadrare */
+.bolle-qr {
+  background: #fff;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  padding: 10px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.bolle-qr svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+
+/* Correzione del cantiere, dentro il visore della bolla */
+.bolle-correzione {
+  background: var(--carta);
+  border-radius: var(--raggio);
+  padding: 14px 16px;
+  margin: 14px auto 0;
+  max-width: 420px;
+  text-align: left;
+}
+
+.bolle-correzione .titolo { font-weight: 700; margin: 0; }
+.bolle-correzione p { margin: 4px 0; }
+
+.bolle-correzione select {
+  width: 100%;
+  min-height: 48px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 2px solid var(--bordo);
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+  color: var(--testo);
+}

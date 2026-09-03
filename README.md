@@ -45,6 +45,28 @@ Aggiungendo dalla galleria un file **identico** a uno già presente (stessa imma
 
 Due scatti diversi della stessa bolla restano invece due invii distinti: nessun confronto di byte può riconoscerli, servirebbe leggere il numero della bolla (OCR), che è fuori perimetro.
 
+## Controllo di leggibilità
+
+Appena la foto è acquisita, l'app misura nitidezza e zone bruciate e avvisa se sembra **mossa, troppo scura o in controluce**: l'anteprima si marca in arancione col motivo. Una bolla illeggibile scoperta in cantiere si rifà in cinque secondi; scoperta in ufficio la sera è persa.
+
+**Avvisa, non blocca**: l'operatore può inviare comunque, perché la regola che nessuna bolla si perda prevale. Le soglie sono tarate per non allarmare sulle foto buone — un avviso che scatta sempre viene ignorato sempre. Metodo e valori misurati: `docs/AppBolleLeggibilita….md`.
+
+Il controllo non legge il contenuto della bolla: misura solo il contrasto locale dei pixel, quindi il modulo resta capture-only.
+
+## Configurare un altro telefono
+
+Un telefono già configurato può passare indirizzo e codice a un altro senza digitare nulla: *Impostazioni del modulo Bolle* → **Configura un altro telefono** mostra un codice QR da far inquadrare (e il link, copiabile).
+
+I dati viaggiano dentro l'hash dell'indirizzo, che il browser **non** invia al server: non finiscono nei log di GitHub Pages. Il telefono che riceve mostra destinazione e codice mascherato, chiede conferma, e dopo l'applicazione ripulisce l'indirizzo per non lasciare il segreto nella cronologia.
+
+⚠️ Quel codice **vale come una password**: si mostra solo a chi deve usare l'app, non si appende in bacheca e si manda per messaggio diretto, non in un gruppo.
+
+## Cantiere sbagliato
+
+Nello storico, aprendo una bolla si può **rimandarla su un altro cantiere** — capita di inviare col picker rimasto sull'ultimo cantiere usato. Possibile solo se la foto originale è ancora sul dispositivo: rimandare la miniatura significherebbe consegnare al magazzino una bolla meno leggibile.
+
+La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va annullata dall'ufficio. È un limite della scelta capture-only, non un difetto.
+
 ## Informazioni e aggiornamenti
 
 Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico. C'è anche un pulsante **Cerca aggiornamenti**.
@@ -66,9 +88,12 @@ manifest.webmanifest  manifest PWA "LL Italia"
 sw.js                 service worker: precache e offline (bump di VERSIONE a ogni release)
 icons/                icone dal logo ufficiale (logo.png = sorgente)
 core/                 shell: router hash, home/launcher, impostazioni app, design system CSS
+core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 docs/                 specifica funzionale e kickoff
 ```
+
+**Una deroga da ratificare:** `core/vendor/qrcode.mjs` è codice di terzi incluso nel repo — il generatore di QR `qrcode-generator` di Kazuhiko Arase, licenza MIT, copiato senza modifiche. Non è una dipendenza installata (nessun npm, nessun build step) e viene caricato **solo** dalla schermata di condivisione della configurazione, quindi non pesa sull'avvio. Scriverne uno da zero avrebbe significato implementare correzione d'errore Reed-Solomon e mascheratura: un QR sbagliato è peggio di nessun QR. La verifica è per decodifica: il collaudo rilegge col riconoscitore il codice generato e confronta il testo con il link atteso.
 
 Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di `core/app.js` (la tessera in home compare da sola). Con un solo modulo la home apre direttamente su Bolle.
 

@@ -127,6 +127,18 @@ export async function confermaBozze(cantiere, autore) {
   return bozze.length;
 }
 
+// Conferma una sola bozza: usata dalla correzione del cantiere, dove non si
+// possono coinvolgere le altre foto in attesa, che vanno su un altro cantiere.
+export async function confermaSingola(id, cantiere, autore) {
+  const record = (await elenca()).find(r => r.id === id && r.stato === 'bozza');
+  if (!record) return false;
+  record.stato = 'in_coda';
+  record.cantiere = cantiere;
+  record.autore = autore;
+  await aggiorna(record);
+  return true;
+}
+
 // Le foto inviate restano consultabili: si conservano le ultime N, le più
 // vecchie si eliminano (la conferma del server è già arrivata).
 export async function potaInviate(conservaUltime) {
