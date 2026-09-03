@@ -2,7 +2,7 @@
 // Flusso felice in 3 tocchi: foto → cantiere (ultimo usato preselezionato) → Invia.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { naviga } from '../../core/router.js';
-import { comprimiInJpeg, creaMiniatura, impronta } from './immagini.js';
+import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from './cantieri.js';
 import * as coda from './coda.js';
@@ -121,6 +121,7 @@ async function gestisciFile(evento) {
   const avviso = radice.querySelector('#avviso-foto');
   avviso.innerHTML = `<p class="avviso avviso-info">Elaborazione di ${file.length} foto&hellip;</p>`;
   const errori = [];
+  const scarse = [];
   let saltate = 0;
   for (const singolo of file) {
     try {
@@ -132,14 +133,24 @@ async function gestisciFile(evento) {
         saltate += 1;
         continue;
       }
+      // Controllo di leggibilità: avvisa, non blocca. Una bolla mossa scoperta
+      // in cantiere si rifà in cinque secondi; scoperta in ufficio è persa.
+      const qualita = await valutaLeggibilita(singolo);
+      if (qualita.esito === 'scarsa') scarse.push(qualita.motivo);
       const blob = await comprimiInJpeg(singolo);
       const miniatura = await creaMiniatura(singolo);
-      await coda.aggiungiBozza(blob, singolo.name, miniatura, marchio);
+      await coda.aggiungiBozza(blob, singolo.name, miniatura, marchio, qualita.esito, qualita.motivo);
     } catch (errore) {
       errori.push(`${singolo.name || 'foto'}: ${errore.message}`);
     }
   }
   const messaggi = [];
+  if (scarse.length) {
+    const motivi = [...new Set(scarse)].join(', ');
+    messaggi.push(`<p class="avviso avviso-attenzione">${scarse.length === 1
+      ? `La foto sembra <strong>${scappaHtml(motivi)}</strong>: se puoi rifalla adesso, prima di inviare.`
+      : `${scarse.length} foto sembrano poco leggibili (${scappaHtml(motivi)}): se puoi rifalle adesso, prima di inviare.`}</p>`);
+  }
   if (errori.length) messaggi.push(`<p class="avviso avviso-errore">Foto non aggiunte — ${scappaHtml(errori.join('; '))}</p>`);
   if (saltate) messaggi.push(`<p class="avviso avviso-info">${saltate === 1 ? 'Una foto già presente non è stata aggiunta.' : `${saltate} foto già presenti non sono state aggiunte.`}</p>`);
   avviso.innerHTML = messaggi.join('');
@@ -196,9 +207,12 @@ async function ridisegna() {
 
   const anteprime = radice.querySelector('#anteprime');
   anteprime.innerHTML = bozze.map(r => `
-    <div class="bolle-anteprima">
+    <div class="bolle-anteprima${r.qualita === 'scarsa' ? ' poco-leggibile' : ''}">
       <img src="${urlFoto(r.foto)}" alt="Anteprima bolla">
       <button class="bolle-rimuovi" data-id="${r.id}" aria-label="Rimuovi foto">&#10005;</button>
+      ${r.qualita === 'scarsa'
+        ? `<span class="bolle-marchio-qualita" title="${scappaHtml(r.motivoQualita)}">&#9888; ${scappaHtml(r.motivoQualita)}</span>`
+        : ''}
     </div>
   `).join('');
   for (const pulsante of anteprime.querySelectorAll('.bolle-rimuovi')) {

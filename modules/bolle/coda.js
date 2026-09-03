@@ -80,7 +80,7 @@ export function timestampDispositivo(data = new Date()) {
 
 // La foto entra in IndexedDB già allo scatto (stato bozza): non si perde
 // nemmeno se l'app viene chiusa prima di premere Invia.
-export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impronta = '') {
+export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impronta = '', qualita = 'ok', motivoQualita = '') {
   const record = {
     id: crypto.randomUUID(),
     stato: 'bozza',
@@ -89,6 +89,8 @@ export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impront
     foto: fotoBlob,
     miniatura,
     impronta,
+    qualita,
+    motivoQualita,
     nome: nomeOriginale || '',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
