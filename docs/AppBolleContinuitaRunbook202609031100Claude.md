@@ -1,6 +1,6 @@
 # App Bolle — Documento unico di continuità per il runbook magazzino
 
-> **Rev. 5 del 03/09/2026 ore 21:45.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 6 del 03/09/2026 ore 22:15.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ---
 
@@ -31,6 +31,7 @@ Gli ultimi due vanno letti insieme: sono il controllo di continuità descritto a
 | `idDispositivo` | GUID dell'installazione: il titolare della sequenza |
 | `progressivo` | intero, sequenza di quel dispositivo |
 | `dataInvio` | ISO 8601 con fuso, **ora reale del telefono** (`2026-09-03T09:17:25+02:00`) |
+| `versioneApp` | versione dell'app in uso su quel telefono (es. `0.15.0`) |
 | `nomeFile` | **ignorato dal backend**: il nome lo compone il flow |
 | `contenutoBase64` | il JPEG in base64 |
 
@@ -56,7 +57,7 @@ Le tre azioni *Response* portano l'header `Access-Control-Allow-Origin: *`, obbl
 
 - Cartelle `AAAA/AAAAMM`, calcolate sulla **data di scatto** (`dataInvio`), non sull'orologio del flow: per le foto accodate offline e inviate ore dopo la differenza è reale.
 - Nome file: `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` — es. `BollaMAR202609030917FrancescoLandod5e1.jpg`. Niente secondi (nomenclatura di gruppo); le 4 cifre dell'`idClient` evitano che due bolle inviate nello stesso minuto si sovrascrivano.
-- Colonne: `Commessa`, `Operatore`, `DataScatto`, `IdClient`, `IdDispositivo`, `Progressivo`.
+- Colonne: `Commessa`, `Operatore`, `DataScatto`, `IdClient`, `IdDispositivo`, `Progressivo`, più `VersioneApp` se la si crea (facoltativa: la versione dell'app che ha mandato la bolla, utile a capire se un campo manca perché il telefono è indietro con l'aggiornamento).
 - **Attenzione:** la colonna della data si chiama `DataScatto`, il campo nel payload si chiama `dataInvio`. Sono la stessa cosa — l'istante dello scatto sul telefono — e il flow mappa `triggerBody()?['dataInvio']` su `DataScatto`. Fa fede il nome della colonna.
 
 ## 2. Cosa cambia per il runbook, rispetto a prima

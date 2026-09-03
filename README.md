@@ -102,6 +102,7 @@ icons/                icone dal logo ufficiale (logo.png = sorgente)
 core/                 shell: router hash, home/launcher, impostazioni app, design system CSS
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
+core/versione.js      versione in uso, letta dalla cache attiva del service worker
 docs/                 4 documenti, tutti correnti:
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
@@ -148,6 +149,7 @@ Content-Type: application/json
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
   "progressivo": 137,                      // intero: sequenza di quel dispositivo
   "dataInvio": "2026-09-01T17:27:53+02:00",
+  "versioneApp": "0.15.0",                 // versione che sta girando sul telefono
   "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
   "contenutoBase64": "…" }
 

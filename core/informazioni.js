@@ -2,12 +2,13 @@
 // cantiere — versione in uso, stato offline, spazio, numeri della coda.
 import { impostazioniApp } from './impostazioni.js';
 import * as coda from '../modules/bolle/coda.js';
+import { versioneApp } from './versione.js';
 
 export async function vistaInformazioni(el) {
   el.innerHTML = '<section class="scheda"><h2>Informazioni</h2><p class="tenue">Lettura in corso&hellip;</p></section>';
 
   const [versione, spazio, record, storico, progressivo] = await Promise.all([
-    versioneInUso(),
+    versioneApp().then(v => v || 'non ancora installata'),
     spazioUsato(),
     coda.elenca().catch(() => []),
     coda.elencaStorico().catch(() => []),
@@ -93,19 +94,6 @@ export async function vistaInformazioni(el) {
       esito.textContent = 'Controllo non riuscito: riprova quando hai rete.';
     }
   });
-}
-
-// La versione non è scritta due volte: si legge dal nome della cache che il
-// service worker ha davvero attiva, così non può divergere dal codice.
-async function versioneInUso() {
-  if (!('caches' in window)) return 'non disponibile';
-  try {
-    const nomi = await caches.keys();
-    const cache = nomi.find(nome => nome.startsWith('llitalia-'));
-    return cache ? cache.replace('llitalia-', '') : 'non ancora installata';
-  } catch {
-    return 'non disponibile';
-  }
 }
 
 async function spazioUsato() {

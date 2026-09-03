@@ -1,6 +1,6 @@
 # App LL Italia — Flow di ricezione bolle: struttura, procedure, collaudi
 
-> **Rev. 3 del 03/09/2026 ore 20:10.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 4 del 03/09/2026 ore 22:15.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ## 1. Struttura del flow
 
@@ -32,6 +32,9 @@ manual (trigger HTTP, POST, "Anyone")
 | `IdClient` | Riga di testo singola, **indicizzata** | `idClient` |
 | `IdDispositivo` | Riga di testo singola | `idDispositivo` (v. §4) |
 | `Progressivo` | Numero, 0 decimali | `progressivo` (v. §4) |
+| `VersioneApp` | Riga di testo singola — **facoltativa** | `versioneApp` |
+
+`VersioneApp` è l'unica colonna facoltativa: porta la versione dell'app che ha mandato la bolla (es. `0.15.0`) e serve alla diagnosi — una bolla senza `Progressivo` viene da una versione precedente, non è un difetto — e a vedere quali telefoni sono rimasti indietro con l'aggiornamento. Se non la si crea, il campo arriva e viene ignorato: nessun effetto sul flow. Mappatura: `triggerBody()?['versioneApp']`.
 
 **Attenzione al nome della colonna della data:** in raccolta si chiama `DataScatto`, il campo nel payload si chiama `dataInvio`. Sono la stessa cosa — l'istante dello scatto sul telefono — e la mappatura è `triggerBody()?['dataInvio']` sulla colonna `DataScatto`. Divergenza segnalata da Cowork il 03/09/2026 e allineata qui: **fa fede il nome della colonna**.
 

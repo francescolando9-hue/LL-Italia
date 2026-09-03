@@ -31,6 +31,7 @@ Content-Type: application/json
   "idDispositivo": "9b2c…",     // GUID dell'installazione (vedi sotto)
   "progressivo": 137,           // intero: sequenza del dispositivo (vedi sotto)
   "dataInvio": "2026-09-01T17:27:53+02:00",
+  "versioneApp": "0.15.0",      // versione in uso sul telefono (vedi sotto)
   "nomeFile": "…",              // IGNORATO dal backend: il nome lo compone il flow
   "contenutoBase64": "…" }
 ```
@@ -58,6 +59,13 @@ Due campi obbligatori nel payload: `progressivo` (intero) e `idDispositivo` (str
 - **Risposta: stato HTTP senza corpo** — `200` dalle tre azioni *Response* del flow (prima del 03/09 era il `202 Accepted` automatico). È lo stato a fare da conferma: solo alla sua ricezione la foto esce dalla coda dell'app, che accetta qualunque 2xx.
 - **Deduplica su `idClient`: controllo inerte** (attivata il 01/09/2026, chiusa così il 03/09/2026). Prima del salvataggio il flow cerca in raccolta un file con lo stesso `IdClient` (*Get files (properties only)*, Filter Query su `IdClient`, Top Count 1), ma la Condition valuta sempre falso e il ramo del duplicato non viene mai eseguito; causa non determinata. **Non è un blocco:** il nome del file è deterministico, quindi un reinvio sovrascrive l'esistente e non genera doppioni in raccolta. Conseguenza: non contare i file per stimare i doppioni, l'omonimia li maschera.
 - **Token:** sostituito il valore di collaudo con un token riservato il 01/09/2026. Vive nel flow e nelle impostazioni dei dispositivi, mai nel repo. Un token errato fa terminare il flow con stato Failed, visibile in cronologia.
+
+## Versione dell'app nel payload (aggiunto il 03/09/2026)
+Campo `versioneApp`, stringa (es. `0.15.0`), letto dal **nome della cache che il service worker ha davvero attiva**: è la versione che sta girando su quel telefono, non quella pubblicata. Vuoto solo alla primissima apertura, prima che il service worker abbia scritto la cache.
+
+Serve a rispondere in raccolta a due domande che altrimenti richiederebbero di chiamare l'operatore: **con quale versione è stata mandata questa bolla** (una bolla senza `progressivo` o senza `idDispositivo` viene da una versione precedente, non è un difetto) e **quali telefoni sono rimasti indietro** con l'aggiornamento. Non è un dato di collaudo: è diagnostica.
+
+Lato raccolta la colonna `VersioneApp` (testo) è **facoltativa**: se non viene creata e mappata, il campo arriva e viene semplicemente ignorato, senza effetti sul flow.
 
 ## Cosa significa «Inviata» nell'app — risolto il 03/09/2026
 Senza un'azione *Response* esplicita, Power Automate risponde **202 Accepted all'arrivo della richiesta**, prima di eseguire il flow: l'app registrava l'**accettazione**, non il **salvataggio**, e un token errato o un fallimento del salvataggio non retroagivano sullo stato mostrato.
