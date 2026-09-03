@@ -1,6 +1,6 @@
 # App Bolle — Documento unico di continuità per il runbook magazzino
 
-> **Rev. 4 del 03/09/2026 ore 21:30.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 5 del 03/09/2026 ore 21:45.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ---
 
@@ -69,7 +69,12 @@ Le tre azioni *Response* portano l'header `Access-Control-Allow-Origin: *`, obbl
   - un telefono **reinstallato riparte da 1** con un `IdDispositivo` nuovo: evento atteso, e riconoscibile proprio perché l'identificativo cambia;
   - il numero è assegnato all'accodamento, quindi **non esistono buchi legittimi**: ogni salto va spiegato uno per uno.
 
-  Nota per il caso «bolla mandata per sbaglio»: quando l'ufficio cancella da SharePoint una bolla e questa viene rimandata, l'operatore può azzerare i contatori del giorno sul telefono, ma **la numerazione progressiva prosegue e non si azzera mai**. La bolla rimandata porta quindi un numero nuovo, e il numero della bolla cancellata resta scoperto in raccolta: è un buco che il controllo di continuità segnalerà. **Le cancellazioni fatte dall'ufficio vanno annotate**, altrimenti si presentano come bolle perse.
+  **Il caso «bolla mandata per sbaglio» — risolto il 03/09/2026 con `Stato = Annullata`.** Una bolla cancellata dalla raccolta ha già consumato il suo progressivo: la rimandata ne prende uno nuovo e il numero cancellato resta scoperto, cioè si presenta come una bolla persa. Sul telefono non è correggibile — l'operatore può azzerare i contatori del giorno, ma **la numerazione progressiva prosegue e non si azzera mai**, per non aprire buchi falsi. La soluzione è quindi in raccolta:
+  - le bolle arrivate per sbaglio **non si cancellano**: si portano allo stato **`Annullata`** (valore aggiunto alla colonna `Stato`, vista *Annullate*), così il file resta, il progressivo resta occupato e il buco non si forma;
+  - per i casi in cui il file deve davvero sparire, e per le cancellazioni già avvenute, c'è la lista **`EccezioniContinuita`** (`Title`, `IdDispositivo`, `ProgressivoDa`, `ProgressivoA`, `Motivo`, `DataEvento` testo `AAAAMMGG`): **il controllo di continuità la legge prima di segnalare un numero mancante**, e un buco coperto da un'eccezione non è un difetto;
+  - prima eccezione già registrata: progressivi **1-23**, collaudo del 03/09 cancellato dalla raccolta.
+
+  Le eccezioni si leggono **per dispositivo**: `IdDispositivo` vuoto in una riga della lista significa che quell'eccezione non si aggancia a nessuna sequenza, e il buco continuerà a comparire. L'identificativo del telefono si legge sull'app, in *Impostazioni app → Questo dispositivo*.
 - **La deduplica lato flow è un controllo inerte.** La Condition sui duplicati esiste ma non scatta mai (causa non determinata, chiusa per decisione il 03/09/2026). Non è un blocco: il nome del file è deterministico — stessa bolla, stesso `dataInvio`, stesso `idClient`, stesso nome — quindi un reinvio **sovrascrive** il file esistente e non genera un doppione in raccolta. Conseguenza per il runbook: **non contare i file per stimare i doppioni**, l'omonimia li maschera.
 
 ## 3. Interventi aperti su SharePoint e sul flow (prerequisiti, non lavoro di runbook)
