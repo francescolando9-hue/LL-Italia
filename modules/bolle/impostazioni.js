@@ -12,10 +12,19 @@ export const API_VERSION = '2024-10-01';
 const PREDEFINITE = {
   endpoint: '',
   token: 'collaudo',
-  mock: true,
+  mock: false,
   conservaUltime: 20,
   ultimoCantiere: '',
 };
+
+// La modalità mock è uno strumento di sviluppo, non un'opzione d'uso: in
+// cantiere significherebbe bolle che sembrano inviate e non arrivano da
+// nessuna parte. Vive quindi solo su localhost, e in campo è spenta
+// qualunque cosa dica il valore salvato sul dispositivo — anche su un
+// telefono che l'aveva accesa prima che l'interruttore venisse rimosso.
+function suLocalhost() {
+  return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
 
 // Sostituzione mirata del solo parametro api-version: non tocca il resto della
 // query string, così la firma (sig=) resta byte per byte quella originale.
@@ -40,7 +49,9 @@ export function impostazioniBolle() {
   } catch {
     salvate = {};
   }
-  return { ...PREDEFINITE, ...salvate };
+  const impostazioni = { ...PREDEFINITE, ...salvate };
+  impostazioni.mock = Boolean(impostazioni.mock) && suLocalhost();
+  return impostazioni;
 }
 
 export function salvaImpostazioniBolle(modifiche) {
@@ -51,7 +62,7 @@ export function salvaImpostazioniBolle(modifiche) {
 }
 
 // Sviluppo locale: se esiste core/configurazione.js (mai versionato) ne prende
-// endpoint e token, senza sovrascrivere quanto già impostato sul dispositivo.
+// endpoint, token ed eventuale mock, senza sovrascrivere quanto già impostato.
 // Va chiesto esplicitamente aprendo l'app con ?config=locale su localhost —
 // una volta sola, poi i valori restano nelle impostazioni del dispositivo.
 // Così l'app pubblicata non richiede mai un file che non esiste.
@@ -70,6 +81,7 @@ export async function caricaConfigurazioneLocale() {
   const modifiche = {};
   if (!attuali.endpoint && config.endpoint) modifiche.endpoint = config.endpoint;
   if (config.token && attuali.token === PREDEFINITE.token) modifiche.token = config.token;
+  if (config.mock === true) modifiche.mock = true;
   if (Object.keys(modifiche).length === 0) return false;
   salvaImpostazioniBolle(modifiche);
   return true;

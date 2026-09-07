@@ -1,4 +1,6 @@
-// Impostazioni del modulo Bolle: endpoint, token, mock, foto conservate.
+// Impostazioni del modulo Bolle: endpoint, token, foto conservate.
+// La modalità mock non è più un interruttore: era un'opzione di sviluppo in
+// mano all'operatore, e accesa per sbaglio significava bolle mai arrivate.
 // L'elenco cantieri non è modificabile dal dispositivo: sta in cantieri.js,
 // perché un codice commessa errato arriverebbe al magazzino come inesistente.
 import { scappaHtml } from '../../core/impostazioni.js';
@@ -29,12 +31,6 @@ export function vistaImpostazioniBolle(el) {
           <p class="aiuto tenue">Inviato nel corpo di ogni richiesta; in collaudo vale <code>collaudo</code>.</p>
         </div>
         <div class="campo">
-          <label class="campo-interruttore" for="mock">
-            <input id="mock" type="checkbox" ${impostazioni.mock ? 'checked' : ''}>
-            Modalità mock (invii simulati, senza backend)
-          </label>
-        </div>
-        <div class="campo">
           <label for="conserva">Foto inviate da conservare (ultime N)</label>
           <input id="conserva" type="number" inputmode="numeric" min="0" step="1"
                  value="${impostazioni.conservaUltime}">
@@ -61,7 +57,6 @@ export function vistaImpostazioniBolle(el) {
     const nuove = salvaImpostazioniBolle({
       endpoint: endpointInserito,
       token: el.querySelector('#token').value.trim() || 'collaudo',
-      mock: el.querySelector('#mock').checked,
       conservaUltime: Number.isInteger(conserva) && conserva >= 0
         ? conserva : impostazioniBolle().conservaUltime,
     });
