@@ -15,14 +15,12 @@ La pubblicazione è automatica a ogni push su `main` (workflow `.github/workflow
 
 Alla prima apertura l'app chiede **nome e cognome**: vengono salvati sul dispositivo e allegati a ogni invio. Dopo la prima visita l'app funziona anche **senza rete**.
 
-## Come provarla in mock (senza backend)
-
-La **modalità mock è attiva di default**: gli invii sono simulati sul dispositivo, nessun dato esce. Il banner giallo "Modalità mock attiva" lo ricorda sempre.
+## Come si usa
 
 1. Aprire il modulo Bolle (l'app ci entra direttamente; la home dei moduli resta raggiungibile dal logo in alto a sinistra).
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
 3. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
-4. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). Il mock risponde dopo ~0,7 s simulando la conferma del server.
+4. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
 5. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
 
 **Collaudo sui numeri, mai sull'esito formale:** i quattro contatori in alto (Scattate oggi / Inviate oggi / In attesa / Errore) sono il riferimento. "Scattate" conta le foto confermate con Invia (le anteprime rimosse prima dell'invio non contano). Un invio "riuscito" si dimostra confrontando scattate vs inviate vs foto atterrate a destinazione: ogni scarto è un difetto da spiegare.
@@ -90,7 +88,9 @@ Quando si pubblica una versione nuova, sui telefoni già installati compare in b
 ## Impostazioni
 
 - **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore; sotto, il riquadro *Questo dispositivo* con l'identificativo in sola lettura e il pulsante per copiarlo.
-- **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, token, mock on/off, quante foto inviate conservare (ultime N, default 20). L'elenco cantieri non si tocca da qui: vedi sotto.
+- **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, token, quante foto inviate conservare (ultime N, default 20). L'elenco cantieri non si tocca da qui: vedi sotto.
+
+**La modalità mock non è più un'impostazione** (rimossa il 03/09/2026, con l'app entrata in uso). Era un interruttore di sviluppo in mano all'operatore, e accesa per sbaglio significava bolle che l'app dava per inviate e che non arrivavano da nessuna parte. Resta disponibile **solo su localhost**, per lo sviluppo: la si accende da `core/configurazione.js` e il banner giallo lo dichiara a video. In campo è spenta qualunque cosa dica il valore salvato sul dispositivo — anche su un telefono che l'aveva accesa prima dell'aggiornamento.
 
 ## Struttura del repo
 

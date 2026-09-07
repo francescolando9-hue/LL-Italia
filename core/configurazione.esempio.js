@@ -13,4 +13,8 @@ export default {
   // (quello mostrato dal designer riporta api-version=1 e viene rifiutato con 400).
   endpoint: '',
   token: 'collaudo',
+  // Invii simulati, senza backend: utile per le demo. Vale SOLO su localhost —
+  // sull'app pubblicata il mock è spento in ogni caso, perché una bolla che
+  // sembra inviata e non arriva è peggio di un errore visibile.
+  mock: false,
 };

@@ -4,7 +4,7 @@ La PWA unica del gruppo MLP / LL Italia: un'app contenitore a moduli (sezioni), 
 Utenti del modulo Bolle: operai e fornitori in cantiere, spesso esterni all'azienda, senza account M365, con guanti e sole negli occhi.
 Architettura: shell + moduli
 Shell (core/): manifest e branding "LL Italia", Service Worker, home/launcher con le tessere dei moduli, routing hash (#/bolle), impostazioni di app (es. autore, condiviso tra moduli), design system (variabili CSS comuni).
-Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni (per Bolle: endpoint, chiave, mock).
+Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni (per Bolle: endpoint, token, foto conservate).
 Con un solo modulo attivo, la home può portare direttamente a Bolle, ma la struttura a launcher resta.
 Fonte di verità (per il modulo Bolle)
 docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale su tutto.
