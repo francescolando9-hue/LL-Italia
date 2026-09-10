@@ -1,6 +1,7 @@
 // Modulo Bolle: foto delle bolle di consegna verso il magazzino (capture-only).
 // Flusso felice in 3 tocchi: foto → cantiere (ultimo usato preselezionato) → Invia.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
+import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
@@ -93,7 +94,10 @@ async function vista(el) {
         <label for="cantiere">Cantiere</label>
         <select id="cantiere" required>${opzioniCantiere}</select>
       </div>
-      <label class="btn btn-primario bolle-fotografa" for="input-camera">&#128247; Fotografa bolla</label>
+      ${fotocameraDisponibile()
+        ? '<button id="apri-fotocamera" class="btn btn-primario bolle-fotografa" type="button">&#128247; Fotografa bolla</button>'
+        : ''}
+      <label class="btn ${fotocameraDisponibile() ? 'btn-secondario' : 'btn-primario'} bolle-fotografa" for="input-camera">${fotocameraDisponibile() ? 'Usa la fotocamera del telefono' : '&#128247; Fotografa bolla'}</label>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
       <label class="btn btn-secondario bolle-galleria" for="input-galleria">Scegli dalla galleria</label>
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
@@ -117,6 +121,8 @@ async function vista(el) {
   `;
 
   el.querySelector('#cantiere').addEventListener('change', () => { ridisegna(); });
+  const pulsanteScatto = el.querySelector('#apri-fotocamera');
+  if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
@@ -137,6 +143,34 @@ async function gestisciFile(evento) {
   const input = evento.target;
   const file = [...input.files];
   input.value = '';
+  await aggiungiFile(file);
+}
+
+// La fotocamera interna: si scatta più volte di fila senza uscire, e gli
+// scatti di una stessa sessione sono le pagine di una sola bolla — è la
+// ragione per cui la sessione esiste. La scelta resta visibile e reversibile
+// nel riquadro di composizione.
+async function apriScatto() {
+  const avviso = radice.querySelector('#avviso-foto');
+  let esito;
+  try {
+    esito = await apriFotocamera({
+      titolo: 'Fotografa la bolla',
+      suggerimento: 'Scatta una pagina dopo l’altra, poi tocca Fine.',
+    });
+  } catch (errore) {
+    // Fotocamera interna non disponibile o permesso negato: si ripiega su
+    // quella di sistema, che non richiede permessi al browser.
+    avviso.innerHTML = `<p class="avviso avviso-attenzione">${scappaHtml(errore.message)}.</p>`;
+    radice.querySelector('#input-camera').click();
+    return;
+  }
+  if (esito.file.length === 0) return;
+  if (esito.file.length > 1) unaSolaBolla = true;
+  await aggiungiFile(esito.file);
+}
+
+async function aggiungiFile(file) {
   if (file.length === 0) return;
   const avviso = radice.querySelector('#avviso-foto');
   avviso.innerHTML = `<p class="avviso avviso-info">Elaborazione di ${file.length} foto&hellip;</p>`;

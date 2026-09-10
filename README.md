@@ -19,6 +19,7 @@ Alla prima apertura l'app chiede **nome e cognome**: vengono salvati sul disposi
 
 1. Aprire il modulo Bolle (l'app ci entra direttamente; la home dei moduli resta raggiungibile dal logo in alto a sinistra).
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
+2b. **La fotocamera è dentro l'app**: si scatta, la miniatura si accoda in basso, si scatta ancora, e alla fine si tocca **Fine** — come in WhatsApp. Gli scatti di una stessa sessione sono le **pagine di una sola bolla**: è la ragione per cui la sessione esiste. La fotocamera **del telefono** resta a un tocco (secondo pulsante), e diventa l'unica se il permesso viene negato.
 3. Subito dopo la prima foto l'app dice cosa sta per partire — *«Questa foto è una bolla di una pagina»* — e offre **«+ Aggiungi pagina a questa bolla»**. Se la bolla continua su un altro foglio si tocca quel pulsante e si scatta la pagina successiva: le anteprime si numerano (`pag. 1`, `pag. 2`…) e il pulsante diventa *Invia 1 bolla di N pagine*. Se invece la bolla è finita, si manda così. La composizione si chiude a ogni invio: la bolla dopo riparte da una pagina.
 4. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
 5. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
@@ -121,6 +122,7 @@ core/                 shell: router hash, home/launcher, impostazioni app, desig
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/endpoint.js      api-version dei flow Power Automate, condivisa
+core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
@@ -139,6 +141,14 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 ## Pipeline della foto
 
 Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server** (202 Accepted); ogni invio porta un `idClient` univoco, su cui il backend potrà deduplicare.
+
+### La fotocamera dentro l'app
+
+`<input type="file" capture>` passa il controllo alla fotocamera **di sistema**, che dopo ogni scatto torna al browser: per una bolla su tre fogli significa entrare e uscire tre volte, e chi ha poca dimestichezza si perde. La fotocamera interna (`getUserMedia`, in `core/fotocamera.js`, condivisa dai due moduli) risolve questo: video a tutto schermo, pulsante di scatto grande, rullino delle miniature, contatore, **Fine**.
+
+**Il compromesso, da conoscere:** `getUserMedia` dà il flusso video della fotocamera, non la foto elaborata dall'app di sistema — niente HDR, niente multiscatto, niente messa a fuoco assistita, e su alcuni telefoni una risoluzione inferiore allo scatto nativo. Per le bolle, dove la leggibilità del testo è il punto, **la fotocamera del telefono resta a un tocco**: su una bolla che esce poco leggibile è l'alternativa, e il controllo di leggibilità continua ad avvisare in entrambi i casi.
+
+Due dettagli nati dal collaudo: il pulsante di scatto **nasce spento** e si accende quando il video ha dimensioni reali (`loadeddata` non basta, e senza l'attesa il primo scatto usciva vuoto **in silenzio**); uno scatto che comunque fallisce lo dice a video invece di sparire.
 
 ### Bolla su più pagine
 
