@@ -33,9 +33,19 @@ export function vistaImpostazioniFoto(el) {
                  value="${impostazioni.conservaUltime}">
           <p class="aiuto tenue">Le foto d'archivio non sono compresse e pesano: tenerne poche sul telefono è voluto.</p>
         </div>
+        <div class="campo">
+          <label for="limite">Peso massimo di un invio (MB)</label>
+          <input id="limite" type="number" inputmode="numeric" min="1" step="1"
+                 value="${impostazioni.limiteMB}">
+          <p class="aiuto tenue">Serve ai video, che non si possono comprimere sul telefono: il contenuto viaggia dentro JSON, che aggiunge un terzo al peso, e oltre una certa taglia il flow rifiuta. Un file più grande non viene accodato e l'app lo dice subito, invece di farlo ritentare a vuoto. Il valore giusto lo dice il collaudo sul flow.</p>
+        </div>
         <button class="btn btn-primario" type="submit">Salva</button>
       </form>
       <p id="conferma" class="avviso avviso-info nascosto"></p>
+    </section>
+    <section class="scheda">
+      <h2>Foto e video</h2>
+      <p class="tenue">Le foto si scattano con la fotocamera dell'app (più scatti di fila) o con quella del telefono. I <strong>video</strong> si registrano sempre con la fotocamera del telefono: registrare dentro l'app darebbe formati diversi fra Android e iPhone e non userebbe l'encoder del telefono. Un video non viene compresso: parte come l'ha prodotto il telefono, quindi conta il limite di peso sopra.</p>
     </section>
     <section class="scheda">
       <h2>Le due categorie</h2>
@@ -49,11 +59,14 @@ export function vistaImpostazioniFoto(el) {
     const endpointInserito = el.querySelector('#endpoint').value.trim();
     const corretto = endpointDaCorreggere(endpointInserito);
     const conserva = parseInt(el.querySelector('#conserva').value, 10);
+    const limite = parseInt(el.querySelector('#limite').value, 10);
     const nuove = salvaImpostazioniFoto({
       endpoint: endpointInserito,
       token: el.querySelector('#token').value.trim() || 'collaudo',
       conservaUltime: Number.isInteger(conserva) && conserva >= 0
         ? conserva : impostazioniFoto().conservaUltime,
+      limiteMB: Number.isInteger(limite) && limite >= 1
+        ? limite : impostazioniFoto().limiteMB,
     });
     if (endpointInserito) el.querySelector('#endpoint').value = normalizzaEndpoint(endpointInserito);
     el.querySelector('#token').value = nuove.token;

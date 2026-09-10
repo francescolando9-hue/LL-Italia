@@ -8,6 +8,7 @@ import { naviga } from '../../core/router.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
+import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
 import { impostazioniFoto, salvaImpostazioniFoto } from './impostazioni.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
@@ -87,8 +88,10 @@ async function vista(el) {
         : ''}
       <label class="btn ${fotocameraDisponibile() ? 'btn-secondario' : 'btn-primario'} foto-scatta" for="input-camera">${fotocameraDisponibile() ? 'Usa la fotocamera del telefono' : '&#128247; Scatta foto'}</label>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
+      <label class="btn btn-secondario foto-registra" for="input-video">&#127909; Registra un video</label>
+      <input id="input-video" class="nascosto" type="file" accept="video/*" capture="environment">
       <label class="btn btn-secondario" for="input-galleria">Scegli dalla galleria</label>
-      <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
+      <input id="input-galleria" class="nascosto" type="file" accept="image/*,video/*" multiple>
       <div id="avviso-foto"></div>
       <div id="anteprime" class="foto-anteprime"></div>
       <div class="campo" id="campo-nota">
@@ -112,6 +115,7 @@ async function vista(el) {
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
+  el.querySelector('#input-video').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
 
@@ -163,20 +167,46 @@ async function aggiungiFile(file) {
     avviso.innerHTML = '<p class="avviso avviso-attenzione">Scegli prima il tipo di foto: cambia come viene inviata.</p>';
     return;
   }
-  avviso.innerHTML = `<p class="avviso avviso-info">Preparazione di ${file.length} foto&hellip;</p>`;
+  avviso.innerHTML = `<p class="avviso avviso-info">Preparazione di ${file.length} file&hellip;</p>`;
   const errori = [];
+  const troppoGrandi = [];
+  const limiteByte = impostazioniFoto().limiteMB * 1048576;
   for (const singolo of file) {
     try {
+      if (eVideo(singolo)) {
+        // Il video non si comprime nel browser: se supera il tetto, si dice
+        // subito invece di accodarlo e farlo ritentare a vuoto per sempre.
+        if (singolo.size > limiteByte) {
+          troppoGrandi.push(pesoLeggibile(singolo.size));
+          continue;
+        }
+        const { anteprima, durata } = await anteprimaVideo(singolo);
+        await coda.aggiungiBozza(singolo, anteprima, singolo.name, tipo, {
+          genere: 'video', estensione: estensioneDi(singolo), durata,
+        });
+        continue;
+      }
       const preparata = await preparaImmagine(singolo, scelta.originale);
+      if (preparata.size > limiteByte) {
+        troppoGrandi.push(pesoLeggibile(preparata.size));
+        continue;
+      }
       const anteprima = await creaAnteprima(singolo);
-      await coda.aggiungiBozza(preparata, anteprima, singolo.name, tipo);
+      await coda.aggiungiBozza(preparata, anteprima, singolo.name, tipo, {
+        genere: 'foto', estensione: 'jpg',
+      });
     } catch (errore) {
-      errori.push(`${singolo.name || 'foto'}: ${errore.message}`);
+      errori.push(`${singolo.name || 'file'}: ${errore.message}`);
     }
   }
-  avviso.innerHTML = errori.length > 0
-    ? `<p class="avviso avviso-errore">${scappaHtml(errori.join(' · '))}</p>`
-    : '';
+  const messaggi = [];
+  if (troppoGrandi.length) {
+    messaggi.push(`<p class="avviso avviso-attenzione">${troppoGrandi.length === 1
+      ? `Un file da ${scappaHtml(troppoGrandi[0])} supera il limite di ${impostazioniFoto().limiteMB} MB e non è stato aggiunto: registra un video più corto.`
+      : `${troppoGrandi.length} file superano il limite di ${impostazioniFoto().limiteMB} MB e non sono stati aggiunti: registra video più corti.`}</p>`);
+  }
+  if (errori.length) messaggi.push(`<p class="avviso avviso-errore">${scappaHtml(errori.join(' · '))}</p>`);
+  avviso.innerHTML = messaggi.join('');
   await ridisegna();
 }
 
@@ -236,13 +266,24 @@ async function ridisegna() {
       : '';
 
   const anteprime = radice.querySelector('#anteprime');
-  anteprime.innerHTML = bozze.map(r => `
-    <div class="foto-anteprima">
-      <img src="${urlFoto(r.anteprima || r.foto)}" alt="Anteprima foto">
-      <button class="foto-rimuovi" data-id="${r.id}" aria-label="Rimuovi foto">&#10005;</button>
-      <span class="foto-marchio">${scappaHtml(etichettaCategoria(r.tipo))} · ${pesoLeggibile(r.byte)}</span>
+  anteprime.innerHTML = bozze.map(r => {
+    const video = r.genere === 'video';
+    // Un video senza anteprima (formato che il browser non decodifica) resta
+    // riconoscibile dall'icona: meglio un riquadro scuro con il simbolo che
+    // un'immagine rotta.
+    const immagine = r.anteprima
+      ? `<img src="${urlFoto(r.anteprima)}" alt="Anteprima">`
+      : video ? '<span class="foto-senza-anteprima">&#127909;</span>' : `<img src="${urlFoto(r.foto)}" alt="Anteprima">`;
+    return `
+    <div class="foto-anteprima${video ? ' e-video' : ''}">
+      ${immagine}
+      ${video ? '<span class="foto-play" aria-hidden="true">&#9654;</span>' : ''}
+      <button class="foto-rimuovi" data-id="${r.id}" aria-label="Rimuovi">&#10005;</button>
+      <span class="foto-marchio">${video ? 'Video' : scappaHtml(etichettaCategoria(r.tipo))}${
+        video && r.durata ? ` ${durataLeggibile(r.durata)}` : ''} · ${pesoLeggibile(r.byte)}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
   for (const pulsante of anteprime.querySelectorAll('.foto-rimuovi')) {
     pulsante.addEventListener('click', () => eliminaBozza(pulsante.dataset.id));
   }
@@ -250,7 +291,12 @@ async function ridisegna() {
   const commessaScelta = radice.querySelector('#commessa').value;
   const pulsanteInvia = radice.querySelector('#invia');
   pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta;
-  pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${bozze.length} foto` : 'Invia';
+  const quantiVideo = bozze.filter(r => r.genere === 'video').length;
+  const quanteFoto = bozze.length - quantiVideo;
+  const parti = [];
+  if (quanteFoto) parti.push(`${quanteFoto} ${quanteFoto === 1 ? 'foto' : 'foto'}`);
+  if (quantiVideo) parti.push(`${quantiVideo} ${quantiVideo === 1 ? 'video' : 'video'}`);
+  pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
   radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && !commessaScelta
     ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
 
@@ -282,10 +328,15 @@ async function ridisegna() {
       const nota = r.nota ? `<div class="tenue">${scappaHtml(r.nota)}</div>` : '';
       return `
         <li class="foto-voce">
-          <img class="foto-miniatura" src="${urlFoto(r.anteprima || r.foto)}" alt="">
+          ${r.anteprima
+            ? `<img class="foto-miniatura" src="${urlFoto(r.anteprima)}" alt="">`
+            : r.genere === 'video'
+              ? '<span class="foto-miniatura foto-senza-anteprima">&#127909;</span>'
+              : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
           <div class="foto-dettagli">
             <div class="riga">
               <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
+              ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
               ${scappaHtml(etichettaCantiere(r.commessa))} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>

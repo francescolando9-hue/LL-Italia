@@ -97,7 +97,8 @@ function pianificaRetry() {
 export function componiNomeFile(record) {
   const compatto = String(record.timestampDispositivo).replace(/[-:]/g, '').slice(0, 15).replace('T', '');
   const operatore = String(record.autore).replace(/\s+/g, '');
-  return `Foto${record.commessa}${record.tipo}${compatto}${operatore}.jpg`;
+  const prefisso = record.genere === 'video' ? 'Video' : 'Foto';
+  return `${prefisso}${record.commessa}${record.tipo}${compatto}${operatore}.${record.estensione || 'jpg'}`;
 }
 
 export function corpoInvio(record, impostazioni, contenutoBase64, versione = '') {
@@ -107,6 +108,10 @@ export function corpoInvio(record, impostazioni, contenutoBase64, versione = '')
     commessa: record.commessa,
     operatore: record.autore,
     nota: record.nota || '',
+    genere: record.genere || 'foto',
+    estensione: record.estensione || 'jpg',
+    mimeType: record.mime || 'image/jpeg',
+    durataSecondi: record.durata || 0,
     idClient: record.id,
     dataScatto: record.timestampDispositivo,
     versioneApp: versione,

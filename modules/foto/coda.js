@@ -63,11 +63,17 @@ export function timestampDispositivo(data = new Date()) {
 
 // La foto entra in IndexedDB già allo scatto: non si perde nemmeno se l'app
 // viene chiusa prima di premere Invia.
-export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo) {
+export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = {}) {
   const record = {
     id: crypto.randomUUID(),
     stato: 'bozza',
     tipo,
+    // Foto o video: il flow deve saperlo per dare al file l'estensione
+    // giusta — un video salvato come .jpg non si apre.
+    genere: extra.genere || 'foto',
+    estensione: extra.estensione || 'jpg',
+    mime: fotoBlob.type || 'image/jpeg',
+    durata: extra.durata || 0,
     commessa: '',
     autore: '',
     nota: '',

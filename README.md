@@ -100,10 +100,12 @@ Secondo modulo, accanto a Bolle: chi è in cantiere fotografa e manda in ufficio
 
 | Categoria | Codice | A cosa serve | Come parte |
 |---|---|---|---|
-| Avanzamento lavori — per capirci tra noi | `AVANZAMENTO` | dire a che punto è una lavorazione | compressa (2500 px, 0,85) |
+| Avanzamento lavori | `AVANZAMENTO` | dire a che punto è una lavorazione | compressa (2500 px, 0,85) |
 | Da archiviare sul server | `ARCHIVIO` | documentazione per la cartella di commessa su `L:` | **risoluzione originale** |
 
 La categoria si sceglie prima perché **decide come l'immagine viene preparata**, non è un'etichetta messa dopo: cambiarla a foto già pronte non ricomprime nulla, e l'app lo dice invece di tacere. Per l'archivio, se il file è già JPEG partono **i byte originali senza ricodifica** — ricomprimere «a qualità massima» degraderebbe l'immagine senza vantaggi; HEIC e PNG vengono convertiti a piena risoluzione, perché in raccolta il file si chiama `.jpg`.
+
+**Si può inviare anche un video** (*Registra un video*), che parte con la fotocamera **di sistema**: registrare in-app darebbe formati diversi fra Android e iPhone e non userebbe l'encoder del telefono. Il video **non viene compresso** — transcodificare in un browser non è realistico — quindi conta il **tetto di peso** nelle impostazioni del modulo (predefinito 20 MB): un file più grande non entra in coda e l'app lo dice subito, invece di farlo ritentare a vuoto. Anteprima e durata si ricavano da un fotogramma del filmato. Foto e video possono stare nello stesso invio.
 
 C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
 

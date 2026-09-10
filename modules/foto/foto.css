@@ -101,3 +101,32 @@
   font-size: 0.8em;
   font-weight: 700;
 }
+
+/* Video: riconoscibile a colpo d'occhio fra le anteprime */
+.foto-anteprima.e-video { background: #1a1a1a; }
+
+.foto-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1rem;
+  padding-left: 3px;
+}
+
+.foto-senza-anteprima {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 1.6rem;
+}
