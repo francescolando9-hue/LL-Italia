@@ -86,6 +86,11 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     tentativi: 0,
     ultimoErrore: '',
     inviatoIl: null,
+    // Caricamento in due fasi: si ricorda dove si era arrivati, così un video
+    // interrotto a metà riprende da lì e non ricomincia da zero.
+    urlCaricamento: '',
+    byteInviati: 0,
+    byteCaricati: false,
   };
   return transazione('readwrite', store => store.add(record)).then(() => record);
 }

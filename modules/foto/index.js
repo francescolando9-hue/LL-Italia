@@ -170,7 +170,11 @@ async function aggiungiFile(file) {
   avviso.innerHTML = `<p class="avviso avviso-info">Preparazione di ${file.length} file&hellip;</p>`;
   const errori = [];
   const troppoGrandi = [];
-  const limiteByte = impostazioniFoto().limiteMB * 1048576;
+  const impostazioni = impostazioniFoto();
+  // Con le due fasi il tetto è molto più alto: il vincolo non è più la taglia
+  // della richiesta ma il tempo di caricamento.
+  const limiteMB = impostazioni.dueFasi ? impostazioni.limiteDueFasiMB : impostazioni.limiteMB;
+  const limiteByte = limiteMB * 1048576;
   for (const singolo of file) {
     try {
       if (eVideo(singolo)) {
@@ -202,8 +206,8 @@ async function aggiungiFile(file) {
   const messaggi = [];
   if (troppoGrandi.length) {
     messaggi.push(`<p class="avviso avviso-attenzione">${troppoGrandi.length === 1
-      ? `Un file da ${scappaHtml(troppoGrandi[0])} supera il limite di ${impostazioniFoto().limiteMB} MB e non è stato aggiunto: registra un video più corto.`
-      : `${troppoGrandi.length} file superano il limite di ${impostazioniFoto().limiteMB} MB e non sono stati aggiunti: registra video più corti.`}</p>`);
+      ? `Un file da ${scappaHtml(troppoGrandi[0])} supera il limite di ${limiteMB} MB e non è stato aggiunto: registra un video più corto.`
+      : `${troppoGrandi.length} file superano il limite di ${limiteMB} MB e non sono stati aggiunti: registra video più corti.`}</p>`);
   }
   if (errori.length) messaggi.push(`<p class="avviso avviso-errore">${scappaHtml(errori.join(' · '))}</p>`);
   avviso.innerHTML = messaggi.join('');
@@ -235,8 +239,14 @@ async function ridisegna() {
   // Tutte le viste condividono lo stesso contenitore: la guardia giusta è la
   // presenza degli elementi di questa vista, non "è ancora nel documento".
   if (!radice || !radice.querySelector('#foto-contatori')) return;
+  const vista = radice;
   revocaUrl();
   const record = await coda.elenca();
+  // Leggere la coda richiede un attimo, e in quell'attimo l'operatore può
+  // essere uscito dal modulo: senza questo controllo il ridisegno cerca gli
+  // elementi di una vista che non c'è più e va in errore. Capita davvero,
+  // perché durante il caricamento di un video i ridisegni sono continui.
+  if (radice !== vista || !vista.querySelector('#foto-contatori')) return;
   const bozze = record.filter(r => r.stato === 'bozza');
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio');
   const inErrore = record.filter(r => r.stato === 'errore');
@@ -323,6 +333,12 @@ async function ridisegna() {
       });
       const messaggioErrore = r.stato === 'errore' && r.ultimoErrore
         ? `<div class="errore-msg">${scappaHtml(r.ultimoErrore)}</div>` : '';
+      // Su un video di decine di MB "in corso" senza altro non dice nulla:
+      // la percentuale fa capire che sta salendo e non che è bloccato.
+      const percentuale = r.byte > 0 && r.byteInviati > 0
+        ? Math.min(100, Math.round((r.byteInviati / r.byte) * 100)) : 0;
+      const avanzamento = r.stato === 'invio' && percentuale > 0 && !r.byteCaricati
+        ? `<div class="tenue">Caricato ${percentuale}%</div>` : '';
       const riprova = r.stato === 'errore'
         ? `<button class="btn btn-secondario btn-piccolo foto-riprova" data-id="${r.id}">Riprova</button>` : '';
       const nota = r.nota ? `<div class="tenue">${scappaHtml(r.nota)}</div>` : '';
@@ -341,6 +357,7 @@ async function ridisegna() {
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
             ${nota}
+            ${avanzamento}
             ${messaggioErrore}
           </div>
           <div class="foto-azioni">

@@ -4,6 +4,7 @@
 import * as coda from './coda.js';
 import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
+import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
@@ -101,6 +102,15 @@ export function componiNomeFile(record) {
   return `${prefisso}${record.commessa}${record.tipo}${compatto}${operatore}.${record.estensione || 'jpg'}`;
 }
 
+// I soli metadati, senza il contenuto: servono alle due fasi, dove i byte
+// viaggiano per conto loro.
+export function metadati(record, impostazioni, versione = '') {
+  const corpo = corpoInvio(record, impostazioni, '', versione);
+  delete corpo.contenutoBase64;
+  corpo.byte = record.byte || (record.foto && record.foto.size) || 0;
+  return corpo;
+}
+
 export function corpoInvio(record, impostazioni, contenutoBase64, versione = '') {
   return {
     token: impostazioni.token,
@@ -136,11 +146,18 @@ async function inviaSingola(record) {
   if (!impostazioni.endpoint) {
     throw new Error('Endpoint non configurato: apri le impostazioni del modulo Foto');
   }
+  const endpoint = normalizzaEndpoint(impostazioni.endpoint);
+  // Sopra la soglia dell'invio in una richiesta si passa alle due fasi, se
+  // sono state attivate: sotto non ha senso, aggiungerebbe due giri di rete.
+  const soglia = impostazioni.limiteMB * 1048576;
+  if (impostazioni.dueFasi && (record.byte || 0) > soglia) {
+    return inviaInDueFasi(record, impostazioni, endpoint);
+  }
   const contenutoBase64 = await blobInBase64(record.foto);
   const versione = await versioneApp();
   let risposta;
   try {
-    risposta = await fetch(normalizzaEndpoint(impostazioni.endpoint), {
+    risposta = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, versione)),
@@ -153,6 +170,65 @@ async function inviaSingola(record) {
   if (!risposta.ok) {
     throw new Error(`Errore del server: ${risposta.status}${spiegazioneStato(risposta.status)}`);
   }
+  return { id: '' };
+}
+
+// Caricamento in due fasi. Ogni passo riuscito viene scritto sul record:
+// un'interruzione riprende da dove era, invece di rimandare tutto il video.
+async function inviaInDueFasi(record, impostazioni, endpoint) {
+  const versione = await versioneApp();
+  const corpo = metadati(record, impostazioni, versione);
+
+  if (!record.byteCaricati) {
+    let url = record.urlCaricamento;
+    let blocco = bloccoValido(impostazioni.bloccoMB * 1048576);
+    let daByte = 0;
+    // Sessione già aperta da un tentativo precedente: si chiede al server
+    // quanto ha davvero, invece di fidarsi del nostro conteggio — l'ultimo
+    // blocco può essere partito e non arrivato. Se il server non la
+    // riconosce più (scaduta, cancellata) si riparte dalla fase 1.
+    if (url) {
+      const giaCaricati = await byteGiaCaricati(url);
+      if (giaCaricati === null) {
+        url = '';
+        record.urlCaricamento = '';
+        record.byteInviati = 0;
+        await coda.aggiorna(record);
+      } else {
+        daByte = Math.min(giaCaricati, record.byte || 0);
+      }
+    }
+    if (!url) {
+      const preparazione = await preparaCaricamento(endpoint, corpo);
+      // Il flow non sa fare le due fasi: si torna all'invio in una richiesta,
+      // che per un file di questa taglia probabilmente verrà rifiutato — ma
+      // con un errore chiaro, non con un silenzio.
+      if (preparazione.modo !== 'sessione') {
+        throw new Error('Il flow non offre il caricamento a blocchi: spegni le due fasi o riducili di peso');
+      }
+      url = preparazione.urlCaricamento;
+      blocco = preparazione.dimensioneBlocco;
+      record.urlCaricamento = url;
+      record.byteInviati = 0;
+      daByte = 0;
+      await coda.aggiorna(record);
+    }
+    // L'indirizzo della sessione NON si butta se un blocco fallisce: è quello
+    // che permette al tentativo successivo di riprendere da dove era, invece
+    // di rimandare decine di megabyte già arrivati. A buttarlo ci pensa il
+    // controllo qui sopra, quando è il server a non riconoscerlo più.
+    await inviaBlocchi(url, record.foto, blocco, daByte, async inviati => {
+      record.byteInviati = inviati;
+      await coda.aggiorna(record);
+      notifica();
+    });
+    record.byteCaricati = true;
+    await coda.aggiorna(record);
+  }
+
+  // Fase 3: i byte ci sono, mancano le colonne. Se questo passo fallisce, al
+  // retry si rifà SOLO questo: byteCaricati resta vero.
+  await completaCaricamento(endpoint, corpo);
   return { id: '' };
 }
 

@@ -254,8 +254,13 @@ async function ridisegna() {
   // di questa vista. Senza, un invio che si conclude mentre l'utente sta
   // guardando lo storico proverebbe a ridisegnare contatori inesistenti.
   if (!radice || !radice.querySelector('#bolle-contatori')) return;
+  const vista = radice;
   revocaUrl();
   const record = await coda.elenca();
+  // Leggere la coda richiede un attimo, e in quell'attimo si può essere
+  // usciti dal modulo: senza questo controllo il ridisegno cerca elementi di
+  // una vista che non c'è più.
+  if (radice !== vista || !vista.querySelector('#bolle-contatori')) return;
   const bozze = record.filter(r => r.stato === 'bozza');
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio');
   const inErrore = record.filter(r => r.stato === 'errore');
