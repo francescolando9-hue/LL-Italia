@@ -152,6 +152,19 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo,
   };
 }
 
+// Il numero di stato da solo non dice a chi guarda cosa fare. Un 502 in
+// particolare non è un problema di rete: è il flow che è terminato senza
+// eseguire nessuna azione Response — la foto non è stata salvata, la
+// spiegazione sta nella cronologia del flow.
+function spiegazioneStato(stato) {
+  if (stato === 400) return ' — verifica api-version nell’URL';
+  if (stato === 401 || stato === 403) return ' — token o firma non validi';
+  if (stato === 502) return ' — il flow è terminato senza rispondere: guarda la cronologia del flow';
+  if (stato === 504) return ' — il flow non ha risposto in tempo: guarda la cronologia del flow';
+  if (stato >= 500) return ' — il flow non è arrivato in fondo: guarda la cronologia del flow';
+  return '';
+}
+
 async function inviaSingola(record) {
   const impostazioni = impostazioniBolle();
   if (impostazioni.mock) return inviaMock(record);
@@ -180,10 +193,7 @@ async function inviaSingola(record) {
       : 'Rete non disponibile');
   }
   if (!risposta.ok) {
-    const dettaglio = risposta.status === 400
-      ? ' — verifica api-version nell’URL'
-      : risposta.status === 401 || risposta.status === 403 ? ' — token o firma non validi' : '';
-    throw new Error(`Errore del server: ${risposta.status}${dettaglio}`);
+    throw new Error(`Errore del server: ${risposta.status}${spiegazioneStato(risposta.status)}`);
   }
   // 202 Accepted senza corpo: la conferma è lo stato HTTP.
   return { id: '' };

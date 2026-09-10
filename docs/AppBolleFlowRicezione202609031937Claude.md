@@ -1,6 +1,6 @@
 # App LL Italia — Flow di ricezione bolle: struttura, procedure, collaudi
 
-> **Rev. 5 del 10/09/2026 ore 17:20.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 6 del 10/09/2026 ore 17:35.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ## 1. Struttura del flow
 
@@ -126,6 +126,10 @@ Il criterio che decide è sempre il confronto **scattate nell'app contro file at
 | Foto in raccolta, app verde | Fatto: «Inviata» vale «salvata» |
 | Foto in raccolta, app in Errore | Header CORS mancante o errato in una delle tre Response; la foto resta in coda, nessuna perdita |
 | App in Errore, esecuzione verde ma nessun file | Un ramo esce senza Response |
+| App in Errore con **502** | Il flow è **terminato senza eseguire nessuna Response**: un'azione prima della Response è fallita, oppure il ramo percorso non ne ha una. Il run è **rosso** in cronologia e la prima azione rossa dice la causa |
+| App in Errore con **504** | Il flow non ha risposto in tempo |
+
+**Il 502 non è un problema di rete né dell'app.** Se l'app riceve un numero di stato, la risposta è arrivata ed è stata letta: CORS e firma funzionano. Un 502 significa che la richiesta è entrata nel flow e il flow è finito senza rispondere — quindi **la foto non è stata salvata**, resta in coda sul telefono in stato Errore e riparte da sola quando il flow torna a funzionare. Dove guardare, in ordine: Power Automate → il flow → **cronologia** → l'ultimo run rosso → **la prima azione rossa**. Le cause più frequenti sono in `Update file properties`: una colonna mappata che in raccolta non esiste, o il cui nome interno è diverso da quello mostrato.
 
 **Dopo l'aggiunta del progressivo** — tre foto di fila dallo stesso telefono, senza scartarne nessuna dalle anteprime:
 
