@@ -1,6 +1,6 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 1 del 10/09/2026 ore 17:28.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia foto, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 2 del 10/09/2026 ore 18:05.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Rev. 2: etichette delle categorie semplificate e invio dei video. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 >
 > ⚠️ **Un punto resta aperto e non l'ho inventato:** la cartella di destinazione su `L:` dove il runbook del venerdì deposita le foto, per commessa. Va indicata da Francesco — vedi §6.
 
@@ -10,7 +10,7 @@ Chi è in cantiere fotografa e manda in ufficio. Due usi diversi, che finora via
 
 | Categoria | Codice | A cosa serve |
 |---|---|---|
-| Avanzamento lavori — per capirci tra noi | `AVANZAMENTO` | Dire a che punto è una lavorazione. Si guarda, si commenta, non si archivia. |
+| Avanzamento lavori | `AVANZAMENTO` | Dire a che punto è una lavorazione. Si guarda, si commenta, non si archivia. |
 | Da archiviare sul server | `ARCHIVIO` | Documentazione che deve finire nella cartella di commessa su `L:`. |
 
 **La categoria si sceglie prima di scattare**, come il cantiere: non è un'etichetta messa dopo, perché decide **come l'immagine viene preparata** (§3).
@@ -46,6 +46,16 @@ Se si cambia categoria quando ci sono già foto in attesa, l'app **avvisa** che 
 
 ⚠️ **Il caso peggiore va provato sul flow vero prima di prometterlo in cantiere.** Il base64 dentro JSON aggiunge un terzo al peso: una foto da 12 MB diventa un corpo da 16 MB. In laboratorio, contro un endpoint finto in locale, l'invio è durato 2,7 secondi — un dato che **non dice nulla** su un telefono in cantiere con poca rete, né su cosa faccia il flow reale con un corpo di quella taglia. Se il flow rifiuta, l'app lo dice con un messaggio dedicato (`413` → «foto troppo grande per il flow») e **la foto resta in coda**, non si perde.
 
+## 3-bis. Video (aggiunto il 10/09/2026)
+
+Si può inviare anche un video, non solo foto.
+
+- **Si registra con la fotocamera di sistema**, non dentro l'app: il pulsante è *Registra un video*. Registrare in-app significherebbe `MediaRecorder`, che produce formati diversi fra Android e iPhone e non usa l'encoder hardware del telefono. Il video di sistema è migliore, consuma meno batteria e si apre su qualunque PC dell'ufficio. Per le foto la fotocamera interna serve a non uscire fra uno scatto e l'altro; un video si registra uno per volta, quindi quel problema non c'è.
+- **Il video non viene compresso.** Transcodificare in un browser non è realistico: parte come l'ha prodotto il telefono, **in qualunque categoria** — la distinzione compressa/originale vale solo per le foto.
+- **Il peso è l'unico vero vincolo.** Nelle impostazioni del modulo c'è un **tetto in MB** (predefinito 20). Un file che lo supera **non entra in coda** e l'app lo dice subito — *«Un file da 373,4 MB supera il limite di 20 MB e non è stato aggiunto: registra un video più corto»* — invece di accodarlo e farlo ritentare a vuoto per sempre. Il valore giusto lo dice il collaudo sul flow vero.
+- **Anteprima e durata** si ricavano da un fotogramma del filmato, mezzo secondo dentro. Se il browser non decodifica il formato, l'anteprima è un'icona e la durata resta 0: l'invio non dipende dalla riuscita di una miniatura.
+- Foto e video **possono stare nello stesso invio**: il pulsante dice *Invia 1 foto e 1 video*.
+
 ## 4. Contratto di invio
 
 POST JSON al **proprio** flow — diverso da quello delle bolle — un file per richiesta, `api-version=2024-10-01` obbligatoria (l'app corregge il parametro da sola, lasciando intatta la firma `sig=`).
@@ -56,7 +66,11 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
   "commessa": "MAR",                  // solo il codice
   "operatore": "Paolo Sanzarello",
   "nota": "Getto solaio piano 3 completato",   // può essere vuota
-  "idClient": "f15f1935-…",           // GUID della foto, per la deduplica
+  "genere": "foto",                   // oppure "video"
+  "estensione": "jpg",                // jpg | mp4 | mov | webm | 3gp…
+  "mimeType": "image/jpeg",
+  "durataSecondi": 0,                 // solo per i video, 0 se sconosciuta
+  "idClient": "f15f1935-…",           // GUID del file, per la deduplica
   "dataScatto": "2026-09-10T17:28:04+02:00",   // ora reale del telefono
   "versioneApp": "0.19.0",
   "nomeFile": "…",                    // IGNORATO dal backend: lo compone il flow
@@ -79,6 +93,8 @@ Un flow e una raccolta **nuovi e dedicati**, non quelli delle bolle: così una m
 | `Nota` | Più righe di testo | `nota` |
 | `DataScatto` | **Riga di testo singola** | `dataScatto`, verbatim |
 | `IdClient` | Riga di testo singola, indicizzata | `idClient` |
+| `Genere` | Riga di testo singola (o Scelta: foto \| video) | `genere` |
+| `DurataSecondi` | Numero, 0 decimali — facoltativa | `durataSecondi` |
 | `VersioneApp` | Riga di testo singola — facoltativa | `versioneApp` |
 
 `DataScatto` di tipo **testo** e non *Data e ora*: è la stessa decisione presa per le bolle il 03/09, dopo che SharePoint archiviava un valore sfasato di 7 ore pur essendo corretti sia il fuso del sito sia quello del profilo. Togliere a SharePoint la possibilità di interpretare il dato è l'unico rimedio che ha tenuto.
@@ -91,7 +107,11 @@ Un flow e una raccolta **nuovi e dedicati**, non quelli delle bolle: così una m
 - `Response 200` finale, **con l'header `Access-Control-Allow-Origin: *` su tutte le Response**: senza, il file arriva ma il browser non lascia leggere la risposta all'app, che segna Errore e ritenta all'infinito;
 - **ogni via d'uscita deve avere una Response.** Un ramo che esce senza rispondere fa arrivare all'app un `502`, che significa esattamente «il flow è terminato senza rispondere».
 
-Nome file suggerito, coerente con la nomenclatura di gruppo: `Foto[Commessa][Tipo][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg`.
+Nome file suggerito, coerente con la nomenclatura di gruppo:
+`Foto[Commessa][Tipo][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` per le foto,
+`Video[…].[estensione]` per i video.
+
+⚠️ **L'estensione va presa dal campo `estensione` del payload, non fissata a `.jpg`.** Un video salvato come `.jpg` non si apre: è l'errore più facile da fare qui, e non dà nessun segnale — il file arriva, il flow è verde, e il problema si scopre in ufficio quando qualcuno prova ad aprirlo. Espressione: `triggerBody()?['estensione']`.
 
 ## 6. Il runbook del venerdì — punto aperto
 
@@ -101,7 +121,7 @@ Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaric
 
 Da decidere insieme al percorso, perché cambia il runbook:
 
-1. **Cosa si scarica:** solo `ARCHIVIO`, o anche `AVANZAMENTO`? L'uso descritto dice solo Archivio: le foto di avanzamento servono a capirsi sul momento e non hanno valore documentale.
+1. **Cosa si scarica:** solo `ARCHIVIO`, o anche `AVANZAMENTO`? E i **video** insieme alle foto, o in una sottocartella a parte? Un video da decine di MB nella cartella di commessa è una scelta da fare consapevolmente. L'uso descritto dice solo Archivio: le foto di avanzamento servono a capirsi sul momento e non hanno valore documentale.
 2. **Come si marca il lavorato.** È lo stesso problema già affrontato per le bolle: senza uno stato in raccolta, il venerdì successivo il runbook o riscarica tutto o rischia di saltare qualcosa. Coerente con la scelta fatta per le bolle, la strada è una colonna `Stato` che il runbook aggiorna, non lo spostamento dei file.
 3. **Cosa fa con `Nota` e `Operatore`**: finiscono nel nome del file, in un file di testo accanto, o si perdono? Se la nota ha valore, va deciso adesso.
 4. **Collaudo sui numeri**, mai sull'esito formale: foto di categoria Archivio presenti in raccolta contro file depositati su `L:`. Ogni scarto è un difetto da spiegare.

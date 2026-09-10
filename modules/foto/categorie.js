@@ -4,7 +4,7 @@
 export const CATEGORIE = [
   {
     codice: 'AVANZAMENTO',
-    etichetta: 'Avanzamento lavori — per capirci tra noi',
+    etichetta: 'Avanzamento lavori',
     breve: 'Avanzamento',
     // Compressa come le bolle: deve partire anche con poca rete, e serve a
     // guardarla, non ad archiviarla.

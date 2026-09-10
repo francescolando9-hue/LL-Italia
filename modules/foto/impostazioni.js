@@ -13,6 +13,12 @@ const PREDEFINITE = {
   conservaUltime: 10,
   ultimaCommessa: '',
   ultimaCategoria: '',
+  // Tetto di peso per un singolo invio, in MB. Serve ai video, che non si
+  // possono comprimere nel browser: il contenuto viaggia in base64 dentro
+  // JSON, che aggiunge un terzo, e oltre una certa taglia il flow rifiuta.
+  // Meglio dirlo all'operatore prima di accodare che lasciarlo ritentare a
+  // vuoto. Il valore giusto lo dice il collaudo sul flow vero.
+  limiteMB: 20,
 };
 
 export function impostazioniFoto() {
