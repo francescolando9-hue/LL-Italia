@@ -3,6 +3,7 @@
 // La categoria si sceglie PRIMA di scattare, perché decide come l'immagine
 // viene preparata: compressa per l'avanzamento, originale per l'archivio.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
+import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
@@ -81,7 +82,10 @@ async function vista(el) {
         <select id="commessa" required>${opzioniCommessa}</select>
       </div>
       <div id="avviso-categoria"></div>
-      <label class="btn btn-primario foto-scatta" for="input-camera">&#128247; Scatta foto</label>
+      ${fotocameraDisponibile()
+        ? '<button id="apri-fotocamera" class="btn btn-primario foto-scatta" type="button">&#128247; Scatta foto</button>'
+        : ''}
+      <label class="btn ${fotocameraDisponibile() ? 'btn-secondario' : 'btn-primario'} foto-scatta" for="input-camera">${fotocameraDisponibile() ? 'Usa la fotocamera del telefono' : '&#128247; Scatta foto'}</label>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
       <label class="btn btn-secondario" for="input-galleria">Scegli dalla galleria</label>
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
@@ -105,6 +109,8 @@ async function vista(el) {
 
   el.querySelector('#categoria').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#commessa').addEventListener('change', () => { ridisegna(); });
+  const pulsanteScatto = el.querySelector('#apri-fotocamera');
+  if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
@@ -117,6 +123,36 @@ async function gestisciFile(evento) {
   const input = evento.target;
   const file = [...input.files];
   input.value = '';
+  await aggiungiFile(file);
+}
+
+// Fotocamera interna: si scatta più volte di fila senza uscire dall'app.
+// Qui non c'è raggruppamento — ogni foto è una foto — ma il gesto è lo stesso
+// del modulo Bolle, così chi usa l'app impara una sola cosa.
+async function apriScatto() {
+  const scelta = categoria(radice.querySelector('#categoria').value);
+  const avviso = radice.querySelector('#avviso-foto');
+  if (!scelta) {
+    avviso.innerHTML = '<p class="avviso avviso-attenzione">Scegli prima il tipo di foto: cambia come viene inviata.</p>';
+    return;
+  }
+  let esito;
+  try {
+    esito = await apriFotocamera({
+      titolo: `Foto — ${scelta.breve}`,
+      suggerimento: scelta.originale
+        ? 'Risoluzione originale: scatta pure più foto, poi tocca Fine.'
+        : 'Scatta pure più foto di fila, poi tocca Fine.',
+    });
+  } catch (errore) {
+    avviso.innerHTML = `<p class="avviso avviso-attenzione">${scappaHtml(errore.message)}.</p>`;
+    radice.querySelector('#input-camera').click();
+    return;
+  }
+  await aggiungiFile(esito.file);
+}
+
+async function aggiungiFile(file) {
   if (file.length === 0) return;
   const tipo = radice.querySelector('#categoria').value;
   const scelta = categoria(tipo);

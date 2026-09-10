@@ -4,7 +4,7 @@ La PWA unica del gruppo MLP / LL Italia: un'app contenitore a moduli (sezioni), 
 Utenti del modulo Bolle: operai e fornitori in cantiere, spesso esterni all'azienda, senza account M365, con guanti e sole negli occhi.
 Architettura: shell + moduli
 Shell (core/): manifest e branding "LL Italia", Service Worker, home/launcher con le tessere dei moduli, routing hash (#/bolle), impostazioni di app (es. autore, condiviso tra moduli), design system (variabili CSS comuni).
-Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni ed endpoint (per Bolle: endpoint, token, foto conservate; per Foto cantiere gli stessi, verso un flow diverso). Nella shell vive ciò che è di tutti: anagrafica cantieri (core/cantieri.js), normalizzazione degli endpoint dei flow (core/endpoint.js), versione dell'app (core/versione.js). Non duplicare questi in un modulo: due verità divergono.
+Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni ed endpoint (per Bolle: endpoint, token, foto conservate; per Foto cantiere gli stessi, verso un flow diverso). Nella shell vive ciò che è di tutti: anagrafica cantieri (core/cantieri.js), normalizzazione degli endpoint dei flow (core/endpoint.js), versione dell'app (core/versione.js), fotocamera interna multiscatto (core/fotocamera.js). Non duplicare questi in un modulo: due verità divergono.
 Con due o più moduli la home mostra le tessere; con un solo modulo attivo aprirebbe direttamente su quello.
 Fonte di verità (per il modulo Bolle)
 docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale su tutto.
@@ -21,7 +21,7 @@ Target: browser mobile recenti (Chrome Android in primis, poi Safari iOS). Camer
 Principi non negoziabili
 Offline-first (modulo Bolle): lo scatto non deve MAI perdersi. Prima la coda locale, poi l'invio; retry con backoff al ritorno della rete; l'elemento esce dalla coda solo a conferma del server (idempotenza via uuid client).
 Il modulo Bolle è capture-only: niente OCR, niente dati estratti, niente scritture su Lists, niente logica di attribuzione.
-UI in italiano, essenziale, tap target grandi: il flusso felice di Bolle è 3 tocchi — foto → cantiere (ultimo usato preselezionato) → invia.
+UI in italiano, essenziale, tap target grandi: il flusso felice di Bolle è 3 tocchi — foto → cantiere (ultimo usato preselezionato) → invia. Per gli scatti multipli si resta dentro la fotocamera dell'app: uscire e rientrare a ogni pagina è la cosa che confonde chi ha poca dimestichezza.
 Nessun segreto nel repo: URL endpoint e chiavi si inseriscono nelle Impostazioni e vivono solo in localStorage del dispositivo.
 Collaudo sui numeri, mai sull'esito formale: contatori locali scatti/inviate/in coda/errore sempre visibili; un invio "riuscito" si dimostra contando foto scattate vs foto atterrate.
 Convenzioni di lavoro

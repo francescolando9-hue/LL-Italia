@@ -268,3 +268,131 @@ body {
   margin-top: 12px;
 }
 .azioni-riga .btn { flex: 1; }
+
+/* Fotocamera dentro l'app: a tutto schermo, comandi grandi, pensata per essere
+   usata con i guanti e con il sole negli occhi */
+.senza-scorrimento { overflow: hidden; }
+
+.fotocamera {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+}
+
+.fotocamera-testata {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.fotocamera-chiudi {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.fotocamera-titolo { flex: 1 1 auto; font-weight: 700; }
+
+.fotocamera-conta {
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--blu);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.fotocamera-conta:empty { background: none; }
+
+.fotocamera-video {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  object-fit: cover;
+  background: #000;
+}
+
+.fotocamera-suggerimento {
+  margin: 0;
+  padding: 8px 14px 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+}
+
+.fotocamera-suggerimento:empty { padding: 0; }
+
+.fotocamera-rullino {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 12px 0;
+  min-height: 0;
+}
+
+.fotocamera-rullino img {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.fotocamera-rullino:empty { padding: 0; }
+
+.fotocamera-comandi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+}
+
+.fotocamera-scatta {
+  width: 74px;
+  height: 74px;
+  flex: 0 0 auto;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.fotocamera-scatta span {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.fotocamera-scatta:disabled span { background: rgba(255, 255, 255, 0.5); }
+
+.fotocamera-fine { flex: 1 1 auto; }
+
+.fotocamera-avviso {
+  margin: 0;
+  padding: 6px 14px 0;
+  color: #ffd9d0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.fotocamera-avviso:empty { padding: 0; }
