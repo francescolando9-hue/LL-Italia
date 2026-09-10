@@ -1,6 +1,6 @@
 # App LL Italia — Flow di ricezione bolle: struttura, procedure, collaudi
 
-> **Rev. 6 del 10/09/2026 ore 17:35.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 7 del 10/09/2026 ore 17:50.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ## 1. Struttura del flow
 
@@ -143,7 +143,7 @@ Il numero mostrato dall'app accanto a ogni bolla (in *Coda invii* e nello storic
 
 ## 6. Bolla su più pagine (aggiunto il 10/09/2026)
 
-Una bolla di consegna può essere su più fogli. L'operatore, quando ha in attesa almeno due foto, accende l'interruttore **«Sono le pagine di una sola bolla»**: le foto partono numerate nell'ordine di scatto.
+Una bolla di consegna può essere su più fogli. Dopo la prima foto l'operatore tocca **«+ Aggiungi pagina a questa bolla»** e scatta il foglio successivo: le pagine partono numerate nell'ordine di scatto.
 
 **Il contratto non cambia: resta un file per richiesta.** Una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`. Li lega:
 
@@ -161,4 +161,4 @@ Mappature in *Update file properties*: `triggerBody()?['idBolla']`, `triggerBody
 
 **Un gruppo incompleto è un difetto da spiegare:** `Pagine` = 3 con due sole righe presenti significa che una pagina non è arrivata, e il buco corrispondente si trova nella sequenza dei progressivi di quel dispositivo.
 
-**Verifica, sui numeri:** una bolla di tre pagine dal telefono → in raccolta tre righe con lo **stesso** `IdBolla`, `Pagina` 1, 2, 3, `Pagine` 3 su tutte, e tre progressivi consecutivi. Colonne vuote su tutte = mappature assenti. `IdBolla` diverso su ogni riga = l'interruttore non era acceso, e le pagine sono state mandate come bolle separate.
+**Verifica, sui numeri:** una bolla di tre pagine dal telefono → in raccolta tre righe con lo **stesso** `IdBolla`, `Pagina` 1, 2, 3, `Pagine` 3 su tutte, e tre progressivi consecutivi. Colonne vuote su tutte = mappature assenti. `IdBolla` diverso su ogni riga = le pagine sono state mandate come bolle separate, cioè senza usare «Aggiungi pagina».

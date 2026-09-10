@@ -59,6 +59,11 @@ function revocaUrl() {
   urlDaRevocare = [];
 }
 
+// Le foto in attesa formano una sola bolla di più pagine oppure altrettante
+// bolle da una pagina. Lo decide l'operatore con "Aggiungi pagina", e la
+// scelta è sempre scritta a video: mai da indovinare al momento di Invia.
+let unaSolaBolla = false;
+
 async function vista(el) {
   if (!impostazioniApp.autore) {
     naviga('#/benvenuto', true);
@@ -95,11 +100,9 @@ async function vista(el) {
       <div id="avviso-foto"></div>
       <div id="anteprime" class="bolle-anteprime"></div>
       <div id="riquadro-pagine" class="nascosto">
-        <label class="campo-interruttore" for="una-bolla">
-          <input id="una-bolla" type="checkbox">
-          Sono le pagine di <strong>una sola bolla</strong>
-        </label>
-        <p class="aiuto tenue">Da usare quando la bolla è su più fogli. Le foto partono nell'ordine in cui le hai scattate: pagina 1, 2, 3.</p>
+        <p id="stato-bolla" class="bolle-stato-bolla"></p>
+        <button id="aggiungi-pagina" class="btn btn-secondario" type="button">&#43; Aggiungi pagina a questa bolla</button>
+        <p id="separa-pagine"></p>
       </div>
       <div id="avviso-cantiere"></div>
       <button id="invia" class="btn btn-successo" disabled>Invia</button>
@@ -117,9 +120,13 @@ async function vista(el) {
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
-  // Acceso o spento, le anteprime si rinumerano subito: l'operatore vede
-  // l'ordine delle pagine prima di premere Invia, non dopo.
-  el.querySelector('#una-bolla').addEventListener('change', () => { ridisegna(); });
+  // Aggiungi pagina: dichiara che le foto in attesa sono una sola bolla e
+  // apre subito la fotocamera, così il gesto è uno.
+  el.querySelector('#aggiungi-pagina').addEventListener('click', async () => {
+    unaSolaBolla = true;
+    await ridisegna();
+    el.querySelector('#input-camera').click();
+  });
 
   await ridisegna();
   // Invio automatico a ogni apertura del modulo.
@@ -186,15 +193,15 @@ async function invia() {
   const selezione = radice.querySelector('#cantiere');
   const cantiere = selezione ? selezione.value : '';
   if (!cantiere) return;
-  const unaBolla = radice.querySelector('#una-bolla');
-  const unaSolaBolla = Boolean(unaBolla && unaBolla.checked);
+  // Con una sola foto in attesa il raggruppamento non fa differenza:
+  // pagina 1 di 1 in ogni caso.
   const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla);
   if (quante > 0) {
     coda.incrementaScattate(quante);
     salvaImpostazioniBolle({ ultimoCantiere: cantiere });
-    // L'interruttore non resta acceso: la bolla dopo è un'altra, e ricordarsi
-    // di spegnerlo sarebbe un modo per unire per sbaglio bolle diverse.
-    if (unaBolla) unaBolla.checked = false;
+    // La bolla dopo è un'altra: la composizione si chiude qui, altrimenti
+    // basterebbe distrarsi per unire due bolle diverse.
+    unaSolaBolla = false;
   }
   await ridisegna();
   invio.avvia();
@@ -227,12 +234,26 @@ async function ridisegna() {
     <div class="bolle-chip errore"><span class="valore">${inErrore.length}</span><span class="etichetta">Errore</span></div>
   `;
 
-  // Il riquadro "una sola bolla" ha senso solo con almeno due foto in attesa.
+  // Il riquadro di composizione compare dalla PRIMA foto: è lì che serve la
+  // scelta fra "aggiungo una pagina" e "la mando così".
+  if (bozze.length === 0) unaSolaBolla = false;
   const riquadroPagine = radice.querySelector('#riquadro-pagine');
-  const unaBolla = radice.querySelector('#una-bolla');
-  riquadroPagine.classList.toggle('nascosto', bozze.length < 2);
-  if (bozze.length < 2 && unaBolla) unaBolla.checked = false;
-  const numeraPagine = Boolean(unaBolla && unaBolla.checked) && bozze.length > 1;
+  riquadroPagine.classList.toggle('nascosto', bozze.length === 0);
+  const numeraPagine = unaSolaBolla && bozze.length > 1;
+  radice.querySelector('#stato-bolla').innerHTML = bozze.length === 0 ? '' : unaSolaBolla
+    ? `Stai componendo <strong>una sola bolla di ${bozze.length} ${bozze.length === 1 ? 'pagina' : 'pagine'}</strong>.`
+    : bozze.length === 1
+      ? 'Questa foto è <strong>una bolla di una pagina</strong>. Se la bolla continua su un altro foglio, aggiungi la pagina.'
+      : `Queste ${bozze.length} foto sono <strong>${bozze.length} bolle diverse</strong>, una pagina ciascuna. Se invece sono i fogli di una sola bolla, aggiungi la pagina.`;
+  // Via d'uscita se "Aggiungi pagina" è stato premuto per sbaglio: senza,
+  // l'unico rimedio sarebbe cancellare le foto e rifarle.
+  radice.querySelector('#separa-pagine').innerHTML = unaSolaBolla && bozze.length > 1
+    ? '<button id="separa" class="btn-collegamento" type="button">Non sono la stessa bolla: mandale separate</button>'
+    : '';
+  const separa = radice.querySelector('#separa');
+  if (separa) {
+    separa.addEventListener('click', () => { unaSolaBolla = false; ridisegna(); });
+  }
 
   const anteprime = radice.querySelector('#anteprime');
   anteprime.innerHTML = bozze.map((r, indice) => `
@@ -257,7 +278,9 @@ async function ridisegna() {
     ? 'Invia'
     : numeraPagine
       ? `Invia 1 bolla di ${bozze.length} pagine`
-      : `Invia (${bozze.length})`;
+      : bozze.length === 1
+        ? 'Invia 1 bolla'
+        : `Invia ${bozze.length} bolle separate`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
   avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
     ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
