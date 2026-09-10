@@ -319,3 +319,29 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Numero di pagina sull'anteprima di una bolla su più fogli */
+.bolle-pagina {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: var(--blu);
+  color: #fff;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Stesso dato nelle righe della coda e dello storico */
+.bolle-pagina-riga {
+  display: inline-block;
+  background: #e8ecf7;
+  color: var(--blu);
+  border-radius: 6px;
+  padding: 0 6px;
+  margin-right: 4px;
+  font-size: 0.85em;
+  font-weight: 700;
+  white-space: nowrap;
+}

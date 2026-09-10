@@ -68,6 +68,13 @@ async function processa() {
         if (!Number.isInteger(record.progressivo)) {
           record.progressivo = await coda.riservaProgressivi(1);
         }
+        // Foto accodate prima della gestione delle bolle su più pagine:
+        // valgono come bolle di una pagina sola.
+        if (!record.idBolla) {
+          record.idBolla = record.id;
+          record.pagina = 1;
+          record.pagine = 1;
+        }
         record.stato = 'invio';
         record.ultimoErrore = '';
         await coda.aggiorna(record);
@@ -118,7 +125,12 @@ function pianificaRetry() {
 export function componiNomeFile(record) {
   const compatto = String(record.timestampDispositivo).replace(/[-:]/g, '').slice(0, 15).replace('T', '');
   const operatore = String(record.autore).replace(/\s+/g, '');
-  return `Bolla${record.cantiere}${compatto}${operatore}.jpg`;
+  // Le pagine di una stessa bolla si distinguono nel nome: il backend ignora
+  // questo campo, ma nei log e nelle diagnosi due pagine identiche nel nome
+  // sarebbero indistinguibili.
+  const pagine = Number(record.pagine) || 1;
+  const pagina = pagine > 1 ? `Pag${record.pagina}di${pagine}` : '';
+  return `Bolla${record.cantiere}${compatto}${operatore}${pagina}.jpg`;
 }
 
 // Costruisce il corpo del contratto concordato col backend (già attivo).
@@ -130,6 +142,9 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo,
     idClient: record.id,
     idDispositivo,
     progressivo: record.progressivo,
+    idBolla: record.idBolla,
+    pagina: record.pagina,
+    pagine: record.pagine,
     dataInvio: record.timestampDispositivo,
     versioneApp: versione,
     nomeFile: componiNomeFile(record),

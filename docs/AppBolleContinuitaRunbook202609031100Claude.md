@@ -1,6 +1,6 @@
 # App Bolle — Documento unico di continuità per il runbook magazzino
 
-> **Rev. 6 del 03/09/2026 ore 22:15.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 7 del 10/09/2026 ore 17:20.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ---
 
@@ -10,7 +10,7 @@ Sto lavorando al runbook serale del magazzino di cantiere. La sorgente delle bol
 
 **App "LL Italia" — PWA installata sui telefoni.** Repo pubblico `francescolando9-hue/LL-Italia`, pubblicata su GitHub Pages. Vanilla JS, nessun framework, nessun account M365 richiesto agli operai. È un contenitore a moduli: oggi c'è solo il modulo **Bolle**, **capture-only** — raccoglie e invia foto, non legge nulla del contenuto.
 
-L'operatore fa tre tocchi: fotografa la bolla, controlla il cantiere (resta l'ultimo usato), preme Invia. La foto viene compressa (JPEG, lato lungo 2500 px, qualità 0,85 — la leggibilità per l'OCR prevale sul peso) e messa in coda su IndexedDB **prima** di qualunque tentativo di rete: se il telefono è senza campo o l'app viene chiusa, la foto non si perde e riparte da sola quando torna la connessione, con retry a backoff da 5 secondi fino a 5 minuti. Una foto esce dalla coda **solo** alla conferma del server.
+L'operatore fa tre tocchi: fotografa la bolla, controlla il cantiere (resta l'ultimo usato), preme Invia. Se la bolla è su più fogli, accende l'interruttore «Sono le pagine di una sola bolla» e le foto partono numerate nell'ordine di scatto. La foto viene compressa (JPEG, lato lungo 2500 px, qualità 0,85 — la leggibilità per l'OCR prevale sul peso) e messa in coda su IndexedDB **prima** di qualunque tentativo di rete: se il telefono è senza campo o l'app viene chiusa, la foto non si perde e riparte da sola quando torna la connessione, con retry a backoff da 5 secondi fino a 5 minuti. Una foto esce dalla coda **solo** alla conferma del server.
 
 Tre identificatori accompagnano ogni bolla lungo tutta la catena, e nessuno cambia tra un tentativo di invio e l'altro:
 
@@ -30,6 +30,8 @@ Gli ultimi due vanno letti insieme: sono il controllo di continuità descritto a
 | `idClient` | GUID della bolla |
 | `idDispositivo` | GUID dell'installazione: il titolare della sequenza |
 | `progressivo` | intero, sequenza di quel dispositivo |
+| `idBolla` | GUID della **bolla**: uguale per tutte le sue pagine |
+| `pagina` / `pagine` | numero della pagina e quante pagine compongono la bolla |
 | `dataInvio` | ISO 8601 con fuso, **ora reale del telefono** (`2026-09-03T09:17:25+02:00`) |
 | `versioneApp` | versione dell'app in uso su quel telefono (es. `0.15.0`) |
 | `nomeFile` | **ignorato dal backend**: il nome lo compone il flow |
@@ -57,7 +59,7 @@ Le tre azioni *Response* portano l'header `Access-Control-Allow-Origin: *`, obbl
 
 - Cartelle `AAAA/AAAAMM`, calcolate sulla **data di scatto** (`dataInvio`), non sull'orologio del flow: per le foto accodate offline e inviate ore dopo la differenza è reale.
 - Nome file: `Bolla[Commessa][AAAAMMGGHHMM][Operatore][4 cifre di idClient].jpg` — es. `BollaMAR202609030917FrancescoLandod5e1.jpg`. Niente secondi (nomenclatura di gruppo); le 4 cifre dell'`idClient` evitano che due bolle inviate nello stesso minuto si sovrascrivano.
-- Colonne: `Commessa`, `Operatore`, `DataScatto`, `IdClient`, `IdDispositivo`, `Progressivo`, più `VersioneApp` se la si crea (facoltativa: la versione dell'app che ha mandato la bolla, utile a capire se un campo manca perché il telefono è indietro con l'aggiornamento).
+- Colonne: `Commessa`, `Operatore`, `DataScatto`, `IdClient`, `IdDispositivo`, `Progressivo`, `IdBolla`, `Pagina`, `Pagine`, più `VersioneApp` se la si crea (facoltativa: la versione dell'app che ha mandato la bolla, utile a capire se un campo manca perché il telefono è indietro con l'aggiornamento).
 - **Attenzione:** la colonna della data si chiama `DataScatto`, il campo nel payload si chiama `dataInvio`. Sono la stessa cosa — l'istante dello scatto sul telefono — e il flow mappa `triggerBody()?['dataInvio']` su `DataScatto`. Fa fede il nome della colonna.
 
 ## 2. Cosa cambia per il runbook, rispetto a prima
@@ -76,24 +78,31 @@ Le tre azioni *Response* portano l'header `Access-Control-Allow-Origin: *`, obbl
   - prima eccezione già registrata: progressivi **1-23**, collaudo del 03/09 cancellato dalla raccolta.
 
   Le eccezioni si leggono **per dispositivo**: `IdDispositivo` vuoto in una riga della lista significa che quell'eccezione non si aggancia a nessuna sequenza, e il buco continuerà a comparire. L'identificativo del telefono si legge sull'app, in *Impostazioni app → Questo dispositivo*.
+- **Una bolla non è più una foto: può essere su più pagine** (dal 10/09/2026). Il contratto resta un file per richiesta, quindi una bolla di tre fogli sono **tre righe** in raccolta, legate da `IdBolla` e ordinate da `Pagina`; `Pagine` dice quante devono essere. Tre conseguenze:
+  - **si ricompone raggruppando per `IdBolla` e ordinando per `Pagina`**, mai per orario di arrivo o per nome del file;
+  - **un gruppo incompleto è un difetto da spiegare**: `Pagine` = 3 con due righe presenti significa una pagina mai arrivata, e nella sequenza dei progressivi di quel dispositivo si trova il buco corrispondente;
+  - anche una bolla di una pagina sola ha il suo `IdBolla`, con `Pagina` 1 e `Pagine` 1: **la regola è una sola, senza casi particolari**.
+
+  Attenzione a non confondere i conteggi: **il collaudo si fa in pagine, non in bolle.** Tre pagine sono tre file in raccolta e tre progressivi consumati; l'app conta pagine, e così deve fare il confronto serale.
 - **La deduplica lato flow è un controllo inerte.** La Condition sui duplicati esiste ma non scatta mai (causa non determinata, chiusa per decisione il 03/09/2026). Non è un blocco: il nome del file è deterministico — stessa bolla, stesso `dataInvio`, stesso `idClient`, stesso nome — quindi un reinvio **sovrascrive** il file esistente e non genera un doppione in raccolta. Conseguenza per il runbook: **non contare i file per stimare i doppioni**, l'omonimia li maschera.
 
 ## 3. Interventi aperti su SharePoint e sul flow (prerequisiti, non lavoro di runbook)
 
-Quattro cose sono decise ma da eseguire, o da verificare. Finché non sono fatte, i dati corrispondenti non sono affidabili.
+Cinque cose sono decise ma da eseguire, o da verificare. Finché non sono fatte, i dati corrispondenti non sono affidabili.
 
 1. **Colonna `Progressivo`** — raccolta → *Aggiungi colonna*: tipo **Numero**, nome `Progressivo`, **0** decimali, valore predefinito **vuoto**. Non zero: la sequenza parte da 1, quindi uno 0 sarebbe un dato falso; vuoto significa «bolla arrivata da una versione precedente dell'app».
 2. **Colonna `IdDispositivo`** — tipo **Riga di testo singola**.
-3. **Mappature nel flow** — azione *Update file properties*: campo `Progressivo` ← `triggerBody()?['progressivo']` (nessuna conversione, nessun `int()`: l'app manda già un intero JSON), campo `IdDispositivo` ← `triggerBody()?['idDispositivo']`. Senza queste mappature i campi arrivano nel corpo della richiesta e vengono buttati.
-4. **Colonna della data di tipo testo** — `DataScatto` deve essere **Riga di testo singola**, non *Data e ora*, col flow che vi scrive `triggerBody()?['dataInvio']` verbatim. **Da verificare se è già stato fatto:** se la colonna è ancora di tipo data, i valori in raccolta possono essere sfasati di alcune ore e non vanno usati come ora dello scatto.
+3. **Colonne della bolla su più pagine** — `IdBolla` (Riga di testo singola), `Pagina` e `Pagine` (Numero, 0 decimali). Senza, le pagine arrivano ma non sono ricomponibili.
+4. **Mappature nel flow** — azione *Update file properties*: `Progressivo` ← `triggerBody()?['progressivo']` (nessuna conversione, nessun `int()`: l'app manda già interi JSON), `IdDispositivo` ← `triggerBody()?['idDispositivo']`, `IdBolla` ← `triggerBody()?['idBolla']`, `Pagina` ← `triggerBody()?['pagina']`, `Pagine` ← `triggerBody()?['pagine']`. Senza queste mappature i campi arrivano nel corpo della richiesta e vengono buttati.
+5. **Colonna della data di tipo testo** — `DataScatto` deve essere **Riga di testo singola**, non *Data e ora*, col flow che vi scrive `triggerBody()?['dataInvio']` verbatim. **Da verificare se è già stato fatto:** se la colonna è ancora di tipo data, i valori in raccolta possono essere sfasati di alcune ore e non vanno usati come ora dello scatto.
 
-Verifica dei punti 1-3, sui numeri: tre foto di fila dallo stesso telefono senza scartarne nessuna dalle anteprime → in raccolta tre numeri consecutivi, tutti con lo stesso `IdDispositivo`. Colonna vuota su tutte = mappatura assente. Numeri non consecutivi a parità di dispositivo = una bolla non è arrivata, ed è esattamente il difetto che i campi servono a scoprire.
+Verifica dei punti 1-4, sui numeri: tre foto di fila dallo stesso telefono senza scartarne nessuna dalle anteprime → in raccolta tre numeri consecutivi, tutti con lo stesso `IdDispositivo`. Poi una bolla di tre pagine → tre righe con lo stesso `IdBolla`, `Pagina` 1, 2, 3 e `Pagine` 3. Colonna vuota su tutte = mappatura assente. Numeri non consecutivi a parità di dispositivo = una bolla non è arrivata, ed è esattamente il difetto che i campi servono a scoprire.
 
 ## 4. Cosa NON è ancora risolto a valle — il lavoro di questa sessione
 
 1. **Manca la marcatura del lavorato.** In raccolta non c'è nulla che distingua una bolla già processata da una nuova. Se il runbook gira ogni sera sulla stessa cartella, o rilavora tutto o rischia di saltare qualcosa. Da decidere: una colonna `Stato` che il runbook aggiorna, oppure lo spostamento dei file lavorati in una sottocartella. **È il punto più urgente.**
 2. **Manca la gestione degli scarti**: bolle illeggibili, foto che non sono bolle, doppioni reali (stessa bolla fotografata due volte — due scatti distinti, che nessun automatismo riconosce senza OCR).
-3. **Il collaudo si ferma a metà.** La catena vera è "scattate → atterrate → **lavorate**". Il primo tratto ora è misurabile in modo indipendente dal telefono grazie a `IdDispositivo` + `Progressivo` (a condizione che i punti 1-3 del capitolo 3 siano fatti). L'ultimo tratto, da atterrate a lavorate, non è mai stato misurato: serve un conteggio confrontabile ogni sera.
+3. **Il collaudo si ferma a metà.** La catena vera è "scattate → atterrate → **lavorate**". Il primo tratto ora è misurabile in modo indipendente dal telefono grazie a `IdDispositivo` + `Progressivo` (a condizione che i punti 1-4 del capitolo 3 siano fatti). L'ultimo tratto, da atterrate a lavorate, non è mai stato misurato: serve un conteggio confrontabile ogni sera.
 
 ## 5. Cose che l'app già fa, e che a valle non vanno duplicate
 

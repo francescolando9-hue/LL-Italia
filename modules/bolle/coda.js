@@ -184,17 +184,31 @@ export function progressivoRaggiunto() {
 // scartata dalle anteprime non deve bruciare un numero, perché il buco nella
 // sequenza è proprio il segnale che il runbook legge come "bolla persa".
 // Assegnato una volta, non cambia più: i retry riusano lo stesso numero.
-export async function confermaBozze(cantiere, autore) {
+//
+// unaSolaBolla = le foto sono le PAGINE di una sola bolla: prendono un
+// idBolla comune e la numerazione pagina/pagine, nell'ordine di scatto.
+// Resta comunque un invio per pagina — il contratto è un file per richiesta —
+// e ogni pagina consuma il suo progressivo, così il controllo di continuità
+// non cambia: una pagina mai arrivata è un buco come qualsiasi altro.
+export async function confermaBozze(cantiere, autore, unaSolaBolla = false) {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
   if (bozze.length === 0) return 0;
   const primo = await riservaProgressivi(bozze.length);
+  const idComune = unaSolaBolla ? crypto.randomUUID() : '';
   let numero = primo;
+  let pagina = 1;
   for (const record of bozze) {
     record.stato = 'in_coda';
     record.cantiere = cantiere;
     record.autore = autore;
     record.progressivo = numero;
+    // Anche una bolla di una pagina sola ha il suo idBolla: a valle la regola
+    // è una — si raggruppa per idBolla — senza casi particolari da ricordare.
+    record.idBolla = idComune || crypto.randomUUID();
+    record.pagina = unaSolaBolla ? pagina : 1;
+    record.pagine = unaSolaBolla ? bozze.length : 1;
     numero += 1;
+    pagina += 1;
     await aggiorna(record);
   }
   return bozze.length;
@@ -202,13 +216,20 @@ export async function confermaBozze(cantiere, autore) {
 
 // Conferma una sola bozza: usata dalla correzione del cantiere, dove non si
 // possono coinvolgere le altre foto in attesa, che vanno su un altro cantiere.
-export async function confermaSingola(id, cantiere, autore) {
+// Rimando di una singola foto (correzione del cantiere dallo storico).
+// `bolla` porta l'appartenenza dell'originale: una pagina corretta deve
+// restare la stessa pagina della stessa bolla, altrimenti la correzione
+// spezzerebbe in due una bolla di più pagine.
+export async function confermaSingola(id, cantiere, autore, bolla = null) {
   const record = (await elenca()).find(r => r.id === id && r.stato === 'bozza');
   if (!record) return false;
   record.stato = 'in_coda';
   record.cantiere = cantiere;
   record.autore = autore;
   record.progressivo = await riservaProgressivi(1);
+  record.idBolla = (bolla && bolla.idBolla) || crypto.randomUUID();
+  record.pagina = (bolla && bolla.pagina) || 1;
+  record.pagine = (bolla && bolla.pagine) || 1;
   await aggiorna(record);
   return true;
 }
@@ -295,6 +316,9 @@ export async function registraInvio(record) {
     inviatoIl: record.inviatoIl || Date.now(),
     impronta: record.impronta || '',
     progressivo: record.progressivo || null,
+    idBolla: record.idBolla || '',
+    pagina: record.pagina || 1,
+    pagine: record.pagine || 1,
   }));
   if (record.miniatura) {
     await transazione(STORE_MINIATURE, 'readwrite', store => store.put({

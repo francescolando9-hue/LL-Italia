@@ -190,7 +190,8 @@ function disegnaElenco() {
           <button class="bolle-riga" data-id="${scappaHtml(riga.idClient)}">
             <span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
             <span class="cantiere">${Number.isInteger(riga.progressivo)
-              ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}</span>
+              ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${Number(riga.pagine) > 1
+              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}</span>
             <span class="tenue">${scappaHtml(riga.operatore)}</span>
             <span class="lente" aria-hidden="true">&#128269;</span>
           </button>
@@ -266,7 +267,9 @@ function collegaCorrezione(record, riga) {
     try {
       const nuova = await coda.aggiungiBozza(
         record.foto, record.nome, record.miniatura, record.impronta, record.qualita, record.motivoQualita);
-      await coda.confermaSingola(nuova.id, scelto, impostazioniApp.autore || record.autore);
+      // La pagina corretta resta la stessa pagina della stessa bolla:
+      // altrimenti correggere il cantiere spezzerebbe una bolla di più pagine.
+      await coda.confermaSingola(nuova.id, scelto, impostazioniApp.autore || record.autore, riga);
       coda.incrementaScattate(1);
       invio.avvia();
       esito.textContent = `In coda per ${scelto}: la trovi nella coda invii, dove diventa verde a consegna avvenuta.`
