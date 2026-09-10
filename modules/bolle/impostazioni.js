@@ -3,11 +3,13 @@
 // Sul dispositivo si inserisce dalle Impostazioni; in sviluppo locale può
 // arrivare da core/configurazione.js (file escluso da git).
 
-const CHIAVE = 'llitalia.bolle';
+// La normalizzazione dell'endpoint vive nella shell: la usano tutti i moduli
+// che inviano a un flow, non solo questo.
+import { API_VERSION, normalizzaEndpoint, endpointDaCorreggere } from '../../core/endpoint.js';
 
-// Il designer di Power Automate mostra l'URL con api-version=1, che il servizio
-// rifiuta con 400: si normalizza sempre a questa versione.
-export const API_VERSION = '2024-10-01';
+export { API_VERSION, normalizzaEndpoint, endpointDaCorreggere };
+
+const CHIAVE = 'llitalia.bolle';
 
 const PREDEFINITE = {
   endpoint: '',
@@ -24,22 +26,6 @@ const PREDEFINITE = {
 // telefono che l'aveva accesa prima che l'interruttore venisse rimosso.
 function suLocalhost() {
   return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-}
-
-// Sostituzione mirata del solo parametro api-version: non tocca il resto della
-// query string, così la firma (sig=) resta byte per byte quella originale.
-export function normalizzaEndpoint(url) {
-  const testo = String(url || '').trim();
-  if (!testo) return '';
-  if (/[?&]api-version=/i.test(testo)) {
-    return testo.replace(/([?&]api-version=)[^&]*/i, `$1${API_VERSION}`);
-  }
-  return `${testo}${testo.includes('?') ? '&' : '?'}api-version=${API_VERSION}`;
-}
-
-export function endpointDaCorreggere(url) {
-  const testo = String(url || '').trim();
-  return testo !== '' && testo !== normalizzaEndpoint(testo);
 }
 
 export function impostazioniBolle() {

@@ -1,15 +1,16 @@
 CLAUDE.md — App LL Italia (PWA modulare del gruppo)
 Cos'è questo repo
-La PWA unica del gruppo MLP / LL Italia: un'app contenitore a moduli (sezioni), destinata a crescere con i progetti del gruppo. Il primo e per ora unico modulo è Bolle: fotografare le bolle di consegna nei cantieri e inviarle al sistema di magazzino via endpoint HTTP → raccolta SharePoint BolleInArrivo. Moduli futuri verranno aggiunti senza rifare la base.
+La PWA unica del gruppo MLP / LL Italia: un'app contenitore a moduli (sezioni), destinata a crescere con i progetti del gruppo. Due moduli attivi: **Bolle** (fotografare le bolle di consegna nei cantieri e inviarle al sistema di magazzino via endpoint HTTP → raccolta SharePoint BolleInArrivo) e **Foto cantiere** (foto di avanzamento lavori e foto da archiviare sul server, in due categorie scelte dall'operatore, verso un flow e una raccolta propri). Moduli futuri si aggiungono senza rifare la base.
 Utenti del modulo Bolle: operai e fornitori in cantiere, spesso esterni all'azienda, senza account M365, con guanti e sole negli occhi.
 Architettura: shell + moduli
 Shell (core/): manifest e branding "LL Italia", Service Worker, home/launcher con le tessere dei moduli, routing hash (#/bolle), impostazioni di app (es. autore, condiviso tra moduli), design system (variabili CSS comuni).
-Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni (per Bolle: endpoint, token, foto conservate).
-Con un solo modulo attivo, la home può portare direttamente a Bolle, ma la struttura a launcher resta.
+Moduli (modules/<nome>/): autonomi e isolati — un modulo non rompe gli altri; aggiungerne uno tocca la shell solo per la tessera in home. Ogni modulo ha le proprie impostazioni ed endpoint (per Bolle: endpoint, token, foto conservate; per Foto cantiere gli stessi, verso un flow diverso). Nella shell vive ciò che è di tutti: anagrafica cantieri (core/cantieri.js), normalizzazione degli endpoint dei flow (core/endpoint.js), versione dell'app (core/versione.js). Non duplicare questi in un modulo: due verità divergono.
+Con due o più moduli la home mostra le tessere; con un solo modulo attivo aprirebbe direttamente su quello.
 Fonte di verità (per il modulo Bolle)
 docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale su tutto.
 docs/AppBolleFlowRicezione….md — il flow di ricezione e la raccolta BolleInArrivo (struttura, procedure, esiti dei collaudi).
 docs/AppBolleContinuitaRunbook….md — documento unico per il lavoro a valle, dalla raccolta in poi.
+docs/AppFotoCantiereSpecifica….md — specifica del modulo Foto cantiere e requisiti del suo flow.
 Questo file. Il kickoff del 01/09/2026 è superato dalla specifica rev. 2 e resta nella storia del repo.
 Non inventare nomi di campi SharePoint, percorsi, formati non documentati: se un'informazione manca, fermarsi e chiedere.
 Stack vincolato

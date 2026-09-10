@@ -1,14 +1,14 @@
 // Impostazioni del modulo Bolle: endpoint, token, foto conservate.
 // La modalità mock non è più un interruttore: era un'opzione di sviluppo in
 // mano all'operatore, e accesa per sbaglio significava bolle mai arrivate.
-// L'elenco cantieri non è modificabile dal dispositivo: sta in cantieri.js,
+// L'elenco cantieri non è modificabile dal dispositivo: sta in core/cantieri.js,
 // perché un codice commessa errato arriverebbe al magazzino come inesistente.
 import { scappaHtml } from '../../core/impostazioni.js';
 import {
   impostazioniBolle, salvaImpostazioniBolle, normalizzaEndpoint,
   endpointDaCorreggere, API_VERSION,
 } from './impostazioni.js';
-import { CANTIERI } from './cantieri.js';
+import { CANTIERI } from '../../core/cantieri.js';
 import * as coda from './coda.js';
 
 export function vistaImpostazioniBolle(el) {

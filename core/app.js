@@ -4,9 +4,10 @@ import { vistaHome } from './home.js';
 import { impostazioniApp, vistaBenvenuto, vistaImpostazioniApp } from './impostazioni.js';
 import { vistaInformazioni } from './informazioni.js';
 import moduloBolle from '../modules/bolle/index.js';
+import moduloFoto from '../modules/foto/index.js';
 
 // Registro dei moduli: aggiungerne uno = importarlo e aggiungerlo qui.
-const moduli = [moduloBolle];
+const moduli = [moduloBolle, moduloFoto];
 
 registraRotta('#/', () => {
   if (!impostazioniApp.autore) {

@@ -2,7 +2,7 @@
 // apertura della foto. Legge il registro locale del dispositivo, che
 // sopravvive alla potatura delle immagini a piena risoluzione.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
-import { CANTIERI, etichettaCantiere } from './cantieri.js';
+import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 

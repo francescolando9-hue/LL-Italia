@@ -1,0 +1,103 @@
+/* Modulo Foto cantiere: stessa impostazione visiva del modulo Bolle, classi
+   proprie perché i due moduli non devono dipendere l'uno dallo stile dell'altro. */
+
+.foto-contatori {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.foto-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--carta);
+  border: 1px solid var(--bordo);
+}
+
+.foto-chip .valore { font-size: 1.3rem; font-weight: 700; color: var(--blu); }
+.foto-chip .etichetta { font-size: 0.68rem; text-align: center; color: var(--testo-tenue); }
+.foto-chip.errore .valore { color: var(--errore); }
+
+.foto-anteprime {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.foto-anteprima {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bordo);
+}
+
+.foto-anteprima img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.foto-rimuovi {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.foto-marchio {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.foto-coda { list-style: none; margin: 0; padding: 0; }
+
+.foto-voce {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bordo);
+}
+
+.foto-voce:last-child { border-bottom: 0; }
+
+.foto-miniatura {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: var(--bordo);
+}
+
+.foto-dettagli { flex: 1 1 auto; min-width: 0; }
+.foto-dettagli .riga { font-weight: 600; }
+.foto-azioni { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+
+.foto-tag {
+  display: inline-block;
+  background: #eef0f7;
+  color: var(--blu);
+  border-radius: 6px;
+  padding: 0 6px;
+  margin-right: 4px;
+  font-size: 0.8em;
+  font-weight: 700;
+}

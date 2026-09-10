@@ -93,6 +93,23 @@ Quando si pubblica una versione nuova, sui telefoni già installati compare in b
 
 **La modalità mock non è più un'impostazione** (rimossa il 03/09/2026, con l'app entrata in uso). Era un interruttore di sviluppo in mano all'operatore, e accesa per sbaglio significava bolle che l'app dava per inviate e che non arrivavano da nessuna parte. Resta disponibile **solo su localhost**, per lo sviluppo: la si accende da `core/configurazione.js` e il banner giallo lo dichiara a video. In campo è spenta qualunque cosa dica il valore salvato sul dispositivo — anche su un telefono che l'aveva accesa prima dell'aggiornamento.
 
+## Modulo «Foto cantiere»
+
+Secondo modulo, accanto a Bolle: chi è in cantiere fotografa e manda in ufficio. **Due categorie, scelte prima di scattare** come si sceglie il cantiere:
+
+| Categoria | Codice | A cosa serve | Come parte |
+|---|---|---|---|
+| Avanzamento lavori — per capirci tra noi | `AVANZAMENTO` | dire a che punto è una lavorazione | compressa (2500 px, 0,85) |
+| Da archiviare sul server | `ARCHIVIO` | documentazione per la cartella di commessa su `L:` | **risoluzione originale** |
+
+La categoria si sceglie prima perché **decide come l'immagine viene preparata**, non è un'etichetta messa dopo: cambiarla a foto già pronte non ricomprime nulla, e l'app lo dice invece di tacere. Per l'archivio, se il file è già JPEG partono **i byte originali senza ricodifica** — ricomprimere «a qualità massima» degraderebbe l'immagine senza vantaggi; HEIC e PNG vengono convertiti a piena risoluzione, perché in raccolta il file si chiama `.jpg`.
+
+C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
+
+Misure dal collaudo (foto 4032 × 3024): avanzamento 1,30 MB → 0,47 MB inviati; archivio 1,30 MB → 1,30 MB, byte identici. **Attenzione al caso peggiore:** una foto da 12 MB diventa un corpo di richiesta da 16 MB, perché il base64 aggiunge un terzo — da provare sul flow vero prima di prometterlo in cantiere. Se il flow rifiuta, l'app lo dice e la foto resta in coda.
+
+Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md`. **Punto aperto:** la cartella di destinazione su `L:` per il runbook del venerdì, che deve indicare Francesco.
+
 ## Struttura del repo
 
 ```
@@ -102,18 +119,22 @@ sw.js                 service worker: precache e offline (bump di VERSIONE a ogn
 icons/                icone dal logo ufficiale (logo.png = sorgente)
 core/                 shell: router hash, home/launcher, impostazioni app, design system CSS
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
+core/cantieri.js      anagrafica cantieri, condivisa dai moduli
+core/endpoint.js      api-version dei flow Power Automate, condivisa
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
+modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
-docs/                 4 documenti, tutti correnti:
+docs/                 5 documenti, tutti correnti:
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
                       AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
+                      AppFotoCantiereSpecifica….md      modulo Foto cantiere e requisiti del suo flow
 ```
 
 **Una deroga da ratificare:** `core/vendor/qrcode.mjs` è codice di terzi incluso nel repo — il generatore di QR `qrcode-generator` di Kazuhiko Arase, licenza MIT, copiato senza modifiche. Non è una dipendenza installata (nessun npm, nessun build step) e viene caricato **solo** dalla schermata di condivisione della configurazione, quindi non pesa sull'avvio. Scriverne uno da zero avrebbe significato implementare correzione d'errore Reed-Solomon e mascheratura: un QR sbagliato è peggio di nessun QR. La verifica è per decodifica: il collaudo rilegge col riconoscitore il codice generato e confronta il testo con il link atteso.
 
-Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di `core/app.js` (la tessera in home compare da sola). Con un solo modulo la home apre direttamente su Bolle.
+Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di `core/app.js` (la tessera in home compare da sola). Nella shell sta ciò che è di tutti i moduli: anagrafica cantieri, normalizzazione degli endpoint, versione dell'app.
 
 ## Pipeline della foto
 

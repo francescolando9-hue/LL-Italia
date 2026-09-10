@@ -4,7 +4,7 @@ import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { naviga } from '../../core/router.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
-import { CANTIERI, etichettaCantiere } from './cantieri.js';
+import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
