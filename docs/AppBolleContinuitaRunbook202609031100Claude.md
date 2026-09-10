@@ -1,6 +1,6 @@
 # App Bolle — Documento unico di continuità per il runbook magazzino
 
-> **Rev. 7 del 10/09/2026 ore 17:20.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 8 del 10/09/2026 ore 17:50.** Da caricare in Cowork (progetto AutomazioneMagazzinoCantiere) come unico allegato per riprendere il lavoro sul tratto a valle: è autosufficiente, non richiede altri file del repo dell'app. Non contiene segreti — token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ---
 
@@ -10,7 +10,7 @@ Sto lavorando al runbook serale del magazzino di cantiere. La sorgente delle bol
 
 **App "LL Italia" — PWA installata sui telefoni.** Repo pubblico `francescolando9-hue/LL-Italia`, pubblicata su GitHub Pages. Vanilla JS, nessun framework, nessun account M365 richiesto agli operai. È un contenitore a moduli: oggi c'è solo il modulo **Bolle**, **capture-only** — raccoglie e invia foto, non legge nulla del contenuto.
 
-L'operatore fa tre tocchi: fotografa la bolla, controlla il cantiere (resta l'ultimo usato), preme Invia. Se la bolla è su più fogli, accende l'interruttore «Sono le pagine di una sola bolla» e le foto partono numerate nell'ordine di scatto. La foto viene compressa (JPEG, lato lungo 2500 px, qualità 0,85 — la leggibilità per l'OCR prevale sul peso) e messa in coda su IndexedDB **prima** di qualunque tentativo di rete: se il telefono è senza campo o l'app viene chiusa, la foto non si perde e riparte da sola quando torna la connessione, con retry a backoff da 5 secondi fino a 5 minuti. Una foto esce dalla coda **solo** alla conferma del server.
+L'operatore fa tre tocchi: fotografa la bolla, controlla il cantiere (resta l'ultimo usato), preme Invia. Se la bolla è su più fogli, dopo la prima foto tocca «Aggiungi pagina a questa bolla» e scatta il foglio successivo: le pagine partono numerate nell'ordine di scatto. La foto viene compressa (JPEG, lato lungo 2500 px, qualità 0,85 — la leggibilità per l'OCR prevale sul peso) e messa in coda su IndexedDB **prima** di qualunque tentativo di rete: se il telefono è senza campo o l'app viene chiusa, la foto non si perde e riparte da sola quando torna la connessione, con retry a backoff da 5 secondi fino a 5 minuti. Una foto esce dalla coda **solo** alla conferma del server.
 
 Tre identificatori accompagnano ogni bolla lungo tutta la catena, e nessuno cambia tra un tentativo di invio e l'altro:
 

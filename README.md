@@ -19,7 +19,7 @@ Alla prima apertura l'app chiede **nome e cognome**: vengono salvati sul disposi
 
 1. Aprire il modulo Bolle (l'app ci entra direttamente; la home dei moduli resta raggiungibile dal logo in alto a sinistra).
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
-3. Se la bolla è su **più fogli**, accendere l'interruttore **«Sono le pagine di una sola bolla»** (compare da due foto in su): le anteprime si numerano nell'ordine di scatto e il pulsante diventa *Invia 1 bolla di N pagine*. L'interruttore si spegne da solo dopo l'invio.
+3. Subito dopo la prima foto l'app dice cosa sta per partire — *«Questa foto è una bolla di una pagina»* — e offre **«+ Aggiungi pagina a questa bolla»**. Se la bolla continua su un altro foglio si tocca quel pulsante e si scatta la pagina successiva: le anteprime si numerano (`pag. 1`, `pag. 2`…) e il pulsante diventa *Invia 1 bolla di N pagine*. Se invece la bolla è finita, si manda così. La composizione si chiude a ogni invio: la bolla dopo riparte da una pagina.
 4. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
 5. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
 6. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
@@ -121,7 +121,9 @@ Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo 
 
 ### Bolla su più pagine
 
-Una bolla di consegna può essere su più fogli. L'interruttore **«Sono le pagine di una sola bolla»** le lega: **il contratto non cambia — resta un file per richiesta**, quindi una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`, legati da `idBolla` (uguale per tutte le pagine) più `pagina` e `pagine`.
+Una bolla di consegna può essere su più fogli. La scelta è offerta **subito dopo la prima foto**, non dopo la seconda: il riquadro dice sempre cosa sta per partire (*una bolla di una pagina*, *una sola bolla di 3 pagine*, *3 bolle diverse*) e il pulsante **«+ Aggiungi pagina a questa bolla»** aggiunge il foglio successivo aprendo direttamente la fotocamera. Se l'operatore raggruppa per sbaglio, la via d'uscita è scritta lì: *«Non sono la stessa bolla: mandale separate»*.
+
+**Il contratto non cambia — resta un file per richiesta**, quindi una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`, legati da `idBolla` (uguale per tutte le pagine) più `pagina` e `pagine`.
 
 Anche una bolla di una pagina sola ha il suo `idBolla`, con `pagina` 1 e `pagine` 1: a valle la regola è una — si raggruppa per `idBolla` — senza casi particolari da ricordare. In *Coda invii* e nello storico ogni riga porta il marchio `pag. 2/3`.
 

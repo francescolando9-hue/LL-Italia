@@ -345,3 +345,27 @@
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* Riquadro di composizione della bolla: dice sempre cosa sta per partire */
+.bolle-stato-bolla {
+  margin: 12px 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eef0f7;
+  color: var(--testo);
+  font-size: 0.95rem;
+}
+
+/* Via d'uscita testuale: deve leggersi come un'azione, non come un pulsante
+   grande quanto quelli del flusso principale */
+.btn-collegamento {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--blu);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
