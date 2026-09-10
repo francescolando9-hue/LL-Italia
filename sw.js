@@ -1,5 +1,5 @@
 // Service worker della shell: precache dell'app, cache-first, fallback offline.
-const VERSIONE = '0.21.0';
+const VERSIONE = '0.22.0';
 const CACHE = `llitalia-${VERSIONE}`;
 const RISORSE = [
   './',
@@ -29,6 +29,7 @@ const RISORSE = [
   './modules/foto/coda.js',
   './modules/foto/immagini.js',
   './modules/foto/video.js',
+  './modules/foto/caricamento.js',
   './modules/foto/impostazioni.js',
   './modules/foto/categorie.js',
   './modules/foto/invio.js',
