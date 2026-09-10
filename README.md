@@ -19,9 +19,10 @@ Alla prima apertura l'app chiede **nome e cognome**: vengono salvati sul disposi
 
 1. Aprire il modulo Bolle (l'app ci entra direttamente; la home dei moduli resta raggiungibile dal logo in alto a sinistra).
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
-3. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
-4. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
-5. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
+3. Se la bolla è su **più fogli**, accendere l'interruttore **«Sono le pagine di una sola bolla»** (compare da due foto in su): le anteprime si numerano nell'ordine di scatto e il pulsante diventa *Invia 1 bolla di N pagine*. L'interruttore si spegne da solo dopo l'invio.
+4. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
+5. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
+6. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
 
 **Collaudo sui numeri, mai sull'esito formale:** i quattro contatori in alto (Scattate oggi / Inviate oggi / In attesa / Errore) sono il riferimento. "Scattate" conta le foto confermate con Invia (le anteprime rimosse prima dell'invio non contano). Un invio "riuscito" si dimostra confrontando scattate vs inviate vs foto atterrate a destinazione: ogni scarto è un difetto da spiegare.
 
@@ -118,6 +119,14 @@ Un modulo nuovo = una cartella in `modules/` + l'import nel registro `moduli` di
 
 Compressione client-side prima dell'accodamento: conversione a JPEG, lato lungo max ~2500 px, qualità ~0,85 (la leggibilità per l'OCR del runbook prevale sul peso); HEIC gestito via canvas dove il dispositivo lo decodifica. Una foto esce dalla coda **solo a conferma del server** (202 Accepted); ogni invio porta un `idClient` univoco, su cui il backend potrà deduplicare.
 
+### Bolla su più pagine
+
+Una bolla di consegna può essere su più fogli. L'interruttore **«Sono le pagine di una sola bolla»** le lega: **il contratto non cambia — resta un file per richiesta**, quindi una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`, legati da `idBolla` (uguale per tutte le pagine) più `pagina` e `pagine`.
+
+Anche una bolla di una pagina sola ha il suo `idBolla`, con `pagina` 1 e `pagine` 1: a valle la regola è una — si raggruppa per `idBolla` — senza casi particolari da ricordare. In *Coda invii* e nello storico ogni riga porta il marchio `pag. 2/3`.
+
+**Il collaudo resta in pagine, non in bolle:** tre pagine sono tre file in raccolta e tre progressivi consumati. Il controllo di continuità non cambia — una pagina mai arrivata è un buco nella sequenza come qualunque altra foto — e un gruppo incompleto (`pagine` = 3 con due righe presenti) è un difetto da spiegare.
+
 ### Identificativo del dispositivo e numero progressivo
 
 Ogni foto **accodata** riceve un intero incrementale, conservato in IndexedDB: parte da 1 alla prima installazione, non si azzera mai e sopravvive agli aggiornamenti dell'app. Viaggia nel payload come campo `progressivo` e compare a video accanto a ogni bolla — in *Coda invii* e nello storico — così l'operatore può leggerlo a voce quando serve un riscontro dall'ufficio. In *Informazioni sull'app* si vede il numero raggiunto.
@@ -148,6 +157,9 @@ Content-Type: application/json
   "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
   "progressivo": 137,                      // intero: sequenza di quel dispositivo
+  "idBolla": "4c1a8e02-…",                 // GUID della bolla: uguale per ogni sua pagina
+  "pagina": 2,                             // intero, da 1
+  "pagine": 3,                             // intero: pagine che compongono la bolla
   "dataInvio": "2026-09-01T17:27:53+02:00",
   "versioneApp": "0.15.0",                 // versione che sta girando sul telefono
   "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
@@ -196,4 +208,4 @@ A ogni modifica dei file dell'app va incrementata `VERSIONE` in `sw.js` (e aggio
 
 ## Fuori perimetro (in capo a Francesco)
 
-Sul flow e sulla raccolta: colonne `Progressivo` e `IdDispositivo` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori a campo libero, deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
+Sul flow e sulla raccolta: colonne `Progressivo`, `IdDispositivo`, `IdBolla`, `Pagina` e `Pagine` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori a campo libero, deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.

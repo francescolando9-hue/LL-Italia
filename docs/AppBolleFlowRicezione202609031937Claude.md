@@ -1,6 +1,6 @@
 # App LL Italia — Flow di ricezione bolle: struttura, procedure, collaudi
 
-> **Rev. 4 del 03/09/2026 ore 22:15.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 5 del 10/09/2026 ore 17:20.** Riferimento corrente per il flow `BolleInArrivoRicevitore` (Power Automate) e per la raccolta `BolleInArrivo` (sito Cantieri LL). Sostituisce la guida di costruzione del 01/09, che documentava un contratto poi superato. Interfaccia Power Automate in inglese (standard di gruppo). Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 
 ## 1. Struttura del flow
 
@@ -32,9 +32,14 @@ manual (trigger HTTP, POST, "Anyone")
 | `IdClient` | Riga di testo singola, **indicizzata** | `idClient` |
 | `IdDispositivo` | Riga di testo singola | `idDispositivo` (v. §4) |
 | `Progressivo` | Numero, 0 decimali | `progressivo` (v. §4) |
+| `IdBolla` | Riga di testo singola | `idBolla` (v. §6) |
+| `Pagina` | Numero, 0 decimali | `pagina` (v. §6) |
+| `Pagine` | Numero, 0 decimali | `pagine` (v. §6) |
 | `VersioneApp` | Riga di testo singola — **facoltativa** | `versioneApp` |
 
 `VersioneApp` è l'unica colonna facoltativa: porta la versione dell'app che ha mandato la bolla (es. `0.15.0`) e serve alla diagnosi — una bolla senza `Progressivo` viene da una versione precedente, non è un difetto — e a vedere quali telefoni sono rimasti indietro con l'aggiornamento. Se non la si crea, il campo arriva e viene ignorato: nessun effetto sul flow. Mappatura: `triggerBody()?['versioneApp']`.
+
+**Nome file e pagine.** Il nome lo compone il flow, e con le bolle su più pagine due pagine della stessa bolla — stesso minuto, stesso operatore, stessa commessa — si distinguono solo per le 4 cifre dell'`idClient`: non si sovrascrivono, ma non si leggono come pagine 1, 2, 3. **Raccomandazione:** aggiungere al nome, quando `pagine` è maggiore di 1, un suffisso `Pag[N]di[M]` — es. `BollaMAR202609101508PaoloSanzarelloPag2di3.jpg`. Non è obbligatorio, perché la regola resta leggere le colonne e non il nome, ma rende la raccolta consultabile a occhio.
 
 **Attenzione al nome della colonna della data:** in raccolta si chiama `DataScatto`, il campo nel payload si chiama `dataInvio`. Sono la stessa cosa — l'istante dello scatto sul telefono — e la mappatura è `triggerBody()?['dataInvio']` sulla colonna `DataScatto`. Divergenza segnalata da Cowork il 03/09/2026 e allineata qui: **fa fede il nome della colonna**.
 
@@ -131,3 +136,25 @@ Il criterio che decide è sempre il confronto **scattate nell'app contro file at
 | Numeri non consecutivi a parità di `IdDispositivo` | **Una bolla non è arrivata**: è il difetto che i campi servono a scoprire — da spiegare, non da ignorare |
 
 Il numero mostrato dall'app accanto a ogni bolla (in *Coda invii* e nello storico) è lo stesso che arriva in raccolta: l'operatore può leggerlo a voce per un riscontro immediato dall'ufficio.
+
+## 6. Bolla su più pagine (aggiunto il 10/09/2026)
+
+Una bolla di consegna può essere su più fogli. L'operatore, quando ha in attesa almeno due foto, accende l'interruttore **«Sono le pagine di una sola bolla»**: le foto partono numerate nell'ordine di scatto.
+
+**Il contratto non cambia: resta un file per richiesta.** Una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`. Li lega:
+
+| Campo | Colonna | Tipo | Contenuto |
+|---|---|---|---|
+| `idBolla` | `IdBolla` | Riga di testo singola | GUID **uguale per tutte le pagine** della stessa bolla |
+| `pagina` | `Pagina` | Numero, 0 decimali | da 1 in avanti, nell'ordine di scatto |
+| `pagine` | `Pagine` | Numero, 0 decimali | quante pagine compongono la bolla |
+
+Mappature in *Update file properties*: `triggerBody()?['idBolla']`, `triggerBody()?['pagina']`, `triggerBody()?['pagine']`.
+
+**Come si legge a valle:** si raggruppa per `IdBolla` e si ordina per `Pagina`; il gruppo è completo quando le righe sono tante quante dice `Pagine`. Anche una bolla di una pagina sola ha il suo `IdBolla`, con `Pagina` 1 e `Pagine` 1: **la regola è una sola, senza casi particolari da ricordare.**
+
+**Il controllo di continuità non cambia.** Il progressivo resta per pagina: una pagina scattata e mai arrivata è un buco nella sequenza come qualunque altra foto. Attenzione a non confondere i due conteggi — **il collaudo si fa in pagine, non in bolle**: tre pagine di una bolla sono tre righe in raccolta e tre progressivi consumati.
+
+**Un gruppo incompleto è un difetto da spiegare:** `Pagine` = 3 con due sole righe presenti significa che una pagina non è arrivata, e il buco corrispondente si trova nella sequenza dei progressivi di quel dispositivo.
+
+**Verifica, sui numeri:** una bolla di tre pagine dal telefono → in raccolta tre righe con lo **stesso** `IdBolla`, `Pagina` 1, 2, 3, `Pagine` 3 su tutte, e tre progressivi consecutivi. Colonne vuote su tutte = mappature assenti. `IdBolla` diverso su ogni riga = l'interruttore non era acceso, e le pagine sono state mandate come bolle separate.

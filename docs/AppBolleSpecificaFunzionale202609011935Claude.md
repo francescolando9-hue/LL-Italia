@@ -9,7 +9,7 @@
 - Piattaforma: **PWA vanilla JS** su GitHub Pages (stack del repo `archiviowhatsapp`: Service Worker, IndexedDB), installabile con "Aggiungi a schermata Home", funzionante su Android e iOS/Safari.
 
 ## Schermate
-1. **Home / Carica bolle**: picker **Cantiere** (obbligatorio, lista configurabile — al lancio: MAR; poi le altre commesse), pulsante fotocamera/galleria multi-foto, anteprime con rimozione, pulsante **Invia**.
+1. **Home / Carica bolle**: picker **Cantiere** (obbligatorio, lista configurabile — al lancio: MAR; poi le altre commesse), pulsante fotocamera/galleria multi-foto, anteprime con rimozione, interruttore **«Sono le pagine di una sola bolla»** (da due foto in su), pulsante **Invia**.
 2. **Coda invii**: elenco invii con stato In coda / Inviato / Fallito (ritenta automaticamente alla connessione; retry manuale). Contatore del giorno: foto scattate / inviate — è il numero per il collaudo.
 3. **Bolle inviate** (aggiunta il 01/09/2026): **calendario del mese** con i giorni che hanno bolle e il relativo conteggio, selezione del singolo giorno o del mese intero, elenco raggruppato per giorno e **apertura della bolla a schermo intero**; filtro per cantiere e totale con dettaglio per commessa. Registro locale del dispositivo: dati dell'invio più una **miniatura a 800 px** (~70 KB) conservata per le ultime 300 bolle, che sopravvive alla potatura degli originali (ultime N, default 20). Oltre le 300 la riga resta senza immagine. Non è la vista condivisa della raccolta e non segue il cambio di dispositivo — se servirà, va aggiunto un endpoint di lettura.
 4. **Rilevamento della foto identica** (aggiunto il 01/09/2026): all'aggiunta si calcola l'impronta SHA-256 del **file originale**; se coincide con una foto già in coda o già inviata, l'app avvisa indicando quando e su quale commessa, e chiede conferma — avvisa, non blocca. Copre il caso dello stesso file scelto due volte dalla galleria; **non** copre due scatti distinti della stessa bolla, che restano due invii legittimi (servirebbe l'OCR, fuori perimetro).
@@ -30,6 +30,9 @@ Content-Type: application/json
   "idClient": "fe7e5c81-…",     // GUID della bolla, per la deduplica
   "idDispositivo": "9b2c…",     // GUID dell'installazione (vedi sotto)
   "progressivo": 137,           // intero: sequenza del dispositivo (vedi sotto)
+  "idBolla": "4c1a…",           // GUID della BOLLA: uguale per tutte le sue pagine
+  "pagina": 2,                  // intero, da 1
+  "pagine": 3,                  // intero: quante pagine compongono la bolla
   "dataInvio": "2026-09-01T17:27:53+02:00",
   "versioneApp": "0.15.0",      // versione in uso sul telefono (vedi sotto)
   "nomeFile": "…",              // IGNORATO dal backend: il nome lo compone il flow
@@ -39,6 +42,17 @@ Content-Type: application/json
 - `api-version=2024-10-01` è obbligatoria: l'URL mostrato dal designer di Power Automate riporta `api-version=1` e viene rifiutato con 400. L'app corregge il parametro da sola, lasciando intatta la firma `sig=`.
 - L'URL contiene una firma di accesso: non entra mai nel repo pubblico (impostazioni sul dispositivo, oppure `core/configurazione.js` escluso da git in sviluppo locale).
 - Il base64 dentro JSON regge senza problemi file da 155 KB: collaudato.
+
+## Bolla su più pagine (aggiunto il 10/09/2026)
+Una bolla di consegna può essere su più fogli. Fino al 09/09/2026 una foto era una bolla: le pagine arrivavano in raccolta come bolle distinte e ricomporle era lavoro a memoria dell'ufficio.
+
+- **A video:** quando in attesa ci sono almeno due foto compare l'interruttore **«Sono le pagine di una sola bolla»**. Acceso, le anteprime si numerano (`pag. 1`, `pag. 2`…) nell'ordine di scatto e il pulsante diventa *Invia 1 bolla di N pagine*. Spento — è il valore predefinito — ogni foto resta una bolla a sé, esattamente come prima.
+- **Si spegne da solo dopo ogni invio:** la bolla successiva è un'altra, e ricordarsi di spegnerlo sarebbe il modo più facile per unire per sbaglio bolle diverse.
+- **Il contratto non cambia: un file per richiesta.** Una bolla di tre pagine sono tre invii, ognuno col suo `idClient` e col suo `progressivo`; li lega `idBolla`, uguale per tutte le pagine, più `pagina` e `pagine`.
+- **Il controllo di continuità non cambia:** il progressivo resta per pagina, quindi una pagina scattata e mai arrivata è un buco nella sequenza come qualunque altra foto. Il conteggio del collaudo resta in **pagine**, non in bolle.
+- **Anche una bolla di una pagina ha il suo `idBolla`** (`pagina` 1, `pagine` 1): a valle la regola è una sola — si raggruppa per `idBolla` — senza casi particolari.
+- **Correzione del cantiere:** rimandare una pagina dallo storico ne conserva `idBolla`, `pagina` e `pagine`, così la correzione non spezza in due una bolla di più pagine.
+- **Lato raccolta (in capo a Francesco):** colonne `IdBolla` (testo), `Pagina` e `Pagine` (numero). Senza, le pagine arrivano ma non sono ricomponibili.
 
 ## Progressivo e identità del dispositivo (aggiunti il 03/09/2026)
 Due campi obbligatori nel payload: `progressivo` (intero) e `idDispositivo` (stringa GUID). Servono a **rendere misurabile il tratto telefono → raccolta**, che prima non era verificabile in alcun modo: raggruppando le bolle per dispositivo, un numero mancante nella sequenza significa una foto scattata e mai arrivata.

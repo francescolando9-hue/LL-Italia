@@ -94,6 +94,13 @@ async function vista(el) {
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
       <div id="avviso-foto"></div>
       <div id="anteprime" class="bolle-anteprime"></div>
+      <div id="riquadro-pagine" class="nascosto">
+        <label class="campo-interruttore" for="una-bolla">
+          <input id="una-bolla" type="checkbox">
+          Sono le pagine di <strong>una sola bolla</strong>
+        </label>
+        <p class="aiuto tenue">Da usare quando la bolla è su più fogli. Le foto partono nell'ordine in cui le hai scattate: pagina 1, 2, 3.</p>
+      </div>
       <div id="avviso-cantiere"></div>
       <button id="invia" class="btn btn-successo" disabled>Invia</button>
     </section>
@@ -110,6 +117,9 @@ async function vista(el) {
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
+  // Acceso o spento, le anteprime si rinumerano subito: l'operatore vede
+  // l'ordine delle pagine prima di premere Invia, non dopo.
+  el.querySelector('#una-bolla').addEventListener('change', () => { ridisegna(); });
 
   await ridisegna();
   // Invio automatico a ogni apertura del modulo.
@@ -176,10 +186,15 @@ async function invia() {
   const selezione = radice.querySelector('#cantiere');
   const cantiere = selezione ? selezione.value : '';
   if (!cantiere) return;
-  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore);
+  const unaBolla = radice.querySelector('#una-bolla');
+  const unaSolaBolla = Boolean(unaBolla && unaBolla.checked);
+  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla);
   if (quante > 0) {
     coda.incrementaScattate(quante);
     salvaImpostazioniBolle({ ultimoCantiere: cantiere });
+    // L'interruttore non resta acceso: la bolla dopo è un'altra, e ricordarsi
+    // di spegnerlo sarebbe un modo per unire per sbaglio bolle diverse.
+    if (unaBolla) unaBolla.checked = false;
   }
   await ridisegna();
   invio.avvia();
@@ -212,11 +227,19 @@ async function ridisegna() {
     <div class="bolle-chip errore"><span class="valore">${inErrore.length}</span><span class="etichetta">Errore</span></div>
   `;
 
+  // Il riquadro "una sola bolla" ha senso solo con almeno due foto in attesa.
+  const riquadroPagine = radice.querySelector('#riquadro-pagine');
+  const unaBolla = radice.querySelector('#una-bolla');
+  riquadroPagine.classList.toggle('nascosto', bozze.length < 2);
+  if (bozze.length < 2 && unaBolla) unaBolla.checked = false;
+  const numeraPagine = Boolean(unaBolla && unaBolla.checked) && bozze.length > 1;
+
   const anteprime = radice.querySelector('#anteprime');
-  anteprime.innerHTML = bozze.map(r => `
+  anteprime.innerHTML = bozze.map((r, indice) => `
     <div class="bolle-anteprima${r.qualita === 'scarsa' ? ' poco-leggibile' : ''}">
       <img src="${urlFoto(r.foto)}" alt="Anteprima bolla">
       <button class="bolle-rimuovi" data-id="${r.id}" aria-label="Rimuovi foto">&#10005;</button>
+      ${numeraPagine ? `<span class="bolle-pagina">pag. ${indice + 1}</span>` : ''}
       ${r.qualita === 'scarsa'
         ? `<span class="bolle-marchio-qualita" title="${scappaHtml(r.motivoQualita)}">&#9888; ${scappaHtml(r.motivoQualita)}</span>`
         : ''}
@@ -230,7 +253,11 @@ async function ridisegna() {
   const cantiereScelto = selezione ? selezione.value : '';
   const pulsanteInvia = radice.querySelector('#invia');
   pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
-  pulsanteInvia.textContent = bozze.length > 0 ? `Invia (${bozze.length})` : 'Invia';
+  pulsanteInvia.textContent = bozze.length === 0
+    ? 'Invia'
+    : numeraPagine
+      ? `Invia 1 bolla di ${bozze.length} pagine`
+      : `Invia (${bozze.length})`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
   avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
     ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
@@ -266,6 +293,7 @@ async function ridisegna() {
           <div class="bolle-dettagli">
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
+              ${Number(r.pagine) > 1 ? `<span class="bolle-pagina-riga">pag. ${r.pagina}/${r.pagine}</span>` : ''}
               ${scappaHtml(etichettaCantiere(r.cantiere))} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
