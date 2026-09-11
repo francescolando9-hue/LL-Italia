@@ -3,6 +3,7 @@ import { avviaRouter, registraRotta, naviga } from './router.js';
 import { vistaHome } from './home.js';
 import { impostazioniApp, vistaBenvenuto, vistaImpostazioniApp } from './impostazioni.js';
 import { vistaInformazioni } from './informazioni.js';
+import { aggiornamentoPronto } from './versione.js';
 import moduloBolle from '../modules/bolle/index.js';
 import moduloFoto from '../modules/foto/index.js';
 
@@ -48,6 +49,17 @@ if ('serviceWorker' in navigator) {
         }
       });
     });
+
+    // L'avviso qui sopra compare solo se l'aggiornamento arriva MENTRE l'app è
+    // aperta. Se invece è sceso prima — app in secondo piano, telefono in
+    // tasca — la pagina sta eseguendo il codice vecchio e nessuno glielo ha
+    // detto: senza questo controllo l'operatore resta su una versione
+    // superata credendo di essere aggiornato. Vale anche quando il service
+    // worker cambia sotto i piedi alla pagina già aperta.
+    if (await aggiornamentoPronto()) mostraAvvisoAggiornamento();
+    navigator.serviceWorker.addEventListener('controllerchange', async () => {
+      if (await aggiornamentoPronto()) mostraAvvisoAggiornamento();
+    });
   });
 }
 
@@ -57,7 +69,7 @@ function mostraAvvisoAggiornamento() {
   barra.id = 'avviso-aggiornamento';
   barra.className = 'barra-aggiornamento';
   barra.innerHTML = `
-    <span>È disponibile una versione aggiornata dell'app.</span>
+    <span>Versione aggiornata pronta: tocca Aggiorna per usarla.</span>
     <button type="button">Aggiorna</button>
   `;
   barra.querySelector('button').addEventListener('click', () => location.reload());

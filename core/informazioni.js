@@ -2,13 +2,14 @@
 // cantiere — versione in uso, stato offline, spazio, numeri della coda.
 import { impostazioniApp } from './impostazioni.js';
 import * as coda from '../modules/bolle/coda.js';
-import { versioneApp } from './versione.js';
+import { versioneApp, versioneInstallata } from './versione.js';
 
 export async function vistaInformazioni(el) {
   el.innerHTML = '<section class="scheda"><h2>Informazioni</h2><p class="tenue">Lettura in corso&hellip;</p></section>';
 
-  const [versione, spazio, record, storico, progressivo] = await Promise.all([
-    versioneApp().then(v => v || 'non ancora installata'),
+  const [versione, installata, spazio, record, storico, progressivo] = await Promise.all([
+    versioneApp(),
+    versioneInstallata(),
     spazioUsato(),
     coda.elenca().catch(() => []),
     coda.elencaStorico().catch(() => []),
@@ -27,7 +28,9 @@ export async function vistaInformazioni(el) {
     <section class="scheda">
       <h2>Informazioni</h2>
       <dl class="info-elenco">
-        <dt>Versione</dt><dd>${versione}</dd>
+        <dt>Versione in uso</dt><dd>${versione}</dd>${installata && installata !== versione
+          ? `<dt>Versione pronta</dt><dd>${installata} — <strong>chiudi e riapri l'app</strong>, o tocca Aggiorna nella barra in alto: finché non lo fai sta girando la ${versione}</dd>`
+          : ''}
         <dt>Operatore</dt><dd>${impostazioniApp.autore || '—'}</dd>
         <dt>Funzionamento offline</dt><dd>${offline}</dd>
         <dt>Rete in questo momento</dt><dd>${navigator.onLine ? 'connesso' : 'assente'}</dd>
@@ -89,7 +92,7 @@ export async function vistaInformazioni(el) {
     try {
       const registrazione = await navigator.serviceWorker.getRegistration();
       if (registrazione) await registrazione.update();
-      esito.textContent = 'Controllo eseguito: se c\'è una versione nuova compare l\'avviso in alto.';
+      esito.textContent = 'Controllo eseguito: se c\'è una versione nuova compare l\'avviso in alto. Finché non la applichi, la versione qui sopra è quella che sta davvero girando.';
     } catch {
       esito.textContent = 'Controllo non riuscito: riprova quando hai rete.';
     }
