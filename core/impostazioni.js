@@ -1,9 +1,10 @@
 // Impostazioni di app (condivise tra i moduli), persistite in localStorage.
-// L'identificativo del dispositivo fa eccezione: vive in IndexedDB accanto al
-// contatore progressivo, perché è la stessa identità e deve sopravvivere
-// insieme a quello (localStorage è più esposto alle pulizie del browser).
+// L'identificativo del dispositivo fa eccezione: vive in IndexedDB
+// (core/dispositivo.js), perché localStorage è più esposto alle pulizie del
+// browser e un identificativo che cambia da solo spezza le sequenze in
+// raccolta senza dare alcun segnale.
 import { naviga } from './router.js';
-import * as coda from '../modules/bolle/coda.js';
+import { idDispositivo } from './dispositivo.js';
 
 const CHIAVE = 'llitalia.app';
 
@@ -94,7 +95,7 @@ export function vistaImpostazioniApp(el) {
 
   const campoId = el.querySelector('#id-dispositivo');
   const bottoneCopia = el.querySelector('#copia-dispositivo');
-  coda.idDispositivo().then(id => {
+  idDispositivo().then(id => {
     campoId.value = id;
   }).catch(() => {
     campoId.value = 'non disponibile';

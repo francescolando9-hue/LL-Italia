@@ -269,18 +269,6 @@
   cursor: pointer;
 }
 
-/* Codice di configurazione da far inquadrare */
-.bolle-qr {
-  background: #fff;
-  border: 1px solid var(--bordo);
-  border-radius: var(--raggio);
-  padding: 10px;
-  margin: 14px 0;
-  text-align: center;
-}
-
-.bolle-qr svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
-
 /* Correzione del cantiere, dentro il visore della bolla */
 .bolle-correzione {
   background: var(--carta);

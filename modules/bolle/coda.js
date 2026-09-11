@@ -20,9 +20,9 @@ const MINIATURE_DA_CONSERVARE = 300;
 // sempre letto insieme a operatore e idClient.
 const STORE_CONTATORE = 'contatore';
 const CHIAVE_PROGRESSIVO = 'progressivo';
-// Identificativo stabile dell'installazione: dà un titolare certo alla sequenza
-// dei progressivi, che altrimenti andrebbe raggruppata per nome dell'operatore.
-const CHIAVE_DISPOSITIVO = 'idDispositivo';
+// Nello store del contatore c'è anche la chiave 'idDispositivo', scritta dalle
+// versioni precedenti: la shell la eredita da qui (core/dispositivo.js). Non
+// va riusata per altro e non va riscritta.
 const CHIAVE_CONTATORI = 'llitalia.bolle.contatori';
 
 let dbPromise = null;
@@ -146,32 +146,13 @@ export function riservaProgressivi(quanti = 1) {
   }));
 }
 
-// Identità del dispositivo: generata alla prima lettura e mai più cambiata.
-// Il progressivo da solo non basta al runbook: raggruppare le sequenze per
-// "operatore" — che è testo libero — le spezza a ogni grafia diversa del nome
-// e ne fonde due se la stessa persona usa due telefoni. Con l'idDispositivo
-// la sequenza ha un titolare stabile, che non cambia se l'operatore corregge
-// il proprio nome. Riparte solo con una reinstallazione, insieme al contatore.
-export function idDispositivo() {
-  return apri().then(db => new Promise((risolvi, rifiuta) => {
-    const tx = db.transaction(STORE_CONTATORE, 'readwrite');
-    const store = tx.objectStore(STORE_CONTATORE);
-    let id = '';
-    const lettura = store.get(CHIAVE_DISPOSITIVO);
-    lettura.onsuccess = () => {
-      id = (lettura.result && lettura.result.valore) || '';
-      // Lettura e scrittura nella stessa transazione: due viste che aprono
-      // insieme l'app non devono poter generare due identità diverse.
-      if (!id) {
-        id = crypto.randomUUID();
-        store.put({ chiave: CHIAVE_DISPOSITIVO, valore: id });
-      }
-    };
-    tx.oncomplete = () => risolvi(id);
-    tx.onerror = () => rifiuta(tx.error);
-    tx.onabort = () => rifiuta(tx.error);
-  }));
-}
+// L'identità del dispositivo NON sta più qui: vive nella shell, in
+// `core/dispositivo.js`, perché è l'identità del telefono e non di un modulo —
+// la usano sia le bolle sia le foto di cantiere, e due copie divergerebbero.
+// Il valore scritto dalle versioni precedenti resta in questo store: è la
+// fonte da cui la shell lo eredita, e va lasciato dov'è. Riscriverlo o
+// cancellarlo farebbe apparire in raccolta un dispositivo nuovo, spezzando la
+// sequenza delle bolle già inviate.
 
 // Quanti progressivi sono stati assegnati finora su questo dispositivo.
 export function progressivoRaggiunto() {

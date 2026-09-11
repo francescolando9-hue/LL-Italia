@@ -11,6 +11,7 @@ docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale 
 docs/AppBolleFlowRicezione….md — il flow di ricezione e la raccolta BolleInArrivo (struttura, procedure, esiti dei collaudi).
 docs/AppBolleContinuitaRunbook….md — documento unico per il lavoro a valle, dalla raccolta in poi.
 docs/AppFotoCantiereSpecifica….md — specifica del modulo Foto cantiere e requisiti del suo flow.
+docs/FotoCantiereBriefingRicevente.md — stato reale di raccolta e flow, misurato sul tenant dopo il collaudo del 10/09/2026. Dove divergono, questo prevale sulla specifica del modulo Foto: lì c'è ciò che è stato misurato, non ciò che era previsto.
 Questo file. Il kickoff del 01/09/2026 è superato dalla specifica rev. 2 e resta nella storia del repo.
 Non inventare nomi di campi SharePoint, percorsi, formati non documentati: se un'informazione manca, fermarsi e chiedere.
 Stack vincolato

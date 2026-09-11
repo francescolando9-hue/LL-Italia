@@ -13,11 +13,17 @@ import { impostazioniFoto, salvaImpostazioniFoto } from './impostazioni.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniFoto } from './vista-impostazioni.js';
+import { vistaConfigura, vistaCondividi } from './configurazione.js';
 
+// Le classi sono quelle del design system in core/ui.css, le stesse del
+// modulo Bolle. Vanno tenute allineate a quel foglio: `badge-attesa` e
+// `badge-ok`, usate qui prima, non esistevano, e lo stato «Inviata» usciva
+// senza colore — chi collaudava non aveva conferma visiva che la foto fosse
+// arrivata, mentre l'errore si vedeva perché la sua classe c'era.
 const ETICHETTE_STATO = {
-  in_coda: { testo: 'In coda', classe: 'badge-attesa' },
+  in_coda: { testo: 'In coda', classe: 'badge-coda' },
   invio: { testo: 'Invio in corso', classe: 'badge-invio' },
-  inviata: { testo: 'Inviata', classe: 'badge-ok' },
+  inviata: { testo: 'Inviata', classe: 'badge-inviata' },
   errore: { testo: 'Errore', classe: 'badge-errore' },
 };
 
@@ -351,6 +357,7 @@ async function ridisegna() {
               : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
           <div class="foto-dettagli">
             <div class="riga">
+              ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
               <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
               ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
               ${scappaHtml(etichettaCantiere(r.commessa))} &middot; ${ora}
@@ -383,6 +390,8 @@ export default {
   registra(registraRotta) {
     registraRotta('#/foto', vista);
     registraRotta('#/foto/impostazioni', vistaImpostazioniFoto);
+    registraRotta('#/foto/configura', vistaConfigura);
+    registraRotta('#/foto/condividi', vistaCondividi);
     // Invio automatico al ritorno della connettività, anche fuori dalla vista.
     window.addEventListener('online', () => invio.avvia());
   },

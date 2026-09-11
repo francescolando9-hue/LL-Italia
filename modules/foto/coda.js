@@ -4,13 +4,26 @@
 // inviata; errore = invio fallito, resta in coda e si ritenta.
 //
 // Più semplice della coda delle bolle, di proposito: qui non servono lo storico
-// permanente, le miniature conservate, il progressivo. Una foto di cantiere che
-// non arriva si riscatta; una bolla di consegna no, e per quella esiste il
-// controllo di continuità.
+// permanente né le miniature conservate.
+//
+// Il progressivo invece SÌ, dal 11/09/2026: senza una sequenza per dispositivo
+// non esiste un controllo di continuità, cioè non si può dimostrare che nessuna
+// foto si è persa fra telefono e raccolta — si può solo sperarlo. Era una scelta
+// presa al contrario («una foto di cantiere che non arriva si riscatta»), che il
+// collaudo del ricevente ha rovesciato: riscattare una foto richiede di sapere
+// che manca, e a dirlo è solo un buco nella sequenza.
+//
+// La sequenza è PROPRIA di questo modulo e parte da 1: le due raccolte sono
+// separate e ognuna si controlla per conto suo. Non va confrontata con quella
+// delle bolle. L'identità del dispositivo, invece, è la stessa — vive nella
+// shell, perché è l'identità del telefono e non di un modulo.
 
 const NOME_DB = 'llitalia-foto';
-const VERSIONE_DB = 1;
+// v2: aggiunto lo store del contatore. Le foto già in coda non si toccano.
+const VERSIONE_DB = 2;
 const STORE = 'foto';
+const STORE_CONTATORE = 'contatore';
+const CHIAVE_PROGRESSIVO = 'progressivo';
 const CHIAVE_CONTATORI = 'llitalia.foto.contatori';
 
 let dbPromise = null;
@@ -25,6 +38,9 @@ function apri() {
           const store = db.createObjectStore(STORE, { keyPath: 'id' });
           store.createIndex('stato', 'stato');
           store.createIndex('creatoIl', 'creatoIl');
+        }
+        if (!db.objectStoreNames.contains(STORE_CONTATORE)) {
+          db.createObjectStore(STORE_CONTATORE, { keyPath: 'chiave' });
         }
       };
       richiesta.onsuccess = () => risolvi(richiesta.result);
@@ -86,6 +102,10 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     tentativi: 0,
     ultimoErrore: '',
     inviatoIl: null,
+    // Assegnato quando la foto entra in coda con Invia, non allo scatto: una
+    // bozza scartata lascerebbe un buco nella sequenza, e un buco significa
+    // «una foto non è arrivata» per chi controlla la raccolta.
+    progressivo: null,
     // Caricamento in due fasi: si ricorda dove si era arrivati, così un video
     // interrotto a metà riprende da lì e non ricomincia da zero.
     urlCaricamento: '',
@@ -108,16 +128,55 @@ export function elimina(id) {
   return transazione('readwrite', store => store.delete(id));
 }
 
+// Riserva `quanti` numeri consecutivi e restituisce il primo. Lettura e
+// scrittura nella stessa transazione: due invii lanciati a un attimo di
+// distanza non devono poter prendere lo stesso numero.
+export function riservaProgressivi(quanti = 1) {
+  return apri().then(db => new Promise((risolvi, rifiuta) => {
+    const tx = db.transaction(STORE_CONTATORE, 'readwrite');
+    const store = tx.objectStore(STORE_CONTATORE);
+    let primo = 1;
+    const lettura = store.get(CHIAVE_PROGRESSIVO);
+    lettura.onsuccess = () => {
+      const ultimo = Number(lettura.result && lettura.result.valore) || 0;
+      primo = ultimo + 1;
+      store.put({ chiave: CHIAVE_PROGRESSIVO, valore: ultimo + quanti });
+    };
+    tx.oncomplete = () => risolvi(primo);
+    tx.onerror = () => rifiuta(tx.error);
+    tx.onabort = () => rifiuta(tx.error);
+  }));
+}
+
+// A quanto è arrivata la numerazione su questo telefono: serve al riscontro
+// con l'ufficio, che vede l'ultimo numero atterrato in raccolta.
+export function progressivoRaggiunto() {
+  return apri().then(db => new Promise((risolvi, rifiuta) => {
+    const tx = db.transaction(STORE_CONTATORE, 'readonly');
+    const lettura = tx.objectStore(STORE_CONTATORE).get(CHIAVE_PROGRESSIVO);
+    lettura.onsuccess = () => risolvi(Number(lettura.result && lettura.result.valore) || 0);
+    tx.onerror = () => rifiuta(tx.error);
+    tx.onabort = () => rifiuta(tx.error);
+  }));
+}
+
 // Invia: le bozze passano in coda con categoria, commessa, autore e nota
 // correnti. La categoria è già sul record dallo scatto, perché decide come
 // l'immagine è stata preparata.
 export async function confermaBozze(commessa, autore, nota) {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
+  if (bozze.length === 0) return 0;
+  // I numeri si prendono tutti insieme e si distribuiscono in ordine di
+  // scatto: `elenca()` ordina per creatoIl, quindi la sequenza in raccolta
+  // rispecchia l'ordine in cui le foto sono state fatte.
+  let progressivo = await riservaProgressivi(bozze.length);
   for (const record of bozze) {
     record.stato = 'in_coda';
     record.commessa = commessa;
     record.autore = autore;
     record.nota = nota;
+    record.progressivo = progressivo;
+    progressivo += 1;
     await aggiorna(record);
   }
   return bozze.length;
