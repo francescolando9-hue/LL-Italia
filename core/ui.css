@@ -396,3 +396,17 @@ body {
 }
 
 .fotocamera-avviso:empty { padding: 0; }
+
+/* Riquadro del QR di configurazione. Vive qui e non in un modulo perché il
+   meccanismo è della shell: lo usano tutti i moduli che si configurano da
+   link. */
+.qr-configurazione {
+  background: #fff;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  padding: 10px;
+  margin: 14px 0;
+  text-align: center;
+}
+
+.qr-configurazione svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }

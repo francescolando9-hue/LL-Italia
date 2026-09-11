@@ -5,6 +5,7 @@
 import * as coda from './coda.js';
 import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
+import { idDispositivo } from '../../core/dispositivo.js';
 
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
@@ -174,7 +175,7 @@ async function inviaSingola(record) {
   // Contratto del backend collaudato: POST JSON, un file per richiesta,
   // risposta 202 Accepted senza corpo. Da non modificare senza aggiornare il flow.
   const contenutoBase64 = await blobInBase64(record.foto);
-  const dispositivo = await coda.idDispositivo();
+  const dispositivo = await idDispositivo();
   // La versione viene dalla cache attiva del service worker, quindi è quella
   // che sta davvero girando sul telefono, non quella che dovrebbe girare.
   const versione = await versioneApp();
@@ -204,7 +205,7 @@ async function inviaSingola(record) {
 async function inviaMock(record) {
   await new Promise(risolvi => setTimeout(risolvi, 700));
   const impostazioni = impostazioniBolle();
-  const corpo = corpoInvio(record, impostazioni, 'mock', await coda.idDispositivo(), await versioneApp());
+  const corpo = corpoInvio(record, impostazioni, 'mock', await idDispositivo(), await versioneApp());
   let dati;
   try {
     dati = JSON.parse(localStorage.getItem(CHIAVE_MOCK)) || {};

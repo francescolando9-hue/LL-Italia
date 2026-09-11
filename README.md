@@ -109,13 +109,19 @@ La categoria si sceglie prima perché **decide come l'immagine viene preparata**
 
 C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
 
+Ogni foto porta anche **`idDispositivo` e `progressivo`**, come le bolle: senza una sequenza per dispositivo non si può dimostrare che nessuna foto si è persa fra telefono e raccolta, si può solo sperarlo. Il numero si assegna **all'accodamento** (una bozza scartata non lascia buchi), parte da 1 e non si azzera mai; la sequenza è **propria del modulo** e non va confrontata con quella delle bolle. L'identità del telefono invece è una sola per tutta l'app (`core/dispositivo.js`) e un telefono che usava già le bolle **conserva quella che aveva**. Il raggruppamento si fa su `IdDispositivo`, **mai** su `Operatore`, che è testo libero.
+
+Nelle impostazioni del modulo c'è **Configura un altro telefono**, come in Bolle: un QR porta indirizzo e codice su un altro dispositivo senza digitare nulla. Il link è **solo di questo modulo**, perché la destinazione è un'altra.
+
 **Per i file che non stanno in una richiesta c'è il caricamento a blocchi**, da accendere nelle impostazioni del modulo (*Caricamento a blocchi per i file grandi*, **spento per default**). Il telefono chiede al flow **dove** mettere i byte (`azione: "preparaCaricamento"`), li manda a pezzi in `PUT` diretti a quell'indirizzo — senza passare dal flow, quindi senza limite di taglia del corpo — e alla fine avvisa il flow perché scriva le colonne (`azione: "completaCaricamento"`). Un caricamento interrotto **riprende da dove era**: al tentativo successivo l'app chiede al server quanti byte ha davvero e riparte da lì, invece di rispedire decine di megabyte. Con i blocchi attivi il tetto di peso è un altro, più alto (predefinito 200 MB): il vincolo non è più la richiesta, è il tempo. Su un flow che non sa rispondere il file **resta in coda** con un errore che si legge, non sparisce.
 
-Collaudato in locale: un video da 28,9 MB passa in 16 blocchi e arriva **intero** (byte contati, non «esito verde»); interrotto al terzo blocco riprende da 5.898.240 e non da zero; un flow che risponde «inline» lascia il file in coda in Errore. **Non collaudabile qui:** che l'indirizzo restituito da Microsoft Graph accetti un `PUT` cross-origin dall'origine dell'app — è la prima cosa da provare sul flow vero.
+Collaudato in locale: un video da 28,9 MB passa in 16 blocchi e arriva **intero** (byte contati, non «esito verde»); interrotto al terzo blocco riprende da 5.898.240 e non da zero; un flow che risponde «inline» lascia il file in coda in Errore.
 
-Misure dal collaudo (foto 4032 × 3024): avanzamento 1,30 MB → 0,47 MB inviati; archivio 1,30 MB → 1,30 MB, byte identici. **Attenzione al caso peggiore:** una foto da 12 MB diventa un corpo di richiesta da 16 MB, perché il base64 aggiunge un terzo — da provare sul flow vero prima di prometterlo in cantiere. Se il flow rifiuta, l'app lo dice e la foto resta in coda.
+⚠️ **Oggi l'interruttore va lasciato spento, e l'app lo dice a video.** Il collaudo del 10/09/2026 ha trovato un gradino prima del CORS: la sessione di caricamento non si riesce ad aprire — `_api/v2.0/drives` risponde 200, ma `createUploadSession` risponde **403 accessDenied**. Il prossimo passo non è codice dell'app: è un flow di prova da due azioni (trigger HTTP + *Send an HTTP request to SharePoint* verso `createUploadSession`). Se torna 200 con `uploadUrl` si riparte; se torna 403 serve la registrazione applicativa su Entra con `Sites.Selected`. Dettagli in `docs/AppFotoCantiereSpecifica….md` §4-bis.
 
-Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md`. **Punto aperto:** la cartella di destinazione su `L:` per il runbook del venerdì, che deve indicare Francesco.
+Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~2,0 MB di corpo; archivio da fotocamera nativa 4,39 MB → ~5,9 MB. L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» **non si è verificata**: un telefono non produce JPEG da 12 MB, e per l'archivio l'app spedisce i byte originali senza ricodificarli. Quindi **per le foto l'invio in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger. Se il flow rifiuta un corpo, l'app lo dice e la foto resta in coda.
+
+Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 3). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. **Punti aperti:** la cartella di destinazione su `L:` per il runbook del venerdì, che deve indicare Francesco, e l'apertura della sessione di caricamento a blocchi.
 
 ## Struttura del repo
 
@@ -129,15 +135,19 @@ core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
+core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
+core/configurazione-link.js  link e QR che configurano un altro telefono, condivisi
+core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
-core/versione.js      versione in uso, letta dalla cache attiva del service worker
-docs/                 5 documenti, tutti correnti:
+docs/                 6 documenti, tutti correnti:
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
                       AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
-                      AppFotoCantiereSpecifica….md      modulo Foto cantiere e requisiti del suo flow
+                      AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 3
+                      FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale
+                                                        sulla specifica dove divergono)
 ```
 
 **Una deroga da ratificare:** `core/vendor/qrcode.mjs` è codice di terzi incluso nel repo — il generatore di QR `qrcode-generator` di Kazuhiko Arase, licenza MIT, copiato senza modifiche. Non è una dipendenza installata (nessun npm, nessun build step) e viene caricato **solo** dalla schermata di condivisione della configurazione, quindi non pesa sull'avvio. Scriverne uno da zero avrebbe significato implementare correzione d'errore Reed-Solomon e mascheratura: un QR sbagliato è peggio di nessun QR. La verifica è per decodifica: il collaudo rilegge col riconoscitore il codice generato e confronta il testo con il link atteso.

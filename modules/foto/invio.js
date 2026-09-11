@@ -4,6 +4,7 @@
 import * as coda from './coda.js';
 import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
+import { idDispositivo } from '../../core/dispositivo.js';
 import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
 const RITARDO_MINIMO_MS = 5000;
@@ -104,14 +105,14 @@ export function componiNomeFile(record) {
 
 // I soli metadati, senza il contenuto: servono alle due fasi, dove i byte
 // viaggiano per conto loro.
-export function metadati(record, impostazioni, versione = '') {
-  const corpo = corpoInvio(record, impostazioni, '', versione);
+export function metadati(record, impostazioni, dispositivo = '', versione = '') {
+  const corpo = corpoInvio(record, impostazioni, '', dispositivo, versione);
   delete corpo.contenutoBase64;
   corpo.byte = record.byte || (record.foto && record.foto.size) || 0;
   return corpo;
 }
 
-export function corpoInvio(record, impostazioni, contenutoBase64, versione = '') {
+export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = '', versione = '') {
   return {
     token: impostazioni.token,
     tipo: record.tipo,
@@ -121,8 +122,15 @@ export function corpoInvio(record, impostazioni, contenutoBase64, versione = '')
     genere: record.genere || 'foto',
     estensione: record.estensione || 'jpg',
     mimeType: record.mime || 'image/jpeg',
-    durataSecondi: record.durata || 0,
+    // Numero, non stringa: le colonne numeriche in raccolta rifiutano una
+    // stringa vuota con «required to be of type Number», e la foto atterra
+    // senza colonne. Dove il dato non c'è si manda null, mai ''.
+    durataSecondi: Number(record.durata) || 0,
     idClient: record.id,
+    // Titolare della sequenza: raggrupparla per «operatore», che è testo
+    // libero, la spezzerebbe a ogni grafia diversa del nome.
+    idDispositivo: dispositivo,
+    progressivo: Number.isFinite(record.progressivo) ? record.progressivo : null,
     dataScatto: record.timestampDispositivo,
     versioneApp: versione,
     nomeFile: componiNomeFile(record),
@@ -154,13 +162,14 @@ async function inviaSingola(record) {
     return inviaInDueFasi(record, impostazioni, endpoint);
   }
   const contenutoBase64 = await blobInBase64(record.foto);
+  const dispositivo = await idDispositivo();
   const versione = await versioneApp();
   let risposta;
   try {
     risposta = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, versione)),
+      body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo, versione)),
     });
   } catch {
     throw new Error(navigator.onLine
@@ -177,7 +186,7 @@ async function inviaSingola(record) {
 // un'interruzione riprende da dove era, invece di rimandare tutto il video.
 async function inviaInDueFasi(record, impostazioni, endpoint) {
   const versione = await versioneApp();
-  const corpo = metadati(record, impostazioni, versione);
+  const corpo = metadati(record, impostazioni, await idDispositivo(), versione);
 
   if (!record.byteCaricati) {
     let url = record.urlCaricamento;

@@ -45,6 +45,7 @@ export function vistaImpostazioniFoto(el) {
             Caricamento a blocchi per i file grandi
           </label>
           <p class="aiuto tenue">Da accendere <strong>solo quando il flow sa gestirlo</strong>: il telefono gli chiede dove mettere i byte e li manda a blocchi, direttamente. Serve ai video, che altrimenti non passano. Su un flow che non lo sa fare l'app lo dice con un errore chiaro, senza perdere il file.</p>
+          <p class="avviso avviso-attenzione">Oggi <strong>va lasciato spento</strong>: al 10/09/2026 la sessione di caricamento non si riesce ancora ad aprire (il tenant risponde <em>403</em> alla creazione), quindi il flow non ha dove mandarti i byte. Si accende quando l'ufficio conferma che la prova sul flow è passata.</p>
         </div>
         <div class="campo">
           <label for="limite-due-fasi">Peso massimo col caricamento a blocchi (MB)</label>
@@ -70,6 +71,12 @@ export function vistaImpostazioniFoto(el) {
     <section class="scheda">
       <h2>Le due categorie</h2>
       <ul class="tenue">${elencoCategorie}</ul>
+    </section>
+    <section class="scheda">
+      <h2>Altri telefoni</h2>
+      <p class="tenue">Passa indirizzo e codice a un altro telefono facendogli inquadrare un codice, senza digitare nulla. L'indirizzo del flow è lungo e firmato: copiarlo a mano è il modo più facile per perdere un carattere e passare un'ora a capire perché non funziona.</p>
+      <p class="tenue">Il link è <strong>solo di questo modulo</strong>: le bolle hanno una destinazione propria e il loro link si genera dalle impostazioni di Bolle.</p>
+      <a class="btn btn-secondario" href="#/foto/condividi">Configura un altro telefono</a>
     </section>
     <a class="btn btn-secondario" href="#/foto">Torna a Foto cantiere</a>
   `;
