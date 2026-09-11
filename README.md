@@ -140,7 +140,9 @@ core/configurazione-link.js  link e QR che configurano un altro telefono, condiv
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
-docs/                 6 documenti, tutti correnti:
+docs/                 7 documenti, tutti correnti:
+                      INDICE.md                         indice a nome stabile: i nomi completi
+                                                        degli altri, per chi legge da fuori
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
                       AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
@@ -253,7 +255,11 @@ python3 -m http.server 8123
 # http://127.0.0.1:8123
 ```
 
-A ogni modifica dei file dell'app va incrementata `VERSIONE` in `sw.js` (e aggiornata la lista `RISORSE` se si aggiungono file), altrimenti i dispositivi restano sulla cache vecchia.
+A ogni modifica dei file dell'app vanno incrementate **due** costanti, insieme: `VERSIONE` in `sw.js` e `VERSIONE_CODICE` in `core/versione.js` (e va aggiornata la lista `RISORSE` in `sw.js` se si aggiungono file), altrimenti i dispositivi restano sulla cache vecchia.
+
+**Perché due e non una.** `VERSIONE` dice cosa è *installato*, `VERSIONE_CODICE` cosa sta *girando*. Non sono la stessa cosa: il service worker fa `skipWaiting()`, quindi appena un pacchetto nuovo è sceso diventa attivo e cancella la cache vecchia, ma **la pagina già aperta continua a eseguire i moduli che aveva caricato** — il browser non li ricarica da solo. Finché non si ricarica, l'app sta eseguendo il codice vecchio con installato quello nuovo. Prima l'app leggeva la versione dal nome della cache e in quella finestra dichiarava la versione nuova: diceva di avere una correzione che non stava eseguendo, e stampava quel numero nella colonna `VersioneApp` della raccolta — falsando proprio il dato che serve a sapere con quale versione è stata mandata una foto. Ora le due si confrontano: quando non coincidono compare la barra **«Versione aggiornata pronta»** e Informazioni mostra sia quella in uso sia quella pronta. Se ci si dimentica di allineare le costanti, l'avviso resta acceso — rumoroso, ma non silenzioso.
+
+Il precache non usa `cache.addAll`, che passa dalla cache HTTP del browser: ogni risorsa si chiede con `cache: 'reload'` e con la versione in coda all'indirizzo, così una versione nuova non può riempire la propria cache con i file della precedente. E a richiesta servita si guarda **solo** nella cache della propria versione, non in tutte, per non mettere in esecuzione un misto di due.
 
 ## Fuori perimetro (in capo a Francesco)
 

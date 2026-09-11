@@ -12,11 +12,12 @@ docs/AppBolleFlowRicezione….md — il flow di ricezione e la raccolta BolleInA
 docs/AppBolleContinuitaRunbook….md — documento unico per il lavoro a valle, dalla raccolta in poi.
 docs/AppFotoCantiereSpecifica….md — specifica del modulo Foto cantiere e requisiti del suo flow.
 docs/FotoCantiereBriefingRicevente.md — stato reale di raccolta e flow, misurato sul tenant dopo il collaudo del 10/09/2026. Dove divergono, questo prevale sulla specifica del modulo Foto: lì c'è ciò che è stato misurato, non ciò che era previsto.
+docs/INDICE.md — nome stabile, senza data: elenca i documenti correnti col nome completo e una riga ciascuno. Va aggiornato OGNI VOLTA che un documento di docs/ cambia nome, cioè a ogni revisione che applica la convenzione data-ora. Serve a chi legge il repo da fuori (Cowork via GitHub Pages), che con i nomi datati perderebbe l'indirizzo a ogni revisione. È un puntatore: non riassume e non duplica i documenti, altrimenti diventa una versione parallela destinata a divergere.
 Questo file. Il kickoff del 01/09/2026 è superato dalla specifica rev. 2 e resta nella storia del repo.
 Non inventare nomi di campi SharePoint, percorsi, formati non documentati: se un'informazione manca, fermarsi e chiedere.
 Stack vincolato
 Vanilla JS, HTML, CSS. Nessun framework, nessun build step, nessuna dipendenza npm a runtime. (Standard del gruppo; stesso stack del repo archiviowhatsapp.)
-Service Worker per offline e install; IndexedDB per le code dei moduli; manifest PWA a nome "LL Italia".
+Service Worker per offline e install; IndexedDB per le code dei moduli; manifest PWA a nome "LL Italia". A ogni rilascio si incrementano INSIEME VERSIONE in sw.js (cosa è installato) e VERSIONE_CODICE in core/versione.js (cosa sta girando): il confronto fra le due è ciò che permette all'app di accorgersi che sta eseguendo codice vecchio con un pacchetto nuovo già sceso, e di dirlo invece di dichiarare una versione che non sta eseguendo.
 Hosting di sviluppo: GitHub Pages dal branch principale.
 Target: browser mobile recenti (Chrome Android in primis, poi Safari iOS). Camera via <input type="file" accept="image/*" capture="environment">.
 Principi non negoziabili
