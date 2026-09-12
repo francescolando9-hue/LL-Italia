@@ -5,6 +5,7 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
+import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
@@ -206,7 +207,13 @@ async function aggiungiFile(file) {
         genere: 'foto', estensione: 'jpg',
       });
     } catch (errore) {
-      errori.push(`${singolo.name || 'file'}: ${errore.message}`);
+      // Con la memoria piena il messaggio del browser è in inglese e nel suo
+      // gergo: qui il file NON è entrato in coda, e serve che si capisca.
+      if (memoriaPiena(errore)) {
+        errori.push(messaggioSalvataggio(errore, 'la foto'));
+        break;
+      }
+      errori.push(`${singolo.name || 'file'}: ${messaggioSalvataggio(errore, 'la foto')}`);
     }
   }
   const messaggi = [];

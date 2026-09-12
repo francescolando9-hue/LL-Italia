@@ -3,6 +3,7 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
+import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
@@ -212,6 +213,7 @@ async function aggiungiFile(file) {
   const avviso = radice.querySelector('#avviso-foto');
   avviso.innerHTML = `<p class="avviso avviso-info">Elaborazione di ${file.length} foto&hellip;</p>`;
   const errori = [];
+  let memoriaEsaurita = '';
   const scarse = [];
   let saltate = 0;
   for (const singolo of file) {
@@ -232,7 +234,14 @@ async function aggiungiFile(file) {
       const miniatura = await creaMiniatura(singolo);
       await coda.aggiungiBozza(blob, singolo.name, miniatura, marchio, qualita.esito, qualita.motivo);
     } catch (errore) {
-      errori.push(`${singolo.name || 'foto'}: ${errore.message}`);
+      // Memoria piena: la bolla NON è entrata in coda. È il caso in cui il
+      // principio «lo scatto non si perde» dipende dall'operatore, quindi il
+      // messaggio deve dirgli cosa fare. Inutile insistere con le altre foto.
+      if (memoriaPiena(errore)) {
+        memoriaEsaurita = messaggioSalvataggio(errore, 'la bolla');
+        break;
+      }
+      errori.push(`${singolo.name || 'foto'}: ${messaggioSalvataggio(errore, 'la bolla')}`);
     }
   }
   const messaggi = [];
@@ -242,6 +251,9 @@ async function aggiungiFile(file) {
       ? `La foto sembra <strong>${scappaHtml(motivi)}</strong>: se puoi rifalla adesso, prima di inviare.`
       : `${scarse.length} foto sembrano poco leggibili (${scappaHtml(motivi)}): se puoi rifalle adesso, prima di inviare.`}</p>`);
   }
+  // La memoria piena si dice da sola: il prefisso «Foto non aggiunte» davanti a
+  // «la bolla NON è stata salvata» ripete la stessa cosa due volte.
+  if (memoriaEsaurita) messaggi.push(`<p class="avviso avviso-errore">${scappaHtml(memoriaEsaurita)}</p>`);
   if (errori.length) messaggi.push(`<p class="avviso avviso-errore">Foto non aggiunte — ${scappaHtml(errori.join('; '))}</p>`);
   if (saltate) messaggi.push(`<p class="avviso avviso-info">${saltate === 1 ? 'Una foto già presente non è stata aggiunta.' : `${saltate} foto già presenti non sono state aggiunte.`}</p>`);
   avviso.innerHTML = messaggi.join('');
