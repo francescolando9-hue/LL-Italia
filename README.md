@@ -69,7 +69,15 @@ La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va a
 
 ## Informazioni e aggiornamenti
 
-Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso, se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono, foto da inviare, elementi in coda o in errore, bolle nello storico, numero progressivo raggiunto. C'è anche un pulsante **Cerca aggiornamenti**.
+Dalle impostazioni dell'app, il link **Informazioni sull'app** apre la pagina che serve al supporto quando un operatore chiama dal cantiere: versione in uso (e, se diversa, quella pronta da applicare), se il funzionamento offline è attivo, stato della rete, spazio occupato sul telefono. C'è anche un pulsante **Cerca aggiornamenti**.
+
+Sotto, **una scheda per ogni modulo** con i suoi numeri: da inviare, in coda, **bloccate** (marcate in rosso: è il numero per cui si telefona), scattate e inviate oggi, più quello che il modulo ha di suo — storico e progressivo per le bolle, progressivo per le foto. I numeri li dichiara il modulo, non la shell: prima li leggeva solo dalle bolle, e un telefono con tre foto ferme in errore compariva come «0 in errore» proprio nella pagina che esiste per capire cosa è bloccato.
+
+### Senza rete
+
+Collaudato spegnendo il server che serve l'app — non simulando la rete assente nel browser, che in Chromium non ferma le richieste del service worker e misura meno di quanto sembri. Con il server spento continuano a funzionare: home, modulo Bolle, modulo Foto, storico, tutte le impostazioni, Informazioni, e il **QR di configurazione** di entrambi i moduli. Una bolla scattata senza rete entra in coda, resta, e parte da sola al ritorno del campo.
+
+Il QR era l'unico pezzo che offline non si disegnava: il generatore si carica a richiesta e non era nel precache. Due telefoni in cantiere senza campo sono esattamente il caso in cui serve, quindi ora è precachato — e se qualcosa va storto comunque, il messaggio dice se manca la rete invece di dare la colpa al telefono.
 
 ### Riparti col conteggio di oggi
 
@@ -136,6 +144,7 @@ core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
+core/informazioni.js  pagina per il supporto: i numeri li dichiarano i moduli
 core/configurazione-link.js  link e QR che configurano un altro telefono, condivisi
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni

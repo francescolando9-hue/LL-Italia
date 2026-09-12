@@ -395,4 +395,20 @@ export default {
     // Invio automatico al ritorno della connettività, anche fuori dalla vista.
     window.addEventListener('online', () => invio.avvia());
   },
+  // Numeri per la pagina Informazioni: prima li dava solo il modulo Bolle, e
+  // un telefono con foto ferme in errore compariva al supporto come «0 in
+  // errore» — la pagina che serve proprio a capire cosa è bloccato.
+  async stato() {
+    const record = await coda.elenca().catch(() => []);
+    const progressivo = await coda.progressivoRaggiunto().catch(() => 0);
+    return {
+      bozze: record.filter(r => r.stato === 'bozza').length,
+      inAttesa: record.filter(r => r.stato === 'in_coda' || r.stato === 'invio').length,
+      inErrore: record.filter(r => r.stato === 'errore').length,
+      oggi: coda.contatoriOggi(),
+      righe: [
+        ['Numero progressivo raggiunto', progressivo ? String(progressivo) : '—'],
+      ],
+    };
+  },
 };

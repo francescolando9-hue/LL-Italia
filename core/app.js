@@ -22,7 +22,8 @@ registraRotta('#/', () => {
 registraRotta('#/home', el => vistaHome(el, moduli));
 registraRotta('#/benvenuto', vistaBenvenuto);
 registraRotta('#/impostazioni', vistaImpostazioniApp);
-registraRotta('#/informazioni', vistaInformazioni);
+// I numeri della pagina li dichiarano i moduli: la shell passa il registro.
+registraRotta('#/informazioni', el => vistaInformazioni(el, moduli));
 for (const modulo of moduli) {
   modulo.registra(registraRotta);
 }

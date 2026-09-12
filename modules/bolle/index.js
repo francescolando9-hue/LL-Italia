@@ -27,6 +27,43 @@ export default {
     window.addEventListener('online', () => invio.avvia());
     invio.alCambiamento(() => { ridisegna(); });
   },
+  // Numeri per la pagina Informazioni. Li dà il modulo, non la shell: la shell
+  // non sa — e non deve sapere — che questo modulo tiene uno storico e una
+  // numerazione progressiva.
+  async stato() {
+    const record = await coda.elenca().catch(() => []);
+    const storico = await coda.elencaStorico().catch(() => []);
+    const progressivo = await coda.progressivoRaggiunto().catch(() => 0);
+    const oggi = coda.contatoriOggi();
+    return {
+      bozze: record.filter(r => r.stato === 'bozza').length,
+      inAttesa: record.filter(r => r.stato === 'in_coda' || r.stato === 'invio').length,
+      inErrore: record.filter(r => r.stato === 'errore').length,
+      oggi,
+      righe: [
+        ['Bolle nello storico', String(storico.length)],
+        ['Numero progressivo raggiunto', progressivo ? String(progressivo) : '—'],
+      ],
+    };
+  },
+  // Azzeramento dei contatori del giorno, con i testi di questo modulo: serve
+  // quando l'ufficio toglie da SharePoint bolle mandate per sbaglio e i
+  // contatori non dicono più quanti siano gli invii veri.
+  azzeraGiorno: {
+    titolo: 'Riparti col conteggio di oggi',
+    spiegazione: [
+      'Da usare quando l\'ufficio ha tolto da SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: i contatori di oggi contano anche gli invii annullati, e non si capisce più quanti siano quelli veri.',
+      'Azzera <strong>solo i contatori del giorno</strong> e toglie dall\'elenco le bolle già confermate dal server. <strong>Non</strong> tocca le foto ancora da inviare o in errore, lo storico delle bolle inviate, la numerazione progressiva.',
+    ],
+    async esegui() {
+      const prima = coda.azzeraContatoriOggi();
+      const tolte = await coda.rimuoviInviate().catch(() => 0);
+      const rimaste = (await coda.elenca().catch(() => []))
+        .filter(r => r.stato !== 'inviata').length;
+      return `Conteggio ripartito da zero (erano ${prima.scattate} scattate e ${prima.inviate} inviate). `
+        + `Tolte dall'elenco ${tolte} bolle già confermate; ${rimaste} foto restano sul telefono.`;
+    },
+  },
 };
 
 const ETICHETTE_STATO = {
