@@ -1,28 +1,89 @@
 // Pagina Informazioni: cosa serve al supporto quando un operatore chiama dal
-// cantiere — versione in uso, stato offline, spazio, numeri della coda.
-import { impostazioniApp } from './impostazioni.js';
-import * as coda from '../modules/bolle/coda.js';
+// cantiere — versione in uso, stato offline, spazio, numeri delle code.
+//
+// I numeri li dichiara **ogni modulo**, con `stato()` nel proprio descrittore.
+// Prima li leggeva la shell, importando direttamente la coda del modulo Bolle:
+// due conseguenze, entrambe cattive. La shell dipendeva da un modulo, cioè
+// esattamente quello che l'architettura vieta; e con due moduli in uso la
+// pagina mostrava solo i numeri delle bolle — un telefono con tre foto ferme
+// in errore compariva al supporto come «0 in errore», proprio nella pagina che
+// esiste per capire cosa è bloccato.
+import { impostazioniApp, scappaHtml } from './impostazioni.js';
 import { versioneApp, versioneInstallata } from './versione.js';
 
-export async function vistaInformazioni(el) {
+export async function vistaInformazioni(el, moduli = []) {
   el.innerHTML = '<section class="scheda"><h2>Informazioni</h2><p class="tenue">Lettura in corso&hellip;</p></section>';
 
-  const [versione, installata, spazio, record, storico, progressivo] = await Promise.all([
+  const conStato = moduli.filter(m => typeof m.stato === 'function');
+  const [versione, installata, spazio, stati] = await Promise.all([
     versioneApp(),
     versioneInstallata(),
     spazioUsato(),
-    coda.elenca().catch(() => []),
-    coda.elencaStorico().catch(() => []),
-    coda.progressivoRaggiunto().catch(() => 0),
+    // Un modulo che non risponde non deve lasciare la pagina in caricamento:
+    // al supporto serve il resto dei dati, e serve vedere che quel modulo non
+    // ha risposto.
+    Promise.all(conStato.map(m => Promise.resolve()
+      .then(() => m.stato())
+      .catch(() => null))),
   ]);
 
-  const oggi = coda.contatoriOggi();
-  const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio').length;
-  const inErrore = record.filter(r => r.stato === 'errore').length;
-  const bozze = record.filter(r => r.stato === 'bozza').length;
   const offline = 'serviceWorker' in navigator && navigator.serviceWorker.controller
     ? 'Attivo — l\'app funziona anche senza rete'
     : 'Non ancora attivo — riapri l\'app una seconda volta';
+
+  const schedeModuli = conStato.map((modulo, indice) => {
+    const stato = stati[indice];
+    const titolo = scappaHtml(modulo.titolo || modulo.id);
+    if (!stato) {
+      return `
+        <section class="scheda">
+          <h2>${titolo}</h2>
+          <p class="avviso avviso-attenzione">Numeri non leggibili su questo telefono: apri il modulo e riprova.</p>
+        </section>`;
+    }
+    const extra = (stato.righe || [])
+      .map(([etichetta, valore]) => `<dt>${scappaHtml(etichetta)}</dt><dd>${scappaHtml(valore)}</dd>`)
+      .join('');
+    // Il numero in errore è quello per cui si telefona: va marcato, non
+    // annegato fra gli altri.
+    const errore = stato.inErrore > 0
+      ? `<dd class="valore-errore">${stato.inErrore} in errore</dd>`
+      : '<dd>nessuna in errore</dd>';
+    return `
+      <section class="scheda">
+        <h2>${titolo}</h2>
+        <dl class="info-elenco">
+          <dt>Da inviare (non ancora confermate)</dt><dd>${stato.bozze}</dd>
+          <dt>In coda</dt><dd>${stato.inAttesa}</dd>
+          <dt>Bloccate</dt>${errore}
+          <dt>Oggi</dt><dd>${(stato.oggi || {}).scattate || 0} scattate, ${(stato.oggi || {}).inviate || 0} inviate</dd>
+          ${extra}
+        </dl>
+      </section>`;
+  }).join('');
+
+  // L'azzeramento dei contatori lo dichiara il modulo che ne ha bisogno, con i
+  // propri testi: la shell non sa cosa significhi «bolla annullata dall'ufficio».
+  const conAzzeramento = moduli.filter(m => m.azzeraGiorno && typeof m.azzeraGiorno.esegui === 'function');
+  const schedeAzzeramento = conAzzeramento.map(modulo => {
+    const stato = stati[conStato.indexOf(modulo)] || {};
+    const oggi = stato.oggi || { scattate: 0, inviate: 0 };
+    const id = scappaHtml(modulo.id);
+    return `
+      <section class="scheda">
+        <h2>${scappaHtml(modulo.azzeraGiorno.titolo)}</h2>
+        ${(modulo.azzeraGiorno.spiegazione || []).map(t => `<p class="tenue">${t}</p>`).join('')}
+        <button id="azzera-${id}" class="btn btn-secondario">Azzera i contatori di oggi</button>
+        <div id="conferma-${id}" class="avviso avviso-attenzione nascosto">
+          <p><strong>Confermi?</strong> I contatori di oggi (${oggi.scattate} scattate, ${oggi.inviate} inviate) ripartono da zero.</p>
+          <div class="azioni-riga">
+            <button id="annulla-${id}" class="btn btn-secondario">Annulla</button>
+            <button id="conferma-azzera-${id}" class="btn btn-primario">Sì, azzera</button>
+          </div>
+        </div>
+        <p id="esito-${id}" class="tenue"></p>
+      </section>`;
+  }).join('');
 
   el.innerHTML = `
     <section class="scheda">
@@ -31,55 +92,39 @@ export async function vistaInformazioni(el) {
         <dt>Versione in uso</dt><dd>${versione}</dd>${installata && installata !== versione
           ? `<dt>Versione pronta</dt><dd>${installata} — <strong>chiudi e riapri l'app</strong>, o tocca Aggiorna nella barra in alto: finché non lo fai sta girando la ${versione}</dd>`
           : ''}
-        <dt>Operatore</dt><dd>${impostazioniApp.autore || '—'}</dd>
+        <dt>Operatore</dt><dd>${scappaHtml(impostazioniApp.autore || '—')}</dd>
         <dt>Funzionamento offline</dt><dd>${offline}</dd>
         <dt>Rete in questo momento</dt><dd>${navigator.onLine ? 'connesso' : 'assente'}</dd>
         <dt>Spazio usato sul telefono</dt><dd>${spazio}</dd>
-        <dt>Foto da inviare</dt><dd>${bozze}</dd>
-        <dt>In coda o in errore</dt><dd>${inAttesa} in attesa, ${inErrore} in errore</dd>
-        <dt>Bolle nello storico</dt><dd>${storico.length}</dd>
-        <dt>Numero progressivo raggiunto</dt><dd>${progressivo || '—'}</dd>
       </dl>
       <button id="cerca-aggiornamenti" class="btn btn-secondario">Cerca aggiornamenti</button>
       <p id="esito-aggiornamento" class="tenue"></p>
     </section>
-    <section class="scheda">
-      <h2>Riparti col conteggio di oggi</h2>
-      <p class="tenue">Da usare quando l'ufficio ha tolto da SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: i contatori di oggi contano anche gli invii annullati, e non si capisce più quanti siano quelli veri.</p>
-      <p class="tenue">Azzera <strong>solo i contatori del giorno</strong> e toglie dall'elenco le bolle già confermate dal server. <strong>Non</strong> tocca le foto ancora da inviare o in errore, lo storico delle bolle inviate, la numerazione progressiva.</p>
-      <button id="azzera-giorno" class="btn btn-secondario">Azzera i contatori di oggi</button>
-      <div id="conferma-azzeramento" class="avviso avviso-attenzione nascosto">
-        <p><strong>Confermi?</strong> I contatori di oggi (${oggi.scattate} scattate, ${oggi.inviate} inviate) ripartono da zero.</p>
-        <div class="azioni-riga">
-          <button id="annulla-azzeramento" class="btn btn-secondario">Annulla</button>
-          <button id="conferma-azzera" class="btn btn-primario">Sì, azzera</button>
-        </div>
-      </div>
-      <p id="esito-azzeramento" class="tenue"></p>
-    </section>
+    ${schedeModuli}
+    ${schedeAzzeramento}
     <a class="btn btn-secondario" href="#/">Torna all'app</a>
   `;
 
   // Due passaggi, non uno: il pulsante sta in una pagina secondaria e chiede
   // conferma, così non si preme per sbaglio con i guanti.
-  const riquadro = el.querySelector('#conferma-azzeramento');
-  const esitoAzzera = el.querySelector('#esito-azzeramento');
-  el.querySelector('#azzera-giorno').addEventListener('click', () => {
-    riquadro.classList.remove('nascosto');
-    esitoAzzera.textContent = '';
-  });
-  el.querySelector('#annulla-azzeramento').addEventListener('click', () => {
-    riquadro.classList.add('nascosto');
-  });
-  el.querySelector('#conferma-azzera').addEventListener('click', async () => {
-    riquadro.classList.add('nascosto');
-    const prima = coda.azzeraContatoriOggi();
-    const tolte = await coda.rimuoviInviate().catch(() => 0);
-    const rimaste = (await coda.elenca().catch(() => []))
-      .filter(r => r.stato !== 'inviata').length;
-    esitoAzzera.textContent =
-      `Conteggio ripartito da zero (erano ${prima.scattate} scattate e ${prima.inviate} inviate). `
-      + `Tolte dall'elenco ${tolte} bolle già confermate; ${rimaste} foto restano sul telefono.`;
+  conAzzeramento.forEach(modulo => {
+    const riquadro = el.querySelector(`#conferma-${modulo.id}`);
+    const esito = el.querySelector(`#esito-${modulo.id}`);
+    el.querySelector(`#azzera-${modulo.id}`).addEventListener('click', () => {
+      riquadro.classList.remove('nascosto');
+      esito.textContent = '';
+    });
+    el.querySelector(`#annulla-${modulo.id}`).addEventListener('click', () => {
+      riquadro.classList.add('nascosto');
+    });
+    el.querySelector(`#conferma-azzera-${modulo.id}`).addEventListener('click', async () => {
+      riquadro.classList.add('nascosto');
+      try {
+        esito.textContent = await modulo.azzeraGiorno.esegui();
+      } catch {
+        esito.textContent = 'Azzeramento non riuscito: riapri il modulo e riprova.';
+      }
+    });
   });
 
   el.querySelector('#cerca-aggiornamenti').addEventListener('click', async () => {

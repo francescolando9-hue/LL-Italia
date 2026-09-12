@@ -261,6 +261,10 @@ body {
 }
 .info-elenco dd { margin: 2px 0 0; }
 
+/* Il numero per cui si telefona al supporto: deve saltare all'occhio, non
+   annegare fra gli altri. */
+.info-elenco dd.valore-errore { color: var(--errore); font-weight: 700; }
+
 /* Coppia annulla/conferma per le azioni che non si tornano indietro */
 .azioni-riga {
   display: flex;

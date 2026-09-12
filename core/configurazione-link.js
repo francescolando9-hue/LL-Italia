@@ -160,7 +160,11 @@ export function configurazioneTrasferibile(descrittore) {
       codice.make();
       contenitore.innerHTML = codice.createSvgTag({ cellSize: 4, margin: 8, scalable: true });
     } catch {
-      contenitore.innerHTML = '<p class="avviso avviso-errore">Codice non generabile su questo dispositivo: usa il pulsante per copiare il link.</p>';
+      // Dire «non generabile su questo dispositivo» dava la colpa al telefono.
+      // La causa vera è quasi sempre un'altra, e cambia cosa fare.
+      contenitore.innerHTML = navigator.onLine
+        ? '<p class="avviso avviso-errore">Codice non generabile su questo telefono: usa il pulsante «Copia il link» qui sotto.</p>'
+        : '<p class="avviso avviso-attenzione">Senza rete il codice non si disegna. Riprova dove c\'è campo, oppure usa «Copia il link» qui sotto.</p>';
     }
   }
 
