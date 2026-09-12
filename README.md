@@ -79,6 +79,12 @@ Collaudato spegnendo il server che serve l'app — non simulando la rete assente
 
 Il QR era l'unico pezzo che offline non si disegnava: il generatore si carica a richiesta e non era nel precache. Due telefoni in cantiere senza campo sono esattamente il caso in cui serve, quindi ora è precachato — e se qualcosa va storto comunque, il messaggio dice se manca la rete invece di dare la colpa al telefono.
 
+### Quando il telefono è pieno
+
+Con la memoria piena lo scatto **non entra in coda**: è il caso in cui la promessa «la foto non si perde» dipende dall'operatore, quindi deve capirlo. Prima arrivava a video il messaggio del browser, in inglese e nel suo gergo (*«Failed to execute 'add' on 'IDBObjectStore'»*); ora dice *«Memoria del telefono piena: la bolla NON è stata salvata. Manda quelle in attesa, poi libera spazio e riprova»*, e l'app smette di provare con le altre foto di quell'invio invece di ripetere lo stesso errore.
+
+Collaudato restringendo davvero la quota del sito a 1 MB e provando con una foto da 12 MB, su entrambi i moduli. Il riconoscimento copre i nomi che l'errore prende su browser diversi, non solo quello di Chrome.
+
 ### Riparti col conteggio di oggi
 
 Sulla stessa pagina, in fondo, il pulsante **Azzera i contatori di oggi**. Serve quando l'ufficio ha tolto da SharePoint delle bolle mandate per sbaglio e queste vanno rimandate: i contatori del giorno sommano invii veri e invii annullati, e non si capisce più quanti siano quelli buoni — proprio il numero su cui si regge il collaudo.
@@ -145,6 +151,7 @@ core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
 core/informazioni.js  pagina per il supporto: i numeri li dichiarano i moduli
+core/errori.js        messaggi d'errore verso l'operatore, una sola verità
 core/configurazione-link.js  link e QR che configurano un altro telefono, condivisi
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni

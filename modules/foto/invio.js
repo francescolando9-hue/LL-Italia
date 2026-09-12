@@ -4,6 +4,7 @@
 import * as coda from './coda.js';
 import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
+import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
 import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
@@ -136,17 +137,6 @@ export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = 
     nomeFile: componiNomeFile(record),
     contenutoBase64,
   };
-}
-
-// Spiegazione degli stati: il numero da solo non dice a chi guarda cosa fare.
-function spiegazioneStato(stato) {
-  if (stato === 400) return ' — verifica api-version nell’URL, o la foto è troppo grande per il flow';
-  if (stato === 401 || stato === 403) return ' — token o firma non validi';
-  if (stato === 413) return ' — foto troppo grande per il flow';
-  if (stato === 502) return ' — il flow è terminato senza rispondere: guarda la cronologia del flow';
-  if (stato === 504) return ' — il flow non ha risposto in tempo: guarda la cronologia del flow';
-  if (stato >= 500) return ' — il flow non è arrivato in fondo: guarda la cronologia del flow';
-  return '';
 }
 
 async function inviaSingola(record) {
