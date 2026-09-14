@@ -137,7 +137,7 @@ Collaudato in locale: un video da 28,9 MB passa in 16 blocchi e arriva **intero*
 
 Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~2,0 MB di corpo; archivio da fotocamera nativa 4,39 MB → ~5,9 MB. L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» **non si è verificata**: un telefono non produce JPEG da 12 MB, e per l'archivio l'app spedisce i byte originali senza ricodificarli. Quindi **per le foto l'invio in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger. Se il flow rifiuta un corpo, l'app lo dice e la foto resta in coda.
 
-Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 3). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — è in `docs/AppFotoCantiereRunbookVenerdi….md`: si esegue in Cowork il venerdì. I **percorsi di destinazione non stanno nel repo**: sono registrati nel file di conoscenza di progetto su `L:`, perché GitHub Pages pubblica tutto e quelli sono percorsi del server interno. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
+Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 3). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
 
 ## Collaudi
 
@@ -175,7 +175,7 @@ core/versione.js      versione in uso, letta dalla cache attiva del service work
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
 collaudi/             prove automatiche su browser vero (node collaudi/esegui.js)
-docs/                 8 documenti, tutti correnti:
+docs/                 7 documenti, tutti correnti:
                       INDICE.md                         indice a nome stabile: i nomi completi
                                                         degli altri, per chi legge da fuori
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
@@ -183,7 +183,6 @@ docs/                 8 documenti, tutti correnti:
                       AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
                       AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 3
-                      AppFotoCantiereRunbookVenerdi….md il lavoro a valle, da eseguire in Cowork
                       FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale
                                                         sulla specifica dove divergono)
 ```

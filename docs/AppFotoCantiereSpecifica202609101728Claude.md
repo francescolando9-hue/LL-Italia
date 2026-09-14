@@ -229,7 +229,7 @@ Il campo `nomeFile` mandato dall'app è **ignorato**: il nome lo compone il flow
 
 ## 6. Il runbook del venerdì
 
-Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaricate dalla raccolta e depositate nella **cartella di commessa sul server**. La procedura completa — passo per passo, con la quadratura e i casi ricorrenti — sta in `docs/AppFotoCantiereRunbookVenerdi….md`, e si esegue in **Cowork**: `L:` è raggiungibile solo dalla rete di sede e nessun connettore cloud ci arriva, quindi Power Automate qui non c'entra.
+Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaricate dalla raccolta e depositate nella **cartella di commessa sul server**. La procedura completa — passo per passo, con la quadratura e i casi ricorrenti — sta nel runbook `AppFotoCantiereRunbookVenerdi….md`, che **non è in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno. Si esegue in **Cowork**: `L:` è raggiungibile solo dalla rete di sede e nessun connettore cloud ci arriva, quindi Power Automate qui non c'entra.
 
 **I percorsi di destinazione esistono e sono registrati.** Sono stati verificati sul server il 10/09/2026 e stanno, insieme alla regola sulle sottocartelle, nel **file di conoscenza di progetto su `L:`**. **Non si scrivono qui**: questo repo è pubblicato integralmente su GitHub Pages, e quelli sono percorsi del server interno. Chi esegue il runbook li ha già a disposizione; chi legge da fuori non deve averli.
 
