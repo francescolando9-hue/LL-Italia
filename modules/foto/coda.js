@@ -18,6 +18,8 @@
 // delle bolle. L'identità del dispositivo, invece, è la stessa — vive nella
 // shell, perché è l'identità del telefono e non di un modulo.
 
+import { timestampDispositivo } from '../../core/orario.js';
+
 const NOME_DB = 'llitalia-foto';
 // v2: aggiunto lo store del contatore. Le foto già in coda non si toccano.
 const VERSIONE_DB = 2;
@@ -66,17 +68,6 @@ function transazione(modo, operazione) {
   }));
 }
 
-// Timestamp del dispositivo in ISO con fuso locale: è l'ora dello scatto, non
-// quella di arrivo sul server, che per una foto accodata offline è un'altra.
-export function timestampDispositivo(data = new Date()) {
-  const scarto = -data.getTimezoneOffset();
-  const segno = scarto >= 0 ? '+' : '-';
-  const p = n => String(Math.abs(n)).padStart(2, '0');
-  return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())}` +
-    `T${p(data.getHours())}:${p(data.getMinutes())}:${p(data.getSeconds())}` +
-    `${segno}${p(Math.floor(Math.abs(scarto) / 60))}:${p(Math.abs(scarto) % 60)}`;
-}
-
 // La foto entra in IndexedDB già allo scatto: non si perde nemmeno se l'app
 // viene chiusa prima di premere Invia.
 export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = {}) {
@@ -97,6 +88,25 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     anteprima,
     byte: fotoBlob.size,
     nome: nomeOriginale || '',
+    // Due ore diverse, che vanno tenute diverse.
+    //
+    // `dataScatto` è QUANDO LA FOTO È STATA FATTA: la legge chi chiama —
+    // dall'EXIF del file originale per le foto di galleria, dall'orologio del
+    // momento per gli scatti fatti dentro l'app — e per l'archivio di commessa
+    // è il dato che conta. `timestampDispositivo` è quando la foto è entrata in
+    // coda, cioè l'ora dell'INVIO: serve alle diagnosi, non alla raccolta.
+    //
+    // Fino alla 0.28.0 c'era solo la seconda e viaggiava come `dataScatto`:
+    // due foto delle 08:31 sono atterrate in raccolta con l'ora in cui
+    // l'operatore ha premuto Invia, senza che nulla lo segnalasse.
+    //
+    // Quando l'ora dello scatto non si riesce a sapere si ripiega su quella di
+    // accodamento, e lo si DICHIARA: `scattoStimato` vale 'SI', così chi legge
+    // la raccolta sa che quel numero è un'approssimazione per eccesso e non un
+    // dato misurato. Testo 'SI'/'NO' e non un booleano: le colonne di tipo Sì/No
+    // in SharePoint sono quelle che il connettore riscrive più volentieri.
+    dataScatto: extra.dataScatto || timestampDispositivo(),
+    scattoStimato: extra.dataScatto ? 'NO' : 'SI',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
     tentativi: 0,

@@ -21,7 +21,7 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 
 | Documento | Cosa contiene |
 |---|---|
-| `AppFotoCantiereSpecifica202609101728Claude.md` | **Rev. 4.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto`, campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow. Il nome del file non cambia a ogni revisione: la storia la tiene git, e un indirizzo stabile è il motivo per cui questo indice esiste. |
+| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 5.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF, `scattoStimato`, campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow — fra cui la **colonna `ScattoStimato` da aggiungere** in raccolta. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, che non esiste più. |
 | `FotoCantiereBriefingRicevente.md` | Stato **reale** di raccolta e flow, misurato sul tenant nel collaudo del 10/09/2026. **Dove diverge dalla specifica qui sopra, fa fede questo:** contiene ciò che è stato misurato, non ciò che era previsto. Nome stabile per la stessa ragione di questo indice. |
 
 ## Non in questo repo

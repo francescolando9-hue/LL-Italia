@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { apriBrowser, MATERIALE } = require('./aiuto');
+const { conExif } = require('./exif-finto');
 
 // Un JPEG di larghezza e peso governabili: il rumore impedisce al compressore
 // di fare miracoli, ed è quello che rende credibile una foto da 12 MB.
@@ -67,7 +68,10 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
 
 (async () => {
   fs.mkdirSync(MATERIALE, { recursive: true });
-  const atteso = ['bolla.jpg', 'bolla2.jpg', 'foto-cantiere.jpg', 'foto-pesante.jpg', 'video-finto.mp4'];
+  const atteso = [
+    'bolla.jpg', 'bolla2.jpg', 'foto-cantiere.jpg', 'foto-pesante.jpg', 'video-finto.mp4',
+    'scatto-exif.jpg', 'scatto-exif-mm.jpg', 'scatto-exif-assurda.jpg',
+  ];
   if (atteso.every(n => fs.existsSync(path.join(MATERIALE, n)))) {
     console.log('Materiale già presente in', MATERIALE);
     for (const nome of atteso) {
@@ -75,6 +79,10 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
     }
     return;
   }
+
+  // Si rifà solo quello che manca: rigenerare da capo la foto da 11 MB per
+  // aggiungere un file da 300 KB è tempo buttato a ogni collaudo nuovo.
+  const serve = nome => !fs.existsSync(path.join(MATERIALE, nome));
 
   const browser = await apriBrowser();
   const pagina = await (await browser.newContext()).newPage();
@@ -87,29 +95,64 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
     ['foto-cantiere.jpg', { larghezza: 4032, altezza: 3024, qualita: 0.85, rumore: 40, testo: 'CANTIERE MAR' }],
   ];
   for (const [nome, opzioni] of files) {
+    if (!serve(nome)) continue;
     const dati = Buffer.from(await generaJpeg(pagina, opzioni), 'base64');
     fs.writeFileSync(path.join(MATERIALE, nome), dati);
     console.log('  scritto', nome, mb(dati.length));
   }
 
   // Il caso peggiore dichiarato nel README: una foto d'archivio pesante.
-  const pesante = await generaFinoA(
-    pagina,
-    { larghezza: 4032, altezza: 3024, qualita: 0.92, rumore: 120, testo: 'CANTIERE MAR — ARCHIVIO' },
-    11 * 1048576,
-  );
-  fs.writeFileSync(path.join(MATERIALE, 'foto-pesante.jpg'), pesante);
-  console.log('  scritto foto-pesante.jpg', mb(pesante.length));
+  if (serve('foto-pesante.jpg')) {
+    const pesante = await generaFinoA(
+      pagina,
+      { larghezza: 4032, altezza: 3024, qualita: 0.92, rumore: 120, testo: 'CANTIERE MAR — ARCHIVIO' },
+      11 * 1048576,
+    );
+    fs.writeFileSync(path.join(MATERIALE, 'foto-pesante.jpg'), pesante);
+    console.log('  scritto foto-pesante.jpg', mb(pesante.length));
+  }
+
+  // Foto con l'ora dello scatto scritta dentro, come le fa un telefono.
+  // Servono a provare che `dataScatto` è l'ora dello scatto e non quella
+  // dell'invio: senza EXIF nel materiale, il collaudo non potrebbe distinguere
+  // le due cose, che è esattamente l'errore costato il difetto del 14/09/2026.
+  // Le date NON sono di comodo: 08:31:39 e 08:31:42 sono quelle delle due foto
+  // di SNZ2.2 atterrate in raccolta con l'ora dell'invio.
+  const conData = [
+    // Ordine II (gran parte degli Android) e fuso scritto dentro: l'app deve
+    // usare QUELLO, non il fuso del telefono che sta inviando.
+    ['scatto-exif.jpg', { data: '2026:09:14 08:31:39', offset: '+02:00' }],
+    // Ordine MM (iPhone) e nessun tag del fuso: si legge come ora locale del
+    // dispositivo. Data d'inverno di proposito — in Italia quel giorno l'offset
+    // è +01:00, e chi applicasse il fuso di oggi sbaglierebbe di un'ora.
+    ['scatto-exif-mm.jpg', { data: '2026:01:15 09:00:00', grandeInTesta: true }],
+    // Orologio mai impostato: il tag c'è ma la data non vale niente, e mandarla
+    // sarebbe peggio che dichiararla stimata.
+    ['scatto-exif-assurda.jpg', { data: '1970:01:01 00:00:00' }],
+  ];
+  if (conData.some(([nome]) => serve(nome))) {
+    const base = Buffer.from(await generaJpeg(pagina, {
+      larghezza: 1600, altezza: 1200, qualita: 0.85, rumore: 30, testo: 'CANTIERE SNZ2.2 — ARCHIVIO',
+    }), 'base64');
+    for (const [nome, exif] of conData) {
+      if (!serve(nome)) continue;
+      const dati = conExif(base, exif);
+      fs.writeFileSync(path.join(MATERIALE, nome), dati);
+      console.log('  scritto', nome, mb(dati.length), `(DateTimeOriginal ${exif.data}${exif.offset ? ' ' + exif.offset : ', senza fuso'})`);
+    }
+  }
 
   // Un «video» che serve solo per il controllo del peso: l'app rifiuta i file
   // oltre il limite PRIMA di provare a decodificarli, quindi non serve che sia
   // un filmato vero. Dove serve davvero un filmato si prova sul telefono, e il
   // collaudo lo dichiara invece di fingere.
-  const finto = Buffer.alloc(25 * 1048576);
-  finto.write('ftypisom', 4, 'ascii');
-  for (let i = 0; i < finto.length; i += 4096) finto[i] = i % 251;
-  fs.writeFileSync(path.join(MATERIALE, 'video-finto.mp4'), finto);
-  console.log('  scritto video-finto.mp4', mb(finto.length), '(non decodificabile, serve solo al limite di peso)');
+  if (serve('video-finto.mp4')) {
+    const finto = Buffer.alloc(25 * 1048576);
+    finto.write('ftypisom', 4, 'ascii');
+    for (let i = 0; i < finto.length; i += 4096) finto[i] = i % 251;
+    fs.writeFileSync(path.join(MATERIALE, 'video-finto.mp4'), finto);
+    console.log('  scritto video-finto.mp4', mb(finto.length), '(non decodificabile, serve solo al limite di peso)');
+  }
 
   await browser.close();
   console.log('Materiale pronto in', MATERIALE);

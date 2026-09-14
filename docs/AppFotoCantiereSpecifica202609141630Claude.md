@@ -1,10 +1,10 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 4 del 14/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 5 del 14/09/2026, sera.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 >
-> **Rev. 4 — esiti del collaudo del 14/09** (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
+> **Rev. 5 — `dataScatto` è finalmente l'ora dello scatto** (§4.1): fino alla 0.28.0 era l'ora dell'invio, misurato in produzione il 14/09. Dalla **0.29.0** l'app legge l'ora dall'EXIF della foto originale e, quando non ci riesce, lo **dichiara** con il campo nuovo `scattoStimato`. **Serve una colonna nuova in raccolta** (§5). Rev. 4 — esiti del collaudo del 14/09 (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
 >
-> ⚠️ **Un punto resta aperto:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis). La destinazione del runbook del venerdì **non è più fra i punti aperti**: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
+> ⚠️ **Due punti aperti:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis); e l'ora di ripresa dei **video**, che non sta nell'EXIF e per ora resta stimata (§4.1). La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
 
 ## 1. A cosa serve
 
@@ -39,6 +39,8 @@ Se si cambia categoria quando ci sono già foto in attesa, l'app **avvisa** che 
 |---|---|
 | `AVANZAMENTO` | JPEG, lato lungo 2500 px, qualità 0,85 — come le bolle. Leggera, parte anche con poca rete. |
 | `ARCHIVIO` | **Risoluzione originale** (deciso il 10/09/2026). Se il file è già JPEG si spediscono **i byte originali, senza ricodificarli**: ricomprimere «a qualità massima» degraderebbe l'immagine senza alcun vantaggio. Se il telefono produce HEIC o PNG si converte in JPEG a piena risoluzione (qualità 0,95), perché il nome del file in raccolta è `.jpg` e byte HEIC dentro un `.jpg` sarebbero un file che non si apre. |
+
+**Ricodificare butta via l'EXIF.** Il passaggio per il canvas — che avviene sempre per l'`AVANZAMENTO`, e per l'`ARCHIVIO` solo quando il file non è già JPEG — produce un JPEG pulito, **senza i metadati dell'originale**. È la ragione per cui l'ora dello scatto si legge **prima** della preparazione (§4.1), ed è anche la ragione per cui una foto d'archivio già JPEG arriva in raccolta con il suo EXIF intatto mentre una d'avanzamento no: sono due trattamenti diversi, non un'incoerenza.
 
 **Misure sul flow vero** (collaudo del ricevente, 10/09/2026 sera, telefono reale) — sostituiscono le stime di laboratorio:
 
@@ -82,21 +84,75 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
   "idClient": "f15f1935-…",           // GUID del file, per la deduplica
   "idDispositivo": "3f2a9c10-…",      // GUID dell'installazione, stabile
   "progressivo": 47,                  // NUMERO, sequenza per dispositivo
-  "dataScatto": "2026-09-10T17:28:04+02:00",   // ora reale del telefono
-  "versioneApp": "0.23.0",
+  "dataScatto": "2026-09-14T08:31:39+02:00",   // ora dello SCATTO, non dell'invio
+  "scattoStimato": "NO",              // "SI" = è un ripiego, vedi §4.1
+  "versioneApp": "0.29.0",
   "nomeFile": "…",                    // IGNORATO dal backend: lo compone il flow
   "contenutoBase64": "…" }
 ```
 
 **Attenzione, il campo si chiama `dataScatto`** — non `dataInvio` come nelle bolle. Nelle bolle il nome del campo e quello della colonna divergono per un incidente storico; qui nascono uguali. **Non dare per scontata la simmetria fra i due contratti.**
 
-### 4.1 `dataScatto`: l'app manda ISO, in colonna vanno 12 cifre
+### 4.1 `dataScatto`: quando la foto è stata FATTA
 
-L'app manda `dataScatto` in **ISO 8601 con fuso** (`2026-09-10T21:47:21+02:00`), e continua a farlo: è l'ora reale del telefono, con l'informazione di fuso, ed è il dato giusto da trasmettere.
+#### Il difetto, misurato in produzione il 14/09/2026
+
+Fino alla **0.28.0** `dataScatto` non era l'ora dello scatto: era **l'ora dell'invio**. L'app scriveva l'orologio del momento in cui la foto entrava in coda, e lo mandava sotto quel nome.
+
+La prova: due foto `ARCHIVIO` della commessa SNZ2.2 sono in raccolta con `DataScatto` **202609140915 tutt'e due**, mentre l'EXIF dei file originali dice `DateTimeOriginal` **2026:09:14 08:31:39** e **08:31:42**. Tre secondi di distanza diventati zero, e **quarantaquattro minuti** di scarto dal vero.
+
+Perché è grave: per l'archivio di commessa **l'ora dello scatto è il dato**, ed è il criterio con cui il flow sceglie le cartelle `AAAA/AAAAMM`. Una foto fatta il 30 del mese e mandata il 1º del mese dopo finiva nella cartella sbagliata. E soprattutto **non faceva rumore**: in colonna si legge un'ora plausibile, e nessuno ha modo di accorgersi che è l'ora sbagliata.
+
+#### Da dove viene l'ora, dalla 0.29.0
+
+| Come arriva la foto | Ora usata | `scattoStimato` |
+|---|---|---|
+| Scelta dalla galleria, o scattata con la fotocamera **di sistema** | `DateTimeOriginal` (tag EXIF `0x9003`) letto dal file **originale** | `NO` |
+| Scattata con la fotocamera **dentro l'app** | l'orologio del telefono **all'istante dello scatto** (il file nasce lì: nessun EXIF da leggere, e nessuno da cercare) | `NO` |
+| Foto senza EXIF, senza quel tag, o con una data assurda | l'ora di accodamento — il comportamento di prima | `SI` |
+| **Video** | l'ora di accodamento — punto aperto, vedi sotto | `SI` |
+
+**La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la preparazione dell'`AVANZAMENTO` (2500 px, qualità 0,85) passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo mai — e il difetto sarebbe tornato su una categoria sola, che è il modo più efficace di non accorgersene.
+
+**Niente libreria EXIF**: lo stack è vincolato e qui non serve. Si leggono i primi 128 KB del file e si scandiscono i marcatori JPEG fino all'APP1 (`core/exif.js`, ~150 righe). Il contenuto della foto non viene toccato.
+
+#### Il fuso
+
+Se la foto porta anche `OffsetTimeOriginal` (tag `0x9011`), **il fuso è quello**: è il fuso in cui la foto è stata scattata, e vince su quello del telefono che sta inviando.
+
+Se non c'è — e su molti telefoni non c'è — le cifre si leggono come **ora locale del dispositivo**, con il fuso in vigore **quel giorno** (a gennaio in Italia `+01:00`, a settembre `+02:00`: applicare il fuso di oggi a una foto di sei mesi fa sposterebbe di un'ora). **Non si interpretano mai come UTC:** l'EXIF non ha un fuso implicito, e leggerlo come UTC sposterebbe indietro di due ore ogni foto italiana. Nel caso peggiore, con l'ora locale, sbaglia solo una foto arrivata da un altro fuso; leggendo UTC sbaglierebbero tutte.
+
+#### `scattoStimato`: `SI` / `NO`
+
+Campo **nuovo**, testo, sempre presente. Vale `NO` quando l'ora è stata misurata e `SI` quando è un ripiego, cioè quando in `dataScatto` c'è l'ora di accodamento perché quella dello scatto non si è potuta sapere.
+
+Serve a **non dover distinguere a mano una misura da un'approssimazione**: senza, in colonna ci sarebbero due dati diversi con lo stesso aspetto, ed è esattamente la condizione che ha reso invisibile il difetto per due settimane. È testo `SI`/`NO` e **non una colonna Sì/No**: le colonne booleane sono fra quelle che il connettore riscrive più volentieri, e qui il rischio non vale il risparmio.
+
+Una data è considerata assurda — e quindi scartata a favore del ripiego — se l'anno è **precedente al 2010** (orologio del telefono mai impostato: 1970, 2001, 2008 a seconda del sistema) o se cade **più di un giorno nel futuro** (orologio avanti).
+
+#### Cosa NON si legge, e perché
+
+- **`DateTime` (tag `0x0132`)**: è l'ora dell'**ultima modifica** del file. Su una foto ritagliata o ri-salvata è l'ora del ritaglio, e finirebbe in colonna come ora di scatto senza che nessuno possa accorgersene.
+- **`lastModified` del file**: per una foto copiata o scaricata è l'ora della copia.
+- **EXIF dentro HEIC/HEIF**: non sta in un APP1 ma in una scatola del contenitore ISO-BMFF, e servirebbe un parser vero. Un iPhone che manda HEIC ricade quindi nel ripiego.
+
+In tutti e tre i casi il valore *sembrerebbe* un'ora di scatto. **Meglio dichiarare «stimata» che affermare un'ora precisa e sbagliata.** Se in futuro si decidesse di usarli, vanno usati con `scattoStimato` = `SI`, mai come misura.
+
+#### Video: punto aperto, dichiarato
+
+L'ora di ripresa di un video non sta nell'EXIF ma nel contenitore (`mvhd` del box `moov`), e **fra MP4 e MOV non è scritta con le stesse convenzioni di fuso** — c'è chi la scrive in UTC e chi in ora locale, senza dirlo. In più su alcuni registratori quel box sta in fondo al file, e leggerlo vorrebbe dire scorrere decine di megabyte.
+
+Finché non è letta davvero, **i video partono con l'ora di accodamento e `scattoStimato` = `SI`**. È una scelta esplicita, non una dimenticanza: per un video registrato e mandato nella stessa giornata lo scarto è di minuti, e il campo dice che è una stima.
+
+#### La forma non cambia: l'app manda ISO, in colonna vanno 12 cifre
+
+L'app manda `dataScatto` in **ISO 8601 con fuso** (`2026-09-14T08:31:39+02:00`), e continua a farlo: cambia **quale** ora è, non **come** è scritta. Il flow non va toccato per questo.
 
 **Quel valore però non va scritto verbatim in colonna.** La colonna è di tipo testo, come previsto, e **non basta**: il connettore SharePoint riconosce qualunque valore che *somigli* a una data e lo riscrive prima di consegnarlo. Misurato sul tenant il 10/09/2026: `2026-09-10T21:47:21+02:00` è atterrato come `09/10/2026 12:47:21` — **nove ore di scarto**, con un mese e un giorno invertiti per soprammercato.
 
-Il rimedio, verificato, è **compattare nel flow a 12 cifre `AAAAMMGGHHMM`**, che non somigliano a una data e quindi nessuno reinterpreta. È lo stesso rimedio adottato sulle bolle il 03/09. Il riscontro si fa incrociando con la colonna `Created`, che SharePoint scrive senza passare dal connettore.
+Il rimedio, verificato, è **compattare nel flow a 12 cifre `AAAAMMGGHHMM`**, che non somigliano a una data e quindi nessuno reinterpreta. È lo stesso rimedio adottato sulle bolle il 03/09.
+
+> ⚠️ **Il riscontro con `Created` cambia di significato, dalla 0.29.0.** Finché `dataScatto` era l'ora dell'invio, `DataScatto` e `Created` **dovevano** coincidere, e la loro coincidenza è stata usata come prova che la compattazione a 12 cifre funzionava (collaudo del 14/09, §5). Ora coincidono solo per le foto scattate e mandate subito: per una foto scelta dalla galleria **è normale che `DataScatto` sia molto più indietro di `Created`**, ed è il segno che la correzione funziona, non che qualcosa si è rotto. Per verificare la compattazione serve d'ora in poi una foto **scattata sul momento** — lì le due colonne tornano a coincidere.
 
 ### 4.2 I campi numerici vogliono un numero, o un null vero
 
@@ -177,6 +233,9 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 | `Genere` | Riga di testo singola, **indicizzata** | `genere` |
 | `DurataSecondi` | Numero, 0 decimali | `durataSecondi` — vedi §4.2 |
 | `DataScarico` | — | scritta dal runbook del venerdì, non dall'app |
+| `ScattoStimato` | Riga di testo singola | `scattoStimato` — **DA AGGIUNGERE**, vedi sotto |
+
+**Colonna da aggiungere, con la 0.29.0: `ScattoStimato`** (riga di testo singola), mappata sul campo omonimo del payload. Finché non c'è, il flow **ignora** il campo — che è il motivo per cui l'app può essere rilasciata subito e senza coordinamento: le foto continuano ad atterrare, con l'ora giusta, e si perde solo l'indicazione se quell'ora sia misurata o stimata. Valori attesi: `SI` e `NO`, nient'altro. Una vista con filtro `ScattoStimato = SI` dice al volo quali foto hanno un'ora approssimativa.
 
 `DataScatto` di tipo **testo** e non *Data e ora*: è la stessa decisione presa per le bolle il 03/09. Da sola però non basta — il connettore riscrive comunque ciò che somiglia a una data, ed è per questo che il flow compatta a 12 cifre (§4.1).
 
@@ -196,6 +255,8 @@ Due foto `ARCHIVIO` mandate dall'app **0.27.0**, stesso dispositivo:
 | `DataScatto` `202609140915` contro `Created` `07:15:11Z` | **coincidono** (07:15 UTC = 09:15 italiane): la correzione a 12 cifre tiene |
 | File più grande arrivato finora | **6,17 MB**, circa **8,2 MB** di corpo, **accettato in una sola richiesta** |
 
+> **Quella riga sul `Created` andava letta al contrario.** `DataScatto` e `Created` coincidevano **al minuto** perché erano la stessa ora: quella dell'invio. Confrontate con l'EXIF dei file originali — `08:31:39` e `08:31:42` — le due foto risultavano scattate 44 minuti prima, e in raccolta erano diventate la stessa ora. Il controllo dimostrava la compattazione a 12 cifre, che era ciò che si stava provando, e nello stesso numero c'era il difetto di §4.1. **Una coincidenza perfetta fra due dati che nascono da fonti diverse è un fatto da spiegare, non da archiviare.**
+
 **È il primo controllo di continuità sulle foto, ed è pulito.** Prima di questa versione le colonne c'erano ma restavano vuote, quindi la sequenza non esisteva: da qui in poi un numero mancante significa una foto scattata e mai arrivata.
 
 Il dato sul peso corregge in meglio la stima del 10/09, quando il file più grande misurato era 4,39 MB: **l'archivio a risoluzione originale ha più margine di quanto si pensasse** nell'invio in una sola richiesta. Non cambia la conclusione — il caricamento a blocchi serve ai video, non alle foto — ma alza il tetto conosciuto.
@@ -206,6 +267,21 @@ Il dato sul peso corregge in meglio la stima del 10/09, quando il file più gran
 - **payload senza `dataScatto` → 400**, e **mai un 502**: un 502 significherebbe un ramo che esce senza Response;
 - **stessa foto mandata due volte → 200 `gia_presente`**, con **un solo file** in raccolta (la guardia sui duplicati);
 - **prova di taglia a scaglioni**, per sapere dove il flow smette di accettare — **prima che qualcuno mandi un video**, non dopo.
+
+### Rilascio 0.29.0 — l'ora dello scatto
+
+Provato in locale con i collaudi automatici del repo (`node collaudi/esegui.js`, collaudo `10-ora-scatto.js`), su foto costruite con un EXIF vero e riletto da una libreria indipendente:
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| EXIF `2026:09:14 08:31:39` con `OffsetTimeOriginal +02:00`, categoria `ARCHIVIO` | `dataScatto` = `2026-09-14T08:31:39+02:00`, `scattoStimato` `NO` | ✓ |
+| EXIF `2026:01:15 09:00:00` senza fuso, ordine byte `MM`, categoria `AVANZAMENTO` | `2026-01-15T09:00:00+01:00` (fuso del **giorno dello scatto**), `NO` | ✓ |
+| La stessa foto, byte effettivamente inviati | **senza EXIF** (ricompressa) e ora **comunque corretta**: la lettura avviene prima | ✓ |
+| Foto senza EXIF | ora di accodamento, `scattoStimato` `SI` | ✓ |
+| EXIF `1970:01:01 00:00:00` | ora di accodamento, `SI` | ✓ |
+| Scatto con la fotocamera dentro l'app | ora dell'istante dello scatto, `NO` | ✓ |
+
+**Cosa questo NON dimostra:** la prova è su foto costruite, non su foto vere di un telefono vero. Sul campo restano da verificare **un iPhone** (che scrive l'ordine `MM` e spesso HEIC: in HEIC l'ora resta stimata) e **un Android** con l'ora regolata a mano. Il modo di verificarlo è quello solito: mandare una foto vecchia dalla galleria e confrontare `DataScatto` in raccolta con l'ora che il telefono mostra nella galleria — **non** con `Created`.
 
 **Quando si aggiungerà il caricamento a blocchi** (§4-bis), lo stesso flow si articola su tre rami, uno `Switch` sul campo `azione` subito dopo il controllo del token:
 
@@ -235,7 +311,7 @@ Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaric
 
 Quello che vale la pena dire qui, perché riguarda il contratto e non il server:
 
-- le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più;
+- le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più. **Dalla 0.29.0 quel criterio è finalmente affidabile:** fino alla 0.28.0 `DataScatto` era l'ora dell'invio (§4.1), quindi una foto fatta il 30 e mandata il 1º finiva nel mese sbagliato — sia nelle cartelle del flow sia in quelle del runbook. Le foto entrate in raccolta **prima** della 0.29.0 restano archiviate con la data dell'invio: non si correggono a posteriori, ma vale la pena saperlo quando una foto sembra nel mese sbagliato;
 - i **video** vanno in una sottocartella a parte, per non appesantire la cartella delle foto e i backup;
 - si scarica **solo `ARCHIVIO`**. L'avanzamento serve a capirsi sul momento, non ha valore documentale e resta in raccolta.
 

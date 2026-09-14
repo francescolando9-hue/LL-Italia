@@ -7,8 +7,8 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
 const CAMPI_ATTESI = [
   'token', 'tipo', 'commessa', 'operatore', 'nota', 'genere', 'estensione', 'mimeType',
-  'durataSecondi', 'idClient', 'idDispositivo', 'progressivo', 'dataScatto', 'versioneApp',
-  'nomeFile', 'contenutoBase64',
+  'durataSecondi', 'idClient', 'idDispositivo', 'progressivo', 'dataScatto', 'scattoStimato',
+  'versioneApp', 'nomeFile', 'contenutoBase64',
 ];
 
 module.exports = {
