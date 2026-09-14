@@ -108,10 +108,10 @@ async function vista(el) {
       <p class="didascalia-alternative">Altri modi per aggiungere foto o video</p>
       <div class="azioni-alternative">
         ${fotocameraDisponibile()
-          ? '<label class="btn btn-quieto" for="input-camera">&#128247; Del telefono</label>'
+          ? '<label class="btn btn-secondario btn-minore" for="input-camera">&#128247; Usa la fotocamera del telefono</label>'
           : ''}
-        <label class="btn btn-quieto" for="input-video">&#127909; Un video</label>
-        <label class="btn btn-quieto" for="input-galleria">&#128194; Dalla galleria</label>
+        <label class="btn btn-secondario btn-minore" for="input-video">&#127909; Registra un video</label>
+        <label class="btn btn-secondario btn-minore" for="input-galleria">&#128194; Scegli dalla galleria</label>
       </div>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
       <input id="input-video" class="nascosto" type="file" accept="video/*" capture="environment">
