@@ -58,6 +58,10 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo,
   return {
     token: impostazioni.token,
     commessa: record.cantiere,
+    // Fase di lavoro a cui la bolla si attribuisce, dall'elenco chiuso della
+    // shell (core/fasi.js). Testo; vuoto solo per le bolle accodate prima
+    // della 0.31.0, che il campo non lo avevano.
+    fase: record.fase || '',
     operatore: record.autore,
     idClient: record.id,
     idDispositivo,

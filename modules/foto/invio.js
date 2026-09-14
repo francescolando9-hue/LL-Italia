@@ -51,6 +51,9 @@ export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = 
     token: impostazioni.token,
     tipo: record.tipo,
     commessa: record.commessa,
+    // Fase di lavoro, dall'elenco chiuso della shell (core/fasi.js). Vuota
+    // solo per le foto accodate prima della 0.31.0.
+    fase: record.fase || '',
     operatore: record.autore,
     nota: record.nota || '',
     genere: record.genere || 'foto',

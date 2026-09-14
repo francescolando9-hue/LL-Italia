@@ -357,3 +357,28 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Barra dei comandi fissa in basso: Fotografa e Invia sempre a portata di
+   pollice, qualunque sia il punto della pagina. Prima stavano nella scheda:
+   con dieci bolle da mandare si finiva a scorrere su e giù per ritrovare
+   ora l'uno ora l'altro — misurato in cantiere il 14/09/2026. Sta sotto la
+   fotocamera in-app (z-index 60), che quando è aperta copre tutto. */
+.bolle-barra {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--carta);
+  box-shadow: 0 -2px 10px rgba(16, 28, 66, 0.15);
+}
+
+.bolle-barra .btn { font-size: 1rem; line-height: 1.2; padding-left: 10px; padding-right: 10px; }
+
+/* Spazio in fondo alla pagina pari alla barra: l'ultima riga della coda non
+   deve finirci sotto. */
+.bolle-spazio-barra { height: calc(var(--tocco) + 24px + env(safe-area-inset-bottom)); }

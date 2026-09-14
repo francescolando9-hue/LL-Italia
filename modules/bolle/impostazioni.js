@@ -17,6 +17,7 @@ const PREDEFINITE = {
   mock: false,
   conservaUltime: 20,
   ultimoCantiere: '',
+  ultimaFase: '',
 };
 
 // La modalità mock è uno strumento di sviluppo, non un'opzione d'uso: in
