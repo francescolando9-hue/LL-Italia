@@ -286,9 +286,11 @@ function messaggioDuplicato(gia) {
 async function invia() {
   const selezione = radice.querySelector('#cantiere');
   const cantiere = selezione ? selezione.value : '';
+  // La fase è facoltativa: vuota è un valore legittimo, e si ricorda anche
+  // quella, così «nessuna» resta «nessuna» al prossimo giro.
   const selezioneFase = radice.querySelector('#fase');
   const fase = selezioneFase ? selezioneFase.value : '';
-  if (!cantiere || !fase) return;
+  if (!cantiere) return;
   // Con una sola foto in attesa il raggruppamento non fa differenza:
   // pagina 1 di 1 in ogni caso.
   const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
@@ -375,10 +377,8 @@ async function ridisegna() {
 
   const selezione = radice.querySelector('#cantiere');
   const cantiereScelto = selezione ? selezione.value : '';
-  const selezioneFase = radice.querySelector('#fase');
-  const faseScelta = selezioneFase ? selezioneFase.value : '';
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto || !faseScelta;
+  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
   pulsanteInvia.textContent = bozze.length === 0
     ? 'Invia'
     : numeraPagine
@@ -387,9 +387,8 @@ async function ridisegna() {
         ? 'Invia 1 bolla'
         : `Invia ${bozze.length} bolle separate`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
-  const mancanti = [!cantiereScelto && 'il cantiere', !faseScelta && 'la fase'].filter(Boolean);
-  avvisoCantiere.innerHTML = bozze.length > 0 && mancanti.length > 0
-    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
+  avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
+    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
