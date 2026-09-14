@@ -166,6 +166,7 @@ core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
 core/informazioni.js  pagina per il supporto: i numeri li dichiarano i moduli
 core/errori.js        messaggi d'errore verso l'operatore, una sola verità
+core/coda-invio.js    motore della coda: retry, backoff, «esce solo a conferma»
 core/configurazione-link.js  link e QR che configurano un altro telefono, condivisi
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni

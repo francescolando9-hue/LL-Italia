@@ -6,94 +6,19 @@ import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
+import { creaMotore } from '../../core/coda-invio.js';
 import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
-const RITARDO_MINIMO_MS = 5000;
-const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
+// Il motore della coda vive nella shell. Qui il modulo Foto non ha niente da
+// aggiungere: nessuno storico, nessun id del server, nessuna migrazione.
+const motore = creaMotore({
+  coda,
+  conservaUltime: () => impostazioniFoto().conservaUltime,
+  inviaRecord: record => inviaSingola(record),
+});
 
-let inCorso = false;
-let richiestaRiprocesso = false;
-let timerRetry = null;
-let ritardoMs = RITARDO_MINIMO_MS;
-let notifica = () => {};
-
-export function alCambiamento(funzione) {
-  notifica = funzione;
-}
-
-export function avvia() {
-  if (timerRetry) {
-    clearTimeout(timerRetry);
-    timerRetry = null;
-  }
-  ritardoMs = RITARDO_MINIMO_MS;
-  processa();
-}
-
-export async function riprova(id) {
-  const record = (await coda.elenca()).find(r => r.id === id);
-  if (record && record.stato === 'errore') {
-    record.stato = 'in_coda';
-    record.ultimoErrore = '';
-    await coda.aggiorna(record);
-    notifica();
-  }
-  avvia();
-}
-
-async function processa() {
-  if (inCorso) {
-    richiestaRiprocesso = true;
-    return;
-  }
-  inCorso = true;
-  try {
-    do {
-      richiestaRiprocesso = false;
-      const daInviare = (await coda.elenca())
-        .filter(r => r.stato === 'in_coda' || r.stato === 'errore');
-      let falliti = false;
-      for (const record of daInviare) {
-        if (!navigator.onLine) {
-          falliti = daInviare.length > 0;
-          break;
-        }
-        record.stato = 'invio';
-        record.ultimoErrore = '';
-        await coda.aggiorna(record);
-        notifica();
-        try {
-          await inviaSingola(record);
-          record.stato = 'inviata';
-          record.inviatoIl = Date.now();
-          await coda.aggiorna(record);
-          coda.incrementaInviate(1);
-          await coda.potaInviate(impostazioniFoto().conservaUltime);
-        } catch (errore) {
-          record.stato = 'errore';
-          record.tentativi += 1;
-          record.ultimoErrore = errore.message;
-          await coda.aggiorna(record);
-          falliti = true;
-        }
-        notifica();
-      }
-      if (falliti) pianificaRetry();
-      else ritardoMs = RITARDO_MINIMO_MS;
-    } while (richiestaRiprocesso);
-  } finally {
-    inCorso = false;
-  }
-}
-
-function pianificaRetry() {
-  if (timerRetry) return;
-  timerRetry = setTimeout(() => {
-    timerRetry = null;
-    processa();
-  }, ritardoMs);
-  ritardoMs = Math.min(ritardoMs * 2, RITARDO_MASSIMO_MS);
-}
+export const { alCambiamento, avvia, riprova } = motore;
+const notifica = motore.notifica;
 
 // Nome file di comodo: il flow lo IGNORA (lo compone lui), ma resta utile nei
 // log e nelle diagnosi. Nomenclatura di gruppo, senza separatori.
