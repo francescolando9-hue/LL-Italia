@@ -267,8 +267,9 @@ async function aggiungiFile(file, daFotocamera = false) {
 
 async function invia() {
   const commessa = radice.querySelector('#commessa').value;
+  // Facoltativa: vuota è legittima, e si ricorda anche quella.
   const fase = radice.querySelector('#fase').value;
-  if (!commessa || !fase) return;
+  if (!commessa) return;
   const nota = radice.querySelector('#nota').value.trim();
   const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota, fase);
   if (quante > 0) {
@@ -351,18 +352,16 @@ async function ridisegna() {
   }
 
   const commessaScelta = radice.querySelector('#commessa').value;
-  const faseScelta = radice.querySelector('#fase').value;
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta || !faseScelta;
+  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta;
   const quantiVideo = bozze.filter(r => r.genere === 'video').length;
   const quanteFoto = bozze.length - quantiVideo;
   const parti = [];
   if (quanteFoto) parti.push(`${quanteFoto} ${quanteFoto === 1 ? 'foto' : 'foto'}`);
   if (quantiVideo) parti.push(`${quantiVideo} ${quantiVideo === 1 ? 'video' : 'video'}`);
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
-  const mancanti = [!commessaScelta && 'il cantiere', !faseScelta && 'la fase'].filter(Boolean);
-  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && mancanti.length > 0
-    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
+  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && !commessaScelta
+    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0

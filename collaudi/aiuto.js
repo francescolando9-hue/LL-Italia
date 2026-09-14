@@ -168,8 +168,9 @@ async function configura(pagina, indirizzoApp, impostazioni = {}) {
     if (dati.foto) localStorage.setItem('llitalia.foto', JSON.stringify(dati.foto));
   }, {
     app: { autore: 'Paolo Sanzarello', ...(impostazioni.app || {}) },
-    // Come un telefono che la fase l'ha già scelta una volta: la richiesta
-    // da zero la prova il collaudo dedicato (12-fase-e-barra.js).
+    // Come un telefono che la fase l'ha già scelta una volta, così negli altri
+    // collaudi il campo viaggia pieno; il caso senza fase lo prova
+    // 12-fase-e-barra.js.
     bolle: impostazioni.bolle ? { ultimaFase: 'Murature', ...impostazioni.bolle } : undefined,
     foto: impostazioni.foto ? { ultimaFase: 'Murature', ...impostazioni.foto } : undefined,
   });
