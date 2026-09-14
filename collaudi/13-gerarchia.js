@@ -13,8 +13,10 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 // legge col telefono in mano e il sole negli occhi.
 //
 // Si misura l'ALTEZZA, non l'area: un pulsante largo e basso non chiama come
-// uno alto e pieno di colore. E si guarda il riempimento, che è il segnale
-// più forte di tutti — fuori dalla barra nessun pulsante deve essere pieno.
+// uno alto e pieno di colore. E si guarda il riempimento — fuori dalla barra
+// nessun pulsante deve essere pieno di COLORE. Il bianco della scheda non
+// conta: contarlo ha portato a togliere il bordo blu alle alternative, e dal
+// cantiere è tornato «sembrano spenti».
 const RAPPORTO_MINIMO = 1.3;
 
 async function misura(pagina) {
@@ -25,7 +27,7 @@ async function misura(pagina) {
       altezza: Math.round(e.getBoundingClientRect().height),
       area: area(e),
       corpo: Math.round(parseFloat(getComputedStyle(e).fontSize) * 10) / 10,
-      pieno: !['rgba(0, 0, 0, 0)', 'transparent'].includes(getComputedStyle(e).backgroundColor),
+      pieno: !['rgba(0, 0, 0, 0)', 'transparent', 'rgb(255, 255, 255)'].includes(getComputedStyle(e).backgroundColor),
     });
     const principale = document.querySelector('.barra-comandi .btn-primario');
     const invia = document.querySelector('.barra-comandi #invia');
@@ -81,6 +83,12 @@ module.exports = {
       registro.controlla('e sta in una riga sola',
         m.alternative.every(a => a.altezza <= 48),
         'un\'etichetta che va a capo raddoppia il pulsante e torna a chiamare');
+      // Accorciare il TESTO per far stare il pulsante è una scorciatoia sulla
+      // chiarezza: «Del telefono» sta in una riga e non dice niente. Si
+      // accorcia la misura, non il nome.
+      registro.controlla('e dice per esteso cosa fa, non un frammento',
+        m.alternative.every(a => a.testo.replace(/[^\p{L} ]/gu, '').trim().split(/\s+/).length >= 3),
+        m.alternative.map(a => a.testo).join(' · '));
 
       const troppoAlti = m.fuori.filter(e => e.altezza * RAPPORTO_MINIMO > m.principale.altezza);
       const pieni = m.fuori.filter(e => e.pieno);

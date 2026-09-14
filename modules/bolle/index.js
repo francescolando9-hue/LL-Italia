@@ -140,9 +140,9 @@ async function vista(el) {
       <p class="didascalia-alternative">Altri modi per aggiungere una foto</p>
       <div class="azioni-alternative">
         ${fotocameraDisponibile()
-          ? '<label class="btn btn-quieto" for="input-camera">&#128247; Del telefono</label>'
+          ? '<label class="btn btn-secondario btn-minore" for="input-camera">&#128247; Usa la fotocamera del telefono</label>'
           : ''}
-        <label class="btn btn-quieto" for="input-galleria">&#128194; Dalla galleria</label>
+        <label class="btn btn-secondario btn-minore" for="input-galleria">&#128194; Scegli dalla galleria</label>
       </div>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
@@ -150,11 +150,11 @@ async function vista(el) {
       <div id="anteprime" class="bolle-anteprime"></div>
       <div id="riquadro-pagine" class="nascosto">
         <p id="stato-bolla" class="bolle-stato-bolla"></p>
-        <button id="aggiungi-pagina" class="btn btn-quieto btn-minore" type="button">&#43; Aggiungi pagina a questa bolla</button>
+        <button id="aggiungi-pagina" class="btn btn-secondario btn-minore" type="button">&#43; Aggiungi pagina a questa bolla</button>
         <p id="separa-pagine"></p>
       </div>
     </section>
-    <a class="btn btn-quieto btn-minore bolle-vai-storico" href="#/bolle/storico">&#128203; Bolle inviate</a>
+    <a class="btn btn-secondario btn-minore bolle-vai-storico" href="#/bolle/storico">&#128203; Bolle inviate</a>
     <section class="scheda">
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>

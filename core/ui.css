@@ -132,44 +132,34 @@ body {
 .btn-secondario { background: var(--carta); color: var(--blu); border: 2px solid var(--blu); }
 .btn-piccolo { min-height: 44px; font-size: 1rem; width: auto; padding: 8px 14px; }
 
-/* Pulsante quieto: c'è, si legge, ma non chiama. Per le vie alternative —
-   la fotocamera di sistema, la galleria — che devono restare raggiungibili
-   senza contendere l'attenzione all'azione principale. */
-/* Azione di contorno: c'è, si legge, ma non è quella per cui si è aperta
-   l'app. Vive nella shell e non nel foglio del modulo anche per un motivo
-   pratico: il foglio del modulo si carica DOPO, e per un istante il pulsante
-   resterebbe della misura grande. */
-.btn-minore { min-height: 46px; font-size: 0.95rem; }
+/* Azione di contorno: c'è, si legge, si vede che è premibile, ma non è quella
+   per cui si è aperta l'app. Si affianca a `.btn-secondario`, che resta
+   bianco col bordo blu: a dire «secondaria» è la MISURA, non lo spegnimento.
+   Un tentativo con bordo grigio e sfondo trasparente è durato mezz'ora: dal
+   cantiere è tornato «sembrano spenti», e un pulsante che sembra spento è un
+   pulsante che nessuno prova a premere.
+   Vive nella shell anche per un motivo pratico: il foglio di stile del modulo
+   si carica DOPO, e per un istante il pulsante resterebbe della misura
+   grande. */
+.btn-minore { min-height: 46px; font-size: 0.95rem; padding: 8px 14px; }
 
-.btn-quieto {
-  background: transparent;
-  color: var(--blu);
-  border: 1px solid var(--bordo);
-  font-weight: 600;
-}
-
-/* Riga delle vie alternative: pulsanti piccoli, affiancati, con una didascalia
-   che dice cosa sono. Prima erano pulsanti a tutta larghezza dentro la scheda:
-   il più grande sullo schermo era «Usa la fotocamera del telefono», e aprendo
-   l'app veniva da premere quello invece dell'azione principale in basso —
-   segnalato dal cantiere il 14/09/2026. La dimensione è la gerarchia. */
+/* Le vie alternative: una sotto l'altra, a tutta larghezza, sotto una
+   didascalia che dice cosa sono.
+   A distinguerle dall'azione principale è la MISURA — 46 px contro 64, corpo
+   più piccolo — non la larghezza e non un'etichetta accorciata. Due tentativi
+   sbagliati, nello stesso giorno, per arrivarci: il primo le lasciava alte
+   76 px col testo più grande della pagina, e aprendo l'app veniva da premere
+   quelle; il secondo le stringeva su due colonne e, per farcele stare, ne
+   accorciava i nomi a «Del telefono», «Un video» — frammenti che non dicono
+   cosa fanno. Un pulsante dice per esteso cosa fa: è il testo a spiegarlo, la
+   misura a dire quanto conta. */
 .azioni-alternative {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin: 4px 0 12px;
 }
 
-/* Una riga di testo, sempre: un'etichetta che va a capo raddoppia l'altezza
-   del pulsante e se lo riporta a contendere l'attenzione all'azione
-   principale — è esattamente com'è nata la segnalazione. */
-.azioni-alternative .btn {
-  min-height: 46px;
-  font-size: 0.95rem;
-  padding: 8px 10px;
-  gap: 6px;
-  white-space: nowrap;
-}
+.azioni-alternative .btn { gap: 8px; }
 
 .didascalia-alternative {
   margin: 14px 0 0;
