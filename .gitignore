@@ -1,2 +1,6 @@
 # Configurazione locale con l'URL firmato dell'endpoint: mai nel repo pubblico.
 core/configurazione.js
+
+# Collaudi: dipendenza di sviluppo e materiale generato, mai nel repo.
+collaudi/node_modules
+collaudi/materiale/

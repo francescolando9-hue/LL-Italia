@@ -29,5 +29,5 @@ Collaudo sui numeri, mai sull'esito formale: contatori locali scatti/inviate/in 
 Convenzioni di lavoro
 Commit piccoli e frequenti, messaggi in italiano, imperativi ("Aggiunge coda offline").
 README aggiornato a ogni feature: cosa fa, come si prova da telefono.
-Definition of done: provata su mobile (o emulazione), funziona offline dove pertinente, nessun errore console, README aggiornato, gli altri moduli e la shell non regrediscono.
+Definition of done: provata su mobile (o emulazione), funziona offline dove pertinente, nessun errore console, README aggiornato, gli altri moduli e la shell non regrediscono. I collaudi automatici stanno in collaudi/ (node collaudi/esegui.js): vanno eseguiti prima di ogni rilascio e ampliati quando si aggiunge una funzione. In collaudi/aiuto.js, in cima, ci sono le trappole gia' pagate — la prima: page.waitForFunction con un predicato async NON aspetta niente, perche' una Promise e' sempre vera.
 Modello di collaborazione: proporre, non decidere — le scelte di prodotto spettano a Francesco; in dubbio, opzioni con pro/contro e chiedere.

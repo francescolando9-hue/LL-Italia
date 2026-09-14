@@ -137,6 +137,20 @@ Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~
 
 Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 3). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. **Punti aperti:** la cartella di destinazione su `L:` per il runbook del venerdì, che deve indicare Francesco, e l'apertura della sessione di caricamento a blocchi.
 
+## Collaudi
+
+Le prove automatiche stanno in `collaudi/`: guidano l'app da un browser vero, come farebbe un telefono, e **dicono i numeri** invece di limitarsi a passare.
+
+```
+cd collaudi && npm install playwright && cd ..   # una volta sola
+node collaudi/materiale.js                       # genera le foto di prova
+node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non torna
+```
+
+Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
+
+Otto collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
+
 ## Struttura del repo
 
 ```
@@ -156,6 +170,7 @@ core/configurazione-link.js  link e QR che configurano un altro telefono, condiv
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
+collaudi/             prove automatiche su browser vero (node collaudi/esegui.js)
 docs/                 7 documenti, tutti correnti:
                       INDICE.md                         indice a nome stabile: i nomi completi
                                                         degli altri, per chi legge da fuori
