@@ -39,6 +39,7 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `08-errori-flow.js` | Il flow rifiuta: la bolla resta sul telefono, il messaggio dice dove guardare, e al ritorno riparte da sola senza consumare un numero. |
 | `09-operatore.js` | Il nome dell'operatore si **sceglie** da un elenco chiuso e non si scrive: niente segnaposto firmabile, e un nome salvato da una versione col campo libero viene riportato alla grafia ufficiale o richiesto di nuovo — mai indovinato. |
 | `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto; dove non si può sapere si ripiega e si dichiara (`scattoStimato`). |
+| `11-obiettivo.js` | La fotocamera in-app sceglie la lente **principale** dai nomi che i telefoni dichiarano (Samsung e Pixel con Chrome, iPhone con Safari), lascia fare al browser dove i nomi non aiutano, registra cosa ha visto per Informazioni; e i comandi stanno al posto giusto: scatto al centro, Fine a sinistra, niente a destra. |
 
 ## Le trappole, già pagate
 
@@ -93,3 +94,9 @@ Vanno detti, altrimenti passano per garanzie che non sono:
   produttore scriva l'EXIF come dice la specifica. Un iPhone (ordine `MM`, e
   spesso HEIC, dove l'ora resta stimata) e un Android con l'ora regolata a mano
   vanno provati sul campo.
+- **La lente che il telefono apre davvero.** Il Chromium del collaudo ha una
+  fotocamera finta sola, senza un nome che dica il verso: la scelta della
+  lente è provata sulla funzione pura con gli elenchi di nomi dei telefoni
+  veri, non aprendo tre lenti e guardando quale inquadra di più. La prova che
+  conta è sul telefono: inquadratura in-app uguale a quella di sistema a 1×,
+  e la riga *Fotocamera in-app* di Informazioni dice cosa è stato scelto.
