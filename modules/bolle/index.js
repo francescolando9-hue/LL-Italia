@@ -137,30 +137,33 @@ async function vista(el) {
         <label for="fase">Fase di lavoro</label>
         <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
       </div>
-      ${fotocameraDisponibile()
-        ? '<label class="btn btn-secondario bolle-fotografa" for="input-camera">Usa la fotocamera del telefono</label>'
-        : ''}
+      <p class="didascalia-alternative">Altri modi per aggiungere una foto</p>
+      <div class="azioni-alternative">
+        ${fotocameraDisponibile()
+          ? '<label class="btn btn-quieto" for="input-camera">&#128247; Del telefono</label>'
+          : ''}
+        <label class="btn btn-quieto" for="input-galleria">&#128194; Dalla galleria</label>
+      </div>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
-      <label class="btn btn-secondario bolle-galleria" for="input-galleria">Scegli dalla galleria</label>
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
       <div id="avviso-foto"></div>
       <div id="anteprime" class="bolle-anteprime"></div>
       <div id="riquadro-pagine" class="nascosto">
         <p id="stato-bolla" class="bolle-stato-bolla"></p>
-        <button id="aggiungi-pagina" class="btn btn-secondario" type="button">&#43; Aggiungi pagina a questa bolla</button>
+        <button id="aggiungi-pagina" class="btn btn-quieto btn-minore" type="button">&#43; Aggiungi pagina a questa bolla</button>
         <p id="separa-pagine"></p>
       </div>
-      <div id="avviso-cantiere"></div>
     </section>
-    <a class="btn btn-secondario bolle-vai-storico" href="#/bolle/storico">Bolle inviate</a>
+    <a class="btn btn-quieto btn-minore bolle-vai-storico" href="#/bolle/storico">&#128203; Bolle inviate</a>
     <section class="scheda">
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="bolle-coda"></ul>
     </section>
     <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
-    <div class="bolle-spazio-barra" aria-hidden="true"></div>
-    <div class="bolle-barra">
+    <div class="spazio-barra" aria-hidden="true"></div>
+    <div class="barra-comandi">
+      <div id="avviso-cantiere" class="barra-avviso"></div>
       ${fotocameraDisponibile()
         ? '<button id="apri-fotocamera" class="btn btn-primario" type="button">&#128247; Fotografa</button>'
         : '<label class="btn btn-primario" for="input-camera">&#128247; Fotografa</label>'}
@@ -211,6 +214,9 @@ async function apriScatto() {
     // Fotocamera interna non disponibile o permesso negato: si ripiega su
     // quella di sistema, che non richiede permessi al browser.
     avviso.innerHTML = `<p class="avviso avviso-attenzione">${scappaHtml(errore.message)}.</p>`;
+    // Il comando sta in fondo allo schermo, il messaggio in cima alla scheda:
+    // senza portarlo sotto gli occhi, chi preme vede l'app non fare niente.
+    if (typeof avviso.scrollIntoView === 'function') avviso.scrollIntoView({ block: 'center', behavior: 'smooth' });
     radice.querySelector('#input-camera').click();
     return;
   }

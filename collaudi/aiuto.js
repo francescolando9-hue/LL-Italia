@@ -15,6 +15,11 @@
 // 3. Interrogare la cache mentre il service worker la sta riempiendo dà
 //    fotografie incoerenti. Si aspetta che il precache sia completo, non che
 //    la cache esista.
+// 4bis. Il foglio di stile di un modulo si aggiunge a pagina già disegnata
+//    (`assicuraStile()`): chi MISURA qualcosa — altezze, corpi, posizioni —
+//    deve aspettare che sia applicato, altrimenti misura la sola shell e
+//    legge numeri che a video non esistono mai. Si attende che
+//    `document.styleSheets` contenga un foglio di `modules/`.
 // 4. I contatori del giorno vivono in localStorage e le code in IndexedDB:
 //    fra un sotto-collaudo e l'altro vanno azzerati, altrimenti un'attesa
 //    risulta vera prima del tempo. `puliscine()` fa entrambe le cose, e

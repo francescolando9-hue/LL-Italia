@@ -91,7 +91,7 @@ module.exports = {
 
     registro.titolo('Bolle: Fotografa e Invia stanno in una barra fissa in basso');
     const misure = await pagina.evaluate(() => {
-      const barra = document.querySelector('.bolle-barra');
+      const barra = document.querySelector('.barra-comandi');
       const r = barra.getBoundingClientRect();
       const stile = getComputedStyle(barra);
       return {
@@ -114,7 +114,7 @@ module.exports = {
     const visibili = await pagina.evaluate(() => {
       const dentro = e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.height > 0; };
       const ultimo = document.querySelector('#lista-coda li:last-child');
-      const coperto = ultimo ? ultimo.getBoundingClientRect().bottom > document.querySelector('.bolle-barra').getBoundingClientRect().top : false;
+      const coperto = ultimo ? ultimo.getBoundingClientRect().bottom > document.querySelector('.barra-comandi').getBoundingClientRect().top : false;
       return { invia: dentro(document.querySelector('#invia')), fotografa: dentro(document.querySelector('#apri-fotocamera') || document.querySelector('label[for="input-camera"]')), ultimaRigaCoperta: coperto };
     });
     registro.controlla('scorrendo in fondo, Invia è ancora sullo schermo', visibili.invia);

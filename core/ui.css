@@ -132,6 +132,51 @@ body {
 .btn-secondario { background: var(--carta); color: var(--blu); border: 2px solid var(--blu); }
 .btn-piccolo { min-height: 44px; font-size: 1rem; width: auto; padding: 8px 14px; }
 
+/* Pulsante quieto: c'è, si legge, ma non chiama. Per le vie alternative —
+   la fotocamera di sistema, la galleria — che devono restare raggiungibili
+   senza contendere l'attenzione all'azione principale. */
+/* Azione di contorno: c'è, si legge, ma non è quella per cui si è aperta
+   l'app. Vive nella shell e non nel foglio del modulo anche per un motivo
+   pratico: il foglio del modulo si carica DOPO, e per un istante il pulsante
+   resterebbe della misura grande. */
+.btn-minore { min-height: 46px; font-size: 0.95rem; }
+
+.btn-quieto {
+  background: transparent;
+  color: var(--blu);
+  border: 1px solid var(--bordo);
+  font-weight: 600;
+}
+
+/* Riga delle vie alternative: pulsanti piccoli, affiancati, con una didascalia
+   che dice cosa sono. Prima erano pulsanti a tutta larghezza dentro la scheda:
+   il più grande sullo schermo era «Usa la fotocamera del telefono», e aprendo
+   l'app veniva da premere quello invece dell'azione principale in basso —
+   segnalato dal cantiere il 14/09/2026. La dimensione è la gerarchia. */
+.azioni-alternative {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+/* Una riga di testo, sempre: un'etichetta che va a capo raddoppia l'altezza
+   del pulsante e se lo riporta a contendere l'attenzione all'azione
+   principale — è esattamente com'è nata la segnalazione. */
+.azioni-alternative .btn {
+  min-height: 46px;
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.didascalia-alternative {
+  margin: 14px 0 0;
+  color: var(--testo-tenue);
+  font-size: 0.9rem;
+}
+
 /* Campi modulo */
 .campo { margin: 14px 0; }
 .campo label { display: block; font-weight: 700; margin-bottom: 6px; }
@@ -217,7 +262,14 @@ body {
 
 .nascosto { display: none !important; }
 
-/* Avviso di aggiornamento: sempre visibile, non copre i comandi principali */
+/* Avviso di aggiornamento: sempre visibile, e non copre i comandi principali.
+   Prima della barra il fondo era libero; ora il fondo è il posto dell'azione
+   principale, e l'avviso ci finirebbe sopra. A spostarsi è la BARRA, che si
+   alza di quanto serve: l'altezza dell'avviso la decide questo foglio ed è
+   stabile, mentre quella della barra cambia con l'avviso di «cosa manca per
+   inviare» — ancorarsi al pezzo che non varia è l'unico modo di non avere un
+   numero magico che un giorno smette di bastare. Su un browser senza `:has()`
+   l'avviso copre i comandi ma resta premibile, e sparisce appena si aggiorna. */
 .barra-aggiornamento {
   position: fixed;
   left: 12px;
@@ -433,3 +485,59 @@ body {
 }
 
 .qr-configurazione svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+
+/* --- Barra dei comandi, fissa in basso ------------------------------------
+   Le due azioni che si fanno davvero — fotografare e inviare — stanno sempre
+   sotto il pollice, qualunque sia il punto della pagina: con dieci bolle da
+   mandare si finiva a scorrere su e giù per ritrovare ora l'una ora l'altra.
+   Vive nella shell perché la usano tutti e due i moduli, e il gesto dev'essere
+   lo stesso: chi impara le bolle sa già usare le foto.
+   Sta sotto la fotocamera in-app (z-index 60), che quando è aperta copre tutto. */
+.barra-comandi {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--carta);
+  border-top: 1px solid var(--bordo);
+  box-shadow: 0 -3px 14px rgba(16, 28, 66, 0.18);
+}
+
+/* Più grandi di qualunque altra cosa a video: è così che si capisce dove
+   premere senza leggere. L'etichetta può andare a capo — «Invia 1 bolla di 3
+   pagine» dice una cosa che serve sapere prima di premere, e accorciarla per
+   farla stare in riga significherebbe togliere l'informazione. */
+/* Finché non c'è niente da mandare, la cosa da fare è una sola: il pulsante
+   che la fa si prende due terzi della barra. Quando compare la prima foto lo
+   spazio torna metà e metà, e il passaggio di consegne fra le due azioni si
+   vede — che è il momento in cui serve saperlo. */
+.barra-comandi:has(#invia:disabled) { grid-template-columns: 2fr 1fr; }
+
+/* Perché manca qualcosa per inviare si legge QUI, accanto al pulsante spento,
+   non in cima alla scheda: da lassù, con la coda lunga, non si vede. */
+.barra-avviso { grid-column: 1 / -1; }
+.barra-avviso:empty { display: none; }
+.barra-avviso .avviso { margin: 0 0 8px; padding: 8px 12px; font-size: 0.95rem; }
+
+.barra-comandi .btn {
+  min-height: 64px;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  padding: 10px;
+  text-align: center;
+}
+
+/* Con l'avviso di aggiornamento a video la barra si alza di quanto basta a
+   non farsi coprire i pulsanti. */
+body:has(.barra-aggiornamento) .barra-comandi {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
+}
+
+/* Spazio in fondo alla pagina pari alla barra: l'ultima riga della coda non
+   deve finirci sotto. */
+.spazio-barra { height: calc(64px + 22px + env(safe-area-inset-bottom)); }
