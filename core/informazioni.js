@@ -10,6 +10,7 @@
 // esiste per capire cosa è bloccato.
 import { impostazioniApp, scappaHtml } from './impostazioni.js';
 import { versioneApp, versioneInstallata } from './versione.js';
+import { diagnosticaFotocamera } from './fotocamera.js';
 
 export async function vistaInformazioni(el, moduli = []) {
   el.innerHTML = '<section class="scheda"><h2>Informazioni</h2><p class="tenue">Lettura in corso&hellip;</p></section>';
@@ -96,6 +97,7 @@ export async function vistaInformazioni(el, moduli = []) {
         <dt>Funzionamento offline</dt><dd>${offline}</dd>
         <dt>Rete in questo momento</dt><dd>${navigator.onLine ? 'connesso' : 'assente'}</dd>
         <dt>Spazio usato sul telefono</dt><dd>${spazio}</dd>
+        <dt>Fotocamera in-app</dt><dd>${descriviFotocamera(diagnosticaFotocamera())}</dd>
       </dl>
       <button id="cerca-aggiornamenti" class="btn btn-secondario">Cerca aggiornamenti</button>
       <p id="esito-aggiornamento" class="tenue"></p>
@@ -153,4 +155,21 @@ async function spazioUsato() {
   } catch {
     return 'non disponibile';
   }
+}
+
+// Quale obiettivo l'app ha aperto l'ultima volta, e perché. È la risposta
+// alla domanda «ma sul tuo telefono che fotocamera prende?» senza doverla
+// fare all'operatore: le etichette variano per produttore e lingua, e qui si
+// leggono così come il telefono le dichiara.
+function descriviFotocamera(diagnostica) {
+  if (!diagnostica) return 'non ancora aperta su questo telefono';
+  const quando = diagnostica.quando ? new Date(diagnostica.quando) : null;
+  const ora = quando && !Number.isNaN(quando.getTime())
+    ? ` (${quando.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})`
+    : '';
+  const rilevate = (diagnostica.rilevate || []).length
+    ? ` Rilevate: ${diagnostica.rilevate.map(scappaHtml).join(' · ')}.`
+    : '';
+  const zoom = diagnostica.zoom ? ` Zoom ${scappaHtml(diagnostica.zoom)}.` : '';
+  return `<strong>${scappaHtml(diagnostica.inUso || '—')}</strong> — ${scappaHtml(diagnostica.esito || '')}${ora}.${rilevate}${zoom}`;
 }
