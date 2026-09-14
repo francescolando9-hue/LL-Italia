@@ -8,16 +8,23 @@
 // moduli, perché «sembra a posto» non è un collaudo.
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
-// Quanto più alta dev'essere l'azione principale rispetto a ogni altro
-// pulsante. Non un numero di gusto: sotto il 30% in più la differenza non si
-// legge col telefono in mano e il sole negli occhi.
+// Le misure concordate col cantiere, in pixel e non in rapporti: l'azione
+// principale sta a 64, le azioni di contorno a 52. Il 15/09 le seconde sono
+// state alzate da 46 a 52 — «leggermente più grandi, non troppo però» — e
+// questo è il tetto: sopra, l'etichetta va a capo e il pulsante torna alto
+// quanto la barra.
 //
 // Si misura l'ALTEZZA, non l'area: un pulsante largo e basso non chiama come
 // uno alto e pieno di colore. E si guarda il riempimento — fuori dalla barra
 // nessun pulsante deve essere pieno di COLORE. Il bianco della scheda non
 // conta: contarlo ha portato a togliere il bordo blu alle alternative, e dal
 // cantiere è tornato «sembrano spenti».
-const RAPPORTO_MINIMO = 1.3;
+const ALTEZZA_PRINCIPALE = 64;
+const TETTO_CONTORNO = 54;
+
+// Schermo stretto ma reale (iPhone SE, Android piccoli): lì l'etichetta a capo
+// ci sta, purché il pulsante resti comunque più basso dell'azione principale.
+const STRETTO = 320;
 
 async function misura(pagina) {
   return pagina.evaluate(() => {
@@ -28,7 +35,17 @@ async function misura(pagina) {
       area: area(e),
       corpo: Math.round(parseFloat(getComputedStyle(e).fontSize) * 10) / 10,
       pieno: !['rgba(0, 0, 0, 0)', 'transparent', 'rgb(255, 255, 255)'].includes(getComputedStyle(e).backgroundColor),
+      righe: righeDi(e),
     });
+    // Quante righe occupa davvero l'etichetta. L'altezza del PULSANTE non lo
+    // dice — `min-height` lo stira comunque, e una riga e due si confondono —
+    // quindi si misura il testo, con un Range sul contenuto.
+    function righeDi(e) {
+      const intervallo = document.createRange();
+      intervallo.selectNodeContents(e);
+      const testo = intervallo.getBoundingClientRect().height;
+      return Math.max(1, Math.round(testo / parseFloat(getComputedStyle(e).lineHeight)));
+    }
     const principale = document.querySelector('.barra-comandi .btn-primario');
     const invia = document.querySelector('.barra-comandi #invia');
     const alternative = [...document.querySelectorAll('.azioni-alternative .btn')].map(descrivi);
@@ -72,17 +89,18 @@ module.exports = {
       registro.dice('alternative', m.alternative.map(a => `«${a.testo}» ${a.altezza} px`));
 
       registro.controlla('la barra è appoggiata al fondo dello schermo', m.barraInFondo === 0, `${m.barraInFondo} px`);
-      registro.controlla('l’azione principale è alta almeno 64 px', m.principale.altezza >= 64, `${m.principale.altezza} px`);
+      registro.controlla(`l’azione principale è alta ${ALTEZZA_PRINCIPALE} px`,
+        m.principale.altezza === ALTEZZA_PRINCIPALE, `${m.principale.altezza} px`);
       registro.controlla('e Invia è grande uguale', m.invia.altezza === m.principale.altezza,
         `${m.invia.altezza} px contro ${m.principale.altezza}`);
       registro.controlla('le alternative ci sono ancora', m.alternative.length >= 1,
         'la fotocamera di sistema resta la via d’uscita quando quella interna non basta');
-      registro.controlla(`ogni alternativa è almeno ${RAPPORTO_MINIMO}× più bassa`,
-        m.alternative.every(a => m.principale.altezza >= a.altezza * RAPPORTO_MINIMO),
-        m.alternative.map(a => `${a.testo}: ${(m.principale.altezza / a.altezza).toFixed(1)}×`).join(' · '));
-      registro.controlla('e sta in una riga sola',
-        m.alternative.every(a => a.altezza <= 48),
-        'un\'etichetta che va a capo raddoppia il pulsante e torna a chiamare');
+      registro.controlla(`ogni alternativa sta entro ${TETTO_CONTORNO} px`,
+        m.alternative.every(a => a.altezza <= TETTO_CONTORNO),
+        m.alternative.map(a => `${a.testo}: ${a.altezza} px`).join(' · '));
+      registro.controlla('e l’etichetta sta in una riga sola',
+        m.alternative.every(a => a.righe === 1),
+        m.alternative.map(a => `${a.testo}: ${a.righe} riga/e`).join(' · '));
       // Accorciare il TESTO per far stare il pulsante è una scorciatoia sulla
       // chiarezza: «Del telefono» sta in una riga e non dice niente. Si
       // accorcia la misura, non il nome.
@@ -90,10 +108,10 @@ module.exports = {
         m.alternative.every(a => a.testo.replace(/[^\p{L} ]/gu, '').trim().split(/\s+/).length >= 3),
         m.alternative.map(a => a.testo).join(' · '));
 
-      const troppoAlti = m.fuori.filter(e => e.altezza * RAPPORTO_MINIMO > m.principale.altezza);
+      const troppoAlti = m.fuori.filter(e => e.altezza > TETTO_CONTORNO);
       const pieni = m.fuori.filter(e => e.pieno);
       registro.dice('pulsanti fuori dalla barra', m.fuori.map(e => `«${e.testo}» ${e.altezza} px${e.pieno ? ', PIENO' : ''}`));
-      registro.controlla('nessun pulsante fuori dalla barra è alto quanto quello principale',
+      registro.controlla(`nessun pulsante fuori dalla barra supera i ${TETTO_CONTORNO} px`,
         troppoAlti.length === 0,
         troppoAlti.map(e => `${e.testo} (${e.altezza} px)`).join(', ') || 'nessuno — è la regola che la 0.31.0 violava');
       registro.controlla('e nessuno è pieno di colore: il colore pieno è della barra',
@@ -104,6 +122,25 @@ module.exports = {
       registro.controlla('nessuna delle alternative si chiama ancora come l’azione principale',
         m.alternative.every(a => a.testo !== m.principale.testo));
     }
+
+    registro.titolo(`Su uno schermo da ${STRETTO} px l’etichetta va a capo, ma il pulsante resta più basso`);
+    // Il telefono di chi prova non è l'unico telefono: a 320 px «Usa la
+    // fotocamera del telefono» in una riga non ci sta, e con l'interlinea
+    // normale quel pulsante arriverebbe a 66 px — più alto della barra.
+    await pagina.setViewportSize({ width: STRETTO, height: 800 });
+    for (const [modulo, rotta] of [['Bolle', '#/bolle'], ['Foto cantiere', '#/foto']]) {
+      await pagina.goto(app.indirizzo + '/index.html' + rotta);
+      await pagina.waitForSelector('.barra-comandi .btn-primario');
+      await aiuto.attendi(pagina, () => [...document.styleSheets].some(f => /modules\//.test(f.href || '')),
+        'foglio di stile del modulo applicato', 20000);
+      const s = await misura(pagina);
+      registro.dice(`${modulo} a ${STRETTO} px`,
+        s.alternative.map(a => `«${a.testo}» ${a.altezza} px, ${a.righe} riga/e`));
+      registro.controlla(`${modulo}: nessuna alternativa arriva all’azione principale`,
+        s.alternative.every(a => a.altezza < s.principale.altezza),
+        `principale ${s.principale.altezza} px`);
+    }
+    await pagina.setViewportSize({ width: 390, height: 844 });
 
     registro.titolo('Quello che manca per inviare si legge accanto al pulsante spento');
     await pagina.goto(app.indirizzo + '/index.html#/bolle');

@@ -141,11 +141,24 @@ body {
    Vive nella shell anche per un motivo pratico: il foglio di stile del modulo
    si carica DOPO, e per un istante il pulsante resterebbe della misura
    grande. */
-.btn-minore { min-height: 46px; font-size: 0.95rem; padding: 8px 14px; }
+/* 52 px e corpo 1 rem: alzati dai 46 della 0.32.1 su indicazione del cantiere
+   — «leggermente più grandi, non troppo però» — e non oltre, perché sopra
+   l'etichetta va a capo.
+   L'interlinea stretta è la rete di sicurezza: su uno schermo da 320 px «Usa
+   la fotocamera del telefono» una riga non ce la fa, e con l'interlinea
+   normale il pulsante arriverebbe a 66 px, PIÙ ALTO dei 64 dell'azione
+   principale — cioè di nuovo il difetto di partenza, su un telefono che non
+   è quello di chi prova. Così anche a capo resta sotto i 60. */
+.btn-minore {
+  min-height: 52px;
+  font-size: 1rem;
+  padding: 8px 12px;
+  line-height: 1.15;
+}
 
 /* Le vie alternative: una sotto l'altra, a tutta larghezza, sotto una
    didascalia che dice cosa sono.
-   A distinguerle dall'azione principale è la MISURA — 46 px contro 64, corpo
+   A distinguerle dall'azione principale è la MISURA — 52 px contro 64, corpo
    più piccolo — non la larghezza e non un'etichetta accorciata. Due tentativi
    sbagliati, nello stesso giorno, per arrivarci: il primo le lasciava alte
    76 px col testo più grande della pagina, e aprendo l'app veniva da premere
