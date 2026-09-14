@@ -13,7 +13,7 @@ La pubblicazione è automatica a ogni push su `main` (workflow `.github/workflow
 
 **iPhone/iPad (Safari):** aprire il link → pulsante Condividi → **Aggiungi a schermata Home** → confermare.
 
-Alla prima apertura l'app chiede **nome e cognome**: vengono salvati sul dispositivo e allegati a ogni invio. Dopo la prima visita l'app funziona anche **senza rete**.
+Alla prima apertura l'app chiede **chi sei**, scegliendo da un elenco chiuso di nomi: la scelta è salvata sul dispositivo e allegata a ogni invio. Dopo la prima visita l'app funziona anche **senza rete**.
 
 ## Come si usa
 
@@ -103,7 +103,9 @@ Quando si pubblica una versione nuova, sui telefoni già installati compare in b
 
 ## Impostazioni
 
-- **App** (⚙ in alto a destra, condivise tra moduli): nome e cognome dell'operatore; sotto, il riquadro *Questo dispositivo* con l'identificativo in sola lettura e il pulsante per copiarlo.
+- **App** (⚙ in alto a destra, condivise tra moduli): il proprio nome, **da un menù a tendina**; sotto, il riquadro *Questo dispositivo* con l'identificativo in sola lettura e il pulsante per copiarlo.
+
+  L'elenco è chiuso (`core/operatori.js`) perché scritto a mano lo stesso operatore diventa «Paolo Sanzarello», «Paolo», «Sanzarello» e ogni refuso possibile: in raccolta sembrano persone diverse, e qualunque conteggio per operatore smette di valere. Un telefono aggiornato da una versione precedente **conserva il nome se corrisponde a uno dell'elenco** (anche con maiuscole o spazi diversi); se non corrisponde — «P. Sanzarello» — l'app **richiede la scelta** invece di indovinare: attribuire un invio per somiglianza è peggio di una domanda in più. Per aggiungere o togliere un nome si modifica l'elenco e si rilascia una versione: dal telefono non si può.
 - **Modulo Bolle** (link in fondo alla schermata del modulo): endpoint di invio, token, quante foto inviate conservare (ultime N, default 20). L'elenco cantieri non si tocca da qui: vedi sotto.
 
 **La modalità mock non è più un'impostazione** (rimossa il 03/09/2026, con l'app entrata in uso). Era un interruttore di sviluppo in mano all'operatore, e accesa per sbaglio significava bolle che l'app dava per inviate e che non arrivavano da nessuna parte. Resta disponibile **solo su localhost**, per lo sviluppo: la si accende da `core/configurazione.js` e il banner giallo lo dichiara a video. In campo è spenta qualunque cosa dica il valore salvato sul dispositivo — anche su un telefono che l'aveva accesa prima dell'aggiornamento.
@@ -161,6 +163,7 @@ icons/                icone dal logo ufficiale (logo.png = sorgente)
 core/                 shell: router hash, home/launcher, impostazioni app, design system CSS
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
+core/operatori.js     chi può firmare un invio: elenco chiuso, condiviso
 core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa

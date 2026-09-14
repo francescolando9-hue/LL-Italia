@@ -94,10 +94,12 @@ module.exports = {
     registro.controlla('tutte dallo stesso dispositivo',
       new Set(flow.stato.ricevuti.map(r => r.idDispositivo)).size === 1);
 
-    registro.titolo('Il progressivo sopravvive al cambio di nome dell\'operatore');
+    registro.titolo('Il progressivo sopravvive al cambio di operatore');
     await pagina.goto(app.indirizzo + '/index.html#/impostazioni');
     await pagina.waitForSelector('#autore');
-    await pagina.fill('#autore', 'P. Sanzarello');
+    // Il nome si sceglie da un elenco chiuso: scritto a mano, la stessa
+    // persona diventa cinque persone in raccolta.
+    await pagina.selectOption('#autore', 'Riccardo Zaccaro');
     await pagina.click('#modulo-impostazioni button[type="submit"]');
     await mandaBolla();
     await aiuto.attendi(pagina,
@@ -105,6 +107,7 @@ module.exports = {
       'quarta bolla', 60000);
     const ultima = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
     registro.dice('ultima bolla', { operatore: ultima.operatore, progressivo: ultima.progressivo });
+    registro.controlla('l\'operatore cambiato arriva al flow', ultima.operatore === 'Riccardo Zaccaro');
     registro.controlla('identificativo invariato', ultima.idDispositivo === ID_PREESISTENTE);
     registro.controlla('progressivo prosegue', ultima.progressivo === 4);
 

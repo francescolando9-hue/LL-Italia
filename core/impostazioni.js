@@ -5,6 +5,7 @@
 // raccolta senza dare alcun segnale.
 import { naviga } from './router.js';
 import { idDispositivo } from './dispositivo.js';
+import { OPERATORI, operatoreValido, riconosciOperatore } from './operatori.js';
 
 const CHIAVE = 'llitalia.app';
 
@@ -21,8 +22,20 @@ function scrivi(dati) {
 }
 
 export const impostazioniApp = {
+  // Solo un nome dell'elenco vale come operatore. Un telefono aggiornato da
+  // una versione precedente aveva testo libero: se corrisponde a un nome
+  // dell'elenco lo si riporta alla grafia ufficiale e si prosegue, altrimenti
+  // si risponde «nessuno» e l'app richiede la scelta. Meglio una domanda in
+  // più che un invio attribuito per somiglianza.
   get autore() {
-    return (leggi().autore || '').trim();
+    const salvato = (leggi().autore || '').trim();
+    if (operatoreValido(salvato)) return salvato;
+    const riconosciuto = riconosciOperatore(salvato);
+    if (riconosciuto) {
+      impostazioniApp.autore = riconosciuto;
+      return riconosciuto;
+    }
+    return '';
   },
   set autore(valore) {
     const dati = leggi();
@@ -31,18 +44,29 @@ export const impostazioniApp = {
   },
 };
 
+// L'elenco come opzioni, con il segnaposto quando non c'è ancora una scelta:
+// senza segnaposto il primo nome risulterebbe selezionato senza che nessuno
+// l'abbia toccato, e basterebbe non guardare per firmare a nome di Paolo.
+function opzioniOperatori(scelto) {
+  const segnaposto = operatoreValido(scelto)
+    ? '' : '<option value="" selected disabled>— scegli il tuo nome —</option>';
+  return segnaposto + OPERATORI.map(nome =>
+    `<option value="${scappaHtml(nome)}"${nome === scelto ? ' selected' : ''}>${scappaHtml(nome)}</option>`
+  ).join('');
+}
+
 // Prima apertura: chiede nome e cognome prima di usare i moduli.
 export function vistaBenvenuto(el) {
   el.innerHTML = `
     <section class="scheda">
       <h2>Benvenuto</h2>
       <p>Questa è l'app di cantiere del gruppo <strong>LL Italia</strong>.</p>
-      <p>Prima di iniziare, inserisci nome e cognome: verranno allegati a ogni invio.</p>
+      <p>Prima di iniziare, scegli il tuo nome: viene allegato a ogni invio.</p>
       <form id="modulo-benvenuto">
         <div class="campo">
-          <label for="autore">Nome e cognome</label>
-          <input id="autore" name="autore" type="text" autocomplete="name"
-                 placeholder="Es. Paolo Sanzarello" required>
+          <label for="autore">Il tuo nome</label>
+          <select id="autore" name="autore" required>${opzioniOperatori('')}</select>
+          <p class="aiuto tenue">Se il tuo nome non c'è, chiedi in ufficio: l'elenco si aggiorna dall'app, non dal telefono.</p>
         </div>
         <button class="btn btn-primario" type="submit">Salva e continua</button>
       </form>
@@ -50,8 +74,8 @@ export function vistaBenvenuto(el) {
   `;
   el.querySelector('#modulo-benvenuto').addEventListener('submit', evento => {
     evento.preventDefault();
-    const autore = el.querySelector('#autore').value.trim();
-    if (!autore) return;
+    const autore = el.querySelector('#autore').value;
+    if (!operatoreValido(autore)) return;
     impostazioniApp.autore = autore;
     naviga('#/', true);
   });
@@ -64,10 +88,9 @@ export function vistaImpostazioniApp(el) {
       <h2>Impostazioni app</h2>
       <form id="modulo-impostazioni">
         <div class="campo">
-          <label for="autore">Nome e cognome</label>
-          <input id="autore" name="autore" type="text" autocomplete="name"
-                 value="${scappaHtml(impostazioniApp.autore)}" required>
-          <p class="aiuto tenue">Allegato a ogni invio, condiviso tra tutti i moduli.</p>
+          <label for="autore">Il tuo nome</label>
+          <select id="autore" name="autore" required>${opzioniOperatori(impostazioniApp.autore)}</select>
+          <p class="aiuto tenue">Allegato a ogni invio, condiviso tra tutti i moduli. L'elenco è chiuso perché in raccolta lo stesso nome scritto in due modi diventa due persone.</p>
         </div>
         <button class="btn btn-primario" type="submit">Salva</button>
       </form>
@@ -87,8 +110,8 @@ export function vistaImpostazioniApp(el) {
   `;
   el.querySelector('#modulo-impostazioni').addEventListener('submit', evento => {
     evento.preventDefault();
-    const autore = el.querySelector('#autore').value.trim();
-    if (!autore) return;
+    const autore = el.querySelector('#autore').value;
+    if (!operatoreValido(autore)) return;
     impostazioniApp.autore = autore;
     el.querySelector('#conferma').classList.remove('nascosto');
   });
