@@ -23,6 +23,7 @@ export const OPERATORI = [
   'Florin Zaharia',
   'Andrea Gondos',
   'Enzo Santovito',
+  'Francesco Lando',
 ];
 
 export function operatoreValido(nome) {

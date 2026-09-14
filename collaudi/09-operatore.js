@@ -26,9 +26,9 @@ module.exports = {
     const elenco = await pagina.$$eval('#autore option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
     const nomi = elenco.filter(o => o.v).map(o => o.t);
     registro.dice('nomi selezionabili', nomi);
-    registro.controlla('ci sono gli otto nomi concordati', nomi.length === 8);
+    registro.controlla('ci sono i nove nomi concordati', nomi.length === 9);
     registro.controlla('nell\'ordine dato, non alfabetico',
-      nomi[0] === 'Paolo Sanzarello' && nomi[nomi.length - 1] === 'Enzo Santovito');
+      nomi[0] === 'Paolo Sanzarello' && nomi[nomi.length - 1] === 'Francesco Lando');
 
     const primo = elenco[0];
     registro.controlla('parte da un segnaposto, non da un nome',
