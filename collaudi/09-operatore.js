@@ -16,7 +16,7 @@ module.exports = {
     await pagina.evaluate(dati => {
       localStorage.clear();
       localStorage.setItem('llitalia.bolle', JSON.stringify(dati));
-    }, { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 20 });
+    }, { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 20, ultimaFase: 'Murature' });
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#autore', { timeout: 20000 });
 

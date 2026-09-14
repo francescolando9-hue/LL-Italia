@@ -6,7 +6,7 @@ const fs = require('fs');
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
 const CAMPI_ATTESI = [
-  'token', 'tipo', 'commessa', 'operatore', 'nota', 'genere', 'estensione', 'mimeType',
+  'token', 'tipo', 'commessa', 'fase', 'operatore', 'nota', 'genere', 'estensione', 'mimeType',
   'durataSecondi', 'idClient', 'idDispositivo', 'progressivo', 'dataScatto', 'scattoStimato',
   'versioneApp', 'nomeFile', 'contenutoBase64',
 ];

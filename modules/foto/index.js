@@ -9,6 +9,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { timestampDispositivo } from '../../core/orario.js';
 import { dataScattoDaFoto } from '../../core/exif.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
+import { opzioniFase } from '../../core/fasi.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
@@ -91,6 +92,10 @@ async function vista(el) {
         <label for="commessa">Cantiere</label>
         <select id="commessa" required>${opzioniCommessa}</select>
       </div>
+      <div class="campo">
+        <label for="fase">Fase di lavoro</label>
+        <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
+      </div>
       <div id="avviso-categoria"></div>
       ${fotocameraDisponibile()
         ? '<button id="apri-fotocamera" class="btn btn-primario foto-scatta" type="button">&#128247; Scatta foto</button>'
@@ -121,6 +126,7 @@ async function vista(el) {
 
   el.querySelector('#categoria').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#commessa').addEventListener('change', () => { ridisegna(); });
+  el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
@@ -261,13 +267,14 @@ async function aggiungiFile(file, daFotocamera = false) {
 
 async function invia() {
   const commessa = radice.querySelector('#commessa').value;
-  if (!commessa) return;
+  const fase = radice.querySelector('#fase').value;
+  if (!commessa || !fase) return;
   const nota = radice.querySelector('#nota').value.trim();
-  const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota);
+  const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota, fase);
   if (quante > 0) {
     coda.incrementaScattate(quante);
     const tipo = radice.querySelector('#categoria').value;
-    salvaImpostazioniFoto({ ultimaCommessa: commessa, ultimaCategoria: tipo });
+    salvaImpostazioniFoto({ ultimaCommessa: commessa, ultimaCategoria: tipo, ultimaFase: fase });
     radice.querySelector('#nota').value = '';
   }
   await ridisegna();
@@ -344,16 +351,18 @@ async function ridisegna() {
   }
 
   const commessaScelta = radice.querySelector('#commessa').value;
+  const faseScelta = radice.querySelector('#fase').value;
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta;
+  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta || !faseScelta;
   const quantiVideo = bozze.filter(r => r.genere === 'video').length;
   const quanteFoto = bozze.length - quantiVideo;
   const parti = [];
   if (quanteFoto) parti.push(`${quanteFoto} ${quanteFoto === 1 ? 'foto' : 'foto'}`);
   if (quantiVideo) parti.push(`${quantiVideo} ${quantiVideo === 1 ? 'video' : 'video'}`);
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
-  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && !commessaScelta
-    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
+  const mancanti = [!commessaScelta && 'il cantiere', !faseScelta && 'la fase'].filter(Boolean);
+  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && mancanti.length > 0
+    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
@@ -399,7 +408,7 @@ async function ridisegna() {
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
               <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
               ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.commessa))} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(r.fase)}` : ''} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
             ${nota}

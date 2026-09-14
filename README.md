@@ -21,7 +21,8 @@ Alla prima apertura l'app chiede **chi sei**, scegliendo da un elenco chiuso di 
 2. **Fotografa bolla** (camera posteriore) oppure **Scegli dalla galleria** (multi-foto). Le foto entrano subito in IndexedDB come bozze: non si perdono nemmeno chiudendo l'app.
 2b. **La fotocamera è dentro l'app**: si scatta, la miniatura si accoda in basso, si scatta ancora, e alla fine si tocca **Fine** — come in WhatsApp. Gli scatti di una stessa sessione sono le **pagine di una sola bolla**: è la ragione per cui la sessione esiste. La fotocamera **del telefono** resta a un tocco (secondo pulsante), e diventa l'unica se il permesso viene negato.
 3. Subito dopo la prima foto l'app dice cosa sta per partire — *«Questa foto è una bolla di una pagina»* — e offre **«+ Aggiungi pagina a questa bolla»**. Se la bolla continua su un altro foglio si tocca quel pulsante e si scatta la pagina successiva: le anteprime si numerano (`pag. 1`, `pag. 2`…) e il pulsante diventa *Invia 1 bolla di N pagine*. Se invece la bolla è finita, si manda così. La composizione si chiude a ogni invio: la bolla dopo riparte da una pagina.
-4. Scegliere il **cantiere** (dal secondo invio l'ultimo usato è preselezionato) e premere **Invia**.
+4. Scegliere il **cantiere** e la **fase di lavoro** (dal secondo invio gli ultimi usati sono preselezionati) e premere **Invia**. La fase viene da un elenco chiuso di gruppo (`core/fasi.js`), lo stesso del modulo Foto: senza, Invia resta spento e l'app dice cosa manca.
+4b. **Fotografa** e **Invia** stanno in una **barra fissa in basso**, sempre visibili qualunque sia il punto della pagina: con dieci bolle da mandare il giro è scatta → Fine → Invia → Fotografa, senza cercare i pulsanti su e giù per la pagina.
 5. Nella **Coda invii** ogni foto passa per gli stati *In coda → Invio in corso → Inviata* (o *Errore*, con pulsante Riprova). *Inviata* significa **salvata in raccolta**: è la risposta del flow a farlo passare, non l'invio della richiesta.
 6. **Prova offline:** attivare la modalità aereo, scattare e premere Invia → le foto restano *In coda*; al ritorno della rete partono da sole. L'invio riparte anche a ogni apertura dell'app, con retry automatico a backoff (5 s → 10 s → … → max 5 min).
 
@@ -123,7 +124,7 @@ La categoria si sceglie prima perché **decide come l'immagine viene preparata**
 
 **Si può inviare anche un video** (*Registra un video*), che parte con la fotocamera **di sistema**: registrare in-app darebbe formati diversi fra Android e iPhone e non userebbe l'encoder del telefono. Il video **non viene compresso** — transcodificare in un browser non è realistico — quindi conta il **tetto di peso** nelle impostazioni del modulo (predefinito 20 MB): un file più grande non entra in coda e l'app lo dice subito, invece di farlo ritentare a vuoto. Anteprima e durata si ricavano da un fotogramma del filmato. Foto e video possono stare nello stesso invio.
 
-C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
+Accanto al cantiere c'è la **fase di lavoro** (dalla 0.31.0), dallo stesso elenco chiuso del modulo Bolle: obbligatoria, con l'ultima usata preselezionata, vale per tutte le foto di un invio. Lato raccolta serve la colonna `Fase`; finché non c'è il flow ignora il campo. C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
 
 Ogni foto porta anche **`idDispositivo` e `progressivo`**, come le bolle: senza una sequenza per dispositivo non si può dimostrare che nessuna foto si è persa fra telefono e raccolta, si può solo sperarlo. Il numero si assegna **all'accodamento** (una bozza scartata non lascia buchi), parte da 1 e non si azzera mai; la sequenza è **propria del modulo** e non va confrontata con quella delle bolle. L'identità del telefono invece è una sola per tutta l'app (`core/dispositivo.js`) e un telefono che usava già le bolle **conserva quella che aveva**. Il raggruppamento si fa su `IdDispositivo`, **mai** su `Operatore`, che è testo libero.
 
@@ -155,7 +156,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Undici collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
+Dodici collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
 
 ## Struttura del repo
 
@@ -168,6 +169,7 @@ core/                 shell: router hash, home/launcher, impostazioni app, desig
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/operatori.js     chi può firmare un invio: elenco chiuso, condiviso
+core/fasi.js          le fasi di lavoro: elenco chiuso, condiviso dai due moduli
 core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
@@ -310,8 +312,8 @@ Quattro richieste di Francesco, emerse dall'uso in cantiere della 0.29.x. Si aff
 
 1. ~~**Obiettivo grandangolare nella fotocamera in-app.**~~ **Fatta nella 0.30.0.** Deciso da Francesco: scelta **automatica**, nessun pulsante, nessuna configurazione per modello di telefono — chi arriva con un telefono nuovo non deve dire niente. Come funziona: sezione *La fotocamera dentro l'app*. Resta da fare **la verifica sul telefono vero**: inquadratura in-app uguale a quella di sistema a 1×; se no, la riga *Fotocamera in-app* di Informazioni dice cosa il telefono ha dichiarato.
 2. ~~**Disposizione dei comandi nella fotocamera in-app.**~~ **Fatta nella 0.30.0.** Deciso da Francesco: *Fine* a sinistra dello scatto, scatto al centro, **niente a destra**.
-3. **Fase di lavoro nel modulo Foto.** Nell'invio delle foto — soprattutto `ARCHIVIO`, ma utile anche per `AVANZAMENTO` — un menù a tendina con la **fase** del lavoro (il gruppo divide il lavoro in fasi → attività → lavorazioni; si sceglie il livello delle **fasi**). L'operatore sceglie cantiere, fase, eventuale nota, e scatta. **L'elenco delle fasi lo dà Francesco**: non è nella skill di gruppo e non si inventa. Da chiudere, oltre all'elenco: se la fase è obbligatoria o facoltativa, se vale per entrambe le categorie, e cosa cambia a valle — campo nuovo nel contratto, colonna nuova in raccolta, mappatura nel flow, eventuale ruolo nelle cartelle del runbook del venerdì.
-4. **Scatti in serie nel modulo Bolle.** Con molte bolle da mandare il giro è faticoso: fotocamera in-app → *Fine* → si torna alla pagina → si scorre in basso per ritrovare *Scatta* → si riparte per la bolla successiva. Fine di una bolla e inizio della prossima non stanno nella stessa schermata. Da chiudere la forma della soluzione: un pulsante **«Prossima bolla»** dentro la fotocamera, che chiude la bolla corrente e apre subito la successiva senza uscire; oppure il pulsante di scatto che resta **sempre visibile** in testa alla pagina dopo *Fine*; oppure entrambe.
+3. ~~**Fase di lavoro nel modulo Foto.**~~ **Fatta nella 0.31.0, in entrambi i moduli** (deciso da Francesco il 14/09, con l'elenco delle 27 fasi). Scelte di costruzione da confermare: **obbligatoria**, con l'ultima usata preselezionata; per tutte le categorie; campo `fase` nei due contratti e **colonna `Fase` da aggiungere** in entrambe le raccolte (Cowork). Due voci dell'elenco segnalate come da verificare: `CMC 128` (sembra un codice commessa) e `Impianto SEFCC` (in rosso nell'elenco originale).
+4. ~~**Scatti in serie nel modulo Bolle.**~~ **Fatta nella 0.31.0** con la **barra fissa in basso** (Fotografa + Invia sempre visibili). Resta **proposto, non fatto**: il pulsante «Prossima bolla» dentro la fotocamera, che chiuderebbe e manderebbe la bolla corrente senza uscire — un tocco per bolla invece di tre, ma con invio implicito, senza vedere anteprima e avviso di leggibilità. Da decidere dopo aver provato la barra in cantiere.
 
 ## Fuori perimetro (in capo a Francesco)
 

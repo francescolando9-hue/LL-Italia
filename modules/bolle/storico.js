@@ -191,7 +191,7 @@ function disegnaElenco() {
             <span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
             <span class="cantiere">${Number.isInteger(riga.progressivo)
               ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${Number(riga.pagine) > 1
-              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}</span>
+              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}${riga.fase ? ` · ${scappaHtml(riga.fase)}` : ''}</span>
             <span class="tenue">${scappaHtml(riga.operatore)}</span>
             <span class="lente" aria-hidden="true">&#128269;</span>
           </button>

@@ -40,6 +40,7 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `09-operatore.js` | Il nome dell'operatore si **sceglie** da un elenco chiuso e non si scrive: niente segnaposto firmabile, e un nome salvato da una versione col campo libero viene riportato alla grafia ufficiale o richiesto di nuovo — mai indovinato. |
 | `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto; dove non si può sapere si ripiega e si dichiara (`scattoStimato`). |
 | `11-obiettivo.js` | La fotocamera in-app sceglie la lente **principale** dai nomi che i telefoni dichiarano (Samsung e Pixel con Chrome, iPhone con Safari), lascia fare al browser dove i nomi non aiutano, registra cosa ha visto per Informazioni; e i comandi stanno al posto giusto: scatto al centro, Fine a sinistra, niente a destra. |
+| `12-fase-e-barra.js` | La **fase di lavoro** si sceglie da un elenco chiuso in entrambi i moduli: senza, Invia resta spento e l'app dice cosa manca; scelta una volta, si ripropone; arriva al flow con la grafia esatta. E nel modulo Bolle **Fotografa** e **Invia** stanno in una barra fissa in basso, visibili anche in fondo a una coda lunga. |
 
 ## Le trappole, già pagate
 

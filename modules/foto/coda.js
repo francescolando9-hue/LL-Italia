@@ -82,6 +82,7 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     mime: fotoBlob.type || 'image/jpeg',
     durata: extra.durata || 0,
     commessa: '',
+    fase: '',
     autore: '',
     nota: '',
     foto: fotoBlob,
@@ -173,7 +174,7 @@ export function progressivoRaggiunto() {
 // Invia: le bozze passano in coda con categoria, commessa, autore e nota
 // correnti. La categoria è già sul record dallo scatto, perché decide come
 // l'immagine è stata preparata.
-export async function confermaBozze(commessa, autore, nota) {
+export async function confermaBozze(commessa, autore, nota, fase = '') {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
   if (bozze.length === 0) return 0;
   // I numeri si prendono tutti insieme e si distribuiscono in ordine di
@@ -183,6 +184,7 @@ export async function confermaBozze(commessa, autore, nota) {
   for (const record of bozze) {
     record.stato = 'in_coda';
     record.commessa = commessa;
+    record.fase = fase;
     record.autore = autore;
     record.nota = nota;
     record.progressivo = progressivo;

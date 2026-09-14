@@ -7,6 +7,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
+import { opzioniFase } from '../../core/fasi.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -132,10 +133,13 @@ async function vista(el) {
         <label for="cantiere">Cantiere</label>
         <select id="cantiere" required>${opzioniCantiere}</select>
       </div>
+      <div class="campo">
+        <label for="fase">Fase di lavoro</label>
+        <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
+      </div>
       ${fotocameraDisponibile()
-        ? '<button id="apri-fotocamera" class="btn btn-primario bolle-fotografa" type="button">&#128247; Fotografa bolla</button>'
+        ? '<label class="btn btn-secondario bolle-fotografa" for="input-camera">Usa la fotocamera del telefono</label>'
         : ''}
-      <label class="btn ${fotocameraDisponibile() ? 'btn-secondario' : 'btn-primario'} bolle-fotografa" for="input-camera">${fotocameraDisponibile() ? 'Usa la fotocamera del telefono' : '&#128247; Fotografa bolla'}</label>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
       <label class="btn btn-secondario bolle-galleria" for="input-galleria">Scegli dalla galleria</label>
       <input id="input-galleria" class="nascosto" type="file" accept="image/*" multiple>
@@ -147,7 +151,6 @@ async function vista(el) {
         <p id="separa-pagine"></p>
       </div>
       <div id="avviso-cantiere"></div>
-      <button id="invia" class="btn btn-successo" disabled>Invia</button>
     </section>
     <a class="btn btn-secondario bolle-vai-storico" href="#/bolle/storico">Bolle inviate</a>
     <section class="scheda">
@@ -156,9 +159,17 @@ async function vista(el) {
       <ul id="lista-coda" class="bolle-coda"></ul>
     </section>
     <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
+    <div class="bolle-spazio-barra" aria-hidden="true"></div>
+    <div class="bolle-barra">
+      ${fotocameraDisponibile()
+        ? '<button id="apri-fotocamera" class="btn btn-primario" type="button">&#128247; Fotografa</button>'
+        : '<label class="btn btn-primario" for="input-camera">&#128247; Fotografa</label>'}
+      <button id="invia" class="btn btn-successo" disabled>Invia</button>
+    </div>
   `;
 
   el.querySelector('#cantiere').addEventListener('change', () => { ridisegna(); });
+  el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
@@ -275,13 +286,17 @@ function messaggioDuplicato(gia) {
 async function invia() {
   const selezione = radice.querySelector('#cantiere');
   const cantiere = selezione ? selezione.value : '';
-  if (!cantiere) return;
+  const selezioneFase = radice.querySelector('#fase');
+  const fase = selezioneFase ? selezioneFase.value : '';
+  if (!cantiere || !fase) return;
   // Con una sola foto in attesa il raggruppamento non fa differenza:
   // pagina 1 di 1 in ogni caso.
-  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla);
+  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    salvaImpostazioniBolle({ ultimoCantiere: cantiere });
+    // Cantiere e fase si ripropongono al prossimo invio: il giro felice resta
+    // di tre tocchi anche con un campo in più.
+    salvaImpostazioniBolle({ ultimoCantiere: cantiere, ultimaFase: fase });
     // La bolla dopo è un'altra: la composizione si chiude qui, altrimenti
     // basterebbe distrarsi per unire due bolle diverse.
     unaSolaBolla = false;
@@ -360,8 +375,10 @@ async function ridisegna() {
 
   const selezione = radice.querySelector('#cantiere');
   const cantiereScelto = selezione ? selezione.value : '';
+  const selezioneFase = radice.querySelector('#fase');
+  const faseScelta = selezioneFase ? selezioneFase.value : '';
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
+  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto || !faseScelta;
   pulsanteInvia.textContent = bozze.length === 0
     ? 'Invia'
     : numeraPagine
@@ -370,8 +387,9 @@ async function ridisegna() {
         ? 'Invia 1 bolla'
         : `Invia ${bozze.length} bolle separate`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
-  avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
-    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
+  const mancanti = [!cantiereScelto && 'il cantiere', !faseScelta && 'la fase'].filter(Boolean);
+  avvisoCantiere.innerHTML = bozze.length > 0 && mancanti.length > 0
+    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
@@ -405,7 +423,7 @@ async function ridisegna() {
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
               ${Number(r.pagine) > 1 ? `<span class="bolle-pagina-riga">pag. ${r.pagina}/${r.pagine}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.cantiere))} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(r.fase)}` : ''} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${messaggioErrore}

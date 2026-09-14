@@ -96,6 +96,8 @@ export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impront
     qualita,
     motivoQualita,
     nome: nomeOriginale || '',
+    // Fase di lavoro: si sceglie con Invia, come il cantiere.
+    fase: '',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
     tentativi: 0,
@@ -163,7 +165,7 @@ export function progressivoRaggiunto() {
 // Resta comunque un invio per pagina — il contratto è un file per richiesta —
 // e ogni pagina consuma il suo progressivo, così il controllo di continuità
 // non cambia: una pagina mai arrivata è un buco come qualsiasi altro.
-export async function confermaBozze(cantiere, autore, unaSolaBolla = false) {
+export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase = '') {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
   if (bozze.length === 0) return 0;
   const primo = await riservaProgressivi(bozze.length);
@@ -173,6 +175,7 @@ export async function confermaBozze(cantiere, autore, unaSolaBolla = false) {
   for (const record of bozze) {
     record.stato = 'in_coda';
     record.cantiere = cantiere;
+    record.fase = fase;
     record.autore = autore;
     record.progressivo = numero;
     // Anche una bolla di una pagina sola ha il suo idBolla: a valle la regola
@@ -198,6 +201,9 @@ export async function confermaSingola(id, cantiere, autore, bolla = null) {
   if (!record) return false;
   record.stato = 'in_coda';
   record.cantiere = cantiere;
+  // La fase resta quella dell'invio originale: si corregge il cantiere, non
+  // l'attribuzione.
+  record.fase = (bolla && bolla.fase) || '';
   record.autore = autore;
   record.progressivo = await riservaProgressivi(1);
   record.idBolla = (bolla && bolla.idBolla) || crypto.randomUUID();
@@ -284,6 +290,7 @@ export async function registraInvio(record) {
   await transazione(STORE_STORICO, 'readwrite', store => store.put({
     idClient: record.id,
     commessa: record.cantiere,
+    fase: record.fase || '',
     operatore: record.autore,
     dataInvio: record.timestampDispositivo,
     inviatoIl: record.inviatoIl || Date.now(),
