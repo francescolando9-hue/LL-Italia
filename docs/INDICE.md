@@ -22,6 +22,7 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 | Documento | Cosa contiene |
 |---|---|
 | `AppFotoCantiereSpecifica202609101728Claude.md` | Rev. 3. Specifica del modulo: categorie, video, contratto di invio (`dataScatto`, campi numerici, `idDispositivo` e `progressivo`), stato del caricamento a blocchi, requisiti del flow, punti aperti. |
+| `AppFotoCantiereRunbookVenerdi202609140922Claude.md` | Rev. 1. Il lavoro a valle: come le foto d'archivio passano ogni venerdì dalla raccolta `FotoCantiere` alle cartelle `12 Foto` delle commesse su `L:`. Procedura, quadratura sui numeri, casi ricorrenti, punti aperti. **Da eseguire in Cowork**, non è codice. |
 | `FotoCantiereBriefingRicevente.md` | Stato **reale** di raccolta e flow, misurato sul tenant nel collaudo del 10/09/2026. **Dove diverge dalla specifica qui sopra, fa fede questo:** contiene ciò che è stato misurato, non ciò che era previsto. Nome stabile per la stessa ragione di questo indice. |
 
 ## Fuori da `docs/`
