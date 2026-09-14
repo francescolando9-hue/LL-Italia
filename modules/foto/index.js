@@ -54,6 +54,14 @@ function revocaUrl() {
   urlAperti = [];
 }
 
+// Il comando sta in fondo allo schermo, il messaggio in cima alla scheda: se
+// non lo si porta sotto gli occhi, chi preme vede l'app non fare niente.
+function portaInVista(elemento) {
+  if (elemento && typeof elemento.scrollIntoView === 'function') {
+    elemento.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
 function pesoLeggibile(byte) {
   if (!byte) return '';
   return byte >= 1048576 ? `${(byte / 1048576).toFixed(1)} MB` : `${Math.round(byte / 1024)} KB`;
@@ -97,14 +105,16 @@ async function vista(el) {
         <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
       </div>
       <div id="avviso-categoria"></div>
-      ${fotocameraDisponibile()
-        ? '<button id="apri-fotocamera" class="btn btn-primario foto-scatta" type="button">&#128247; Scatta foto</button>'
-        : ''}
-      <label class="btn ${fotocameraDisponibile() ? 'btn-secondario' : 'btn-primario'} foto-scatta" for="input-camera">${fotocameraDisponibile() ? 'Usa la fotocamera del telefono' : '&#128247; Scatta foto'}</label>
+      <p class="didascalia-alternative">Altri modi per aggiungere foto o video</p>
+      <div class="azioni-alternative">
+        ${fotocameraDisponibile()
+          ? '<label class="btn btn-quieto" for="input-camera">&#128247; Del telefono</label>'
+          : ''}
+        <label class="btn btn-quieto" for="input-video">&#127909; Un video</label>
+        <label class="btn btn-quieto" for="input-galleria">&#128194; Dalla galleria</label>
+      </div>
       <input id="input-camera" class="nascosto" type="file" accept="image/*" capture="environment">
-      <label class="btn btn-secondario foto-registra" for="input-video">&#127909; Registra un video</label>
       <input id="input-video" class="nascosto" type="file" accept="video/*" capture="environment">
-      <label class="btn btn-secondario" for="input-galleria">Scegli dalla galleria</label>
       <input id="input-galleria" class="nascosto" type="file" accept="image/*,video/*" multiple>
       <div id="avviso-foto"></div>
       <div id="anteprime" class="foto-anteprime"></div>
@@ -113,8 +123,6 @@ async function vista(el) {
         <input id="nota" type="text" maxlength="255" placeholder="Es. Getto solaio piano 3 completato">
         <p class="aiuto tenue">Vale per tutte le foto di questo invio.</p>
       </div>
-      <div id="avviso-invio"></div>
-      <button id="invia" class="btn btn-successo" disabled>Invia</button>
     </section>
     <section class="scheda">
       <h2>Coda invii</h2>
@@ -122,6 +130,14 @@ async function vista(el) {
       <ul id="lista-coda" class="foto-coda"></ul>
     </section>
     <p style="text-align:center"><a class="tenue" href="#/foto/impostazioni">Impostazioni del modulo Foto</a></p>
+    <div class="spazio-barra" aria-hidden="true"></div>
+    <div class="barra-comandi">
+      <div id="avviso-invio" class="barra-avviso"></div>
+      ${fotocameraDisponibile()
+        ? '<button id="apri-fotocamera" class="btn btn-primario" type="button">&#128247; Scatta</button>'
+        : '<label class="btn btn-primario" for="input-camera">&#128247; Scatta</label>'}
+      <button id="invia" class="btn btn-successo" disabled>Invia</button>
+    </div>
   `;
 
   el.querySelector('#categoria').addEventListener('change', () => { ridisegna(); });
@@ -153,6 +169,7 @@ async function apriScatto() {
   const avviso = radice.querySelector('#avviso-foto');
   if (!scelta) {
     avviso.innerHTML = '<p class="avviso avviso-attenzione">Scegli prima il tipo di foto: cambia come viene inviata.</p>';
+    portaInVista(avviso);
     return;
   }
   let esito;
@@ -165,6 +182,7 @@ async function apriScatto() {
     });
   } catch (errore) {
     avviso.innerHTML = `<p class="avviso avviso-attenzione">${scappaHtml(errore.message)}.</p>`;
+    portaInVista(avviso);
     radice.querySelector('#input-camera').click();
     return;
   }

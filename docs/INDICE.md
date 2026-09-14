@@ -4,7 +4,9 @@
 >
 > **È un puntatore, non una copia.** Non riassume e non duplica il contenuto dei documenti: se lo facesse diventerebbe una versione parallela destinata a divergere, che è esattamente il problema che deve risolvere. Una riga per documento, per sapere quale aprire.
 >
-> **Va aggiornato ogni volta che un documento di `docs/` cambia nome**, cioè a ogni revisione che applica la convenzione data-ora. Un indice che punta a un file che non esiste più è peggio di nessun indice: manda un `404` a chi si fidava.
+> **Va aggiornato quando un documento di `docs/` cambia nome** — cioè quando nasce, sparisce o cambia natura. Un indice che punta a un file che non esiste più è peggio di nessun indice: manda un `404` a chi si fidava.
+>
+> **I nomi qui dentro non cambiano a ogni revisione.** In un repository la storia la tiene git: la data nel nome è quella di **creazione**, quella dell'ultima modifica la dà `git log`, e la revisione corrente si legge in testa al documento. È lo standard di gruppo per i documenti versionati (skill `ll-italia` §9, confermato da Francesco il 14/09/2026) e vale al posto del «modello B» dei file su `L:`, che rinomina a ogni giro perché lì una cronologia non c'è. Conseguenza pratica: gli indirizzi qui sotto restano validi, e questo indice si tocca di rado.
 
 Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs/<nome del file>` — oppure direttamente nel repo, cartella `docs/`.
 
@@ -21,7 +23,7 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 
 | Documento | Cosa contiene |
 |---|---|
-| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 6.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF, `scattoStimato`, **`fase`** da elenco chiuso, campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow — fra cui le **colonne `ScattoStimato` e `Fase` da aggiungere** in raccolta. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, che non esiste più. Dalla rev. 6 il nome resta stabile a ogni revisione (standard di gruppo per i documenti in repository: la storia la tiene git). |
+| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 6.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF, `scattoStimato`, **`fase`** da elenco chiuso, campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow — fra cui le **colonne `ScattoStimato` e `Fase` da aggiungere** in raccolta. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, rinominato il 14/09 e da allora stabile: le revisioni si scrivono dentro il documento. |
 | `FotoCantiereBriefingRicevente.md` | Stato **reale** di raccolta e flow, misurato sul tenant nel collaudo del 10/09/2026. **Dove diverge dalla specifica qui sopra, fa fede questo:** contiene ciò che è stato misurato, non ciò che era previsto. Nome stabile per la stessa ragione di questo indice. |
 
 ## Non in questo repo
