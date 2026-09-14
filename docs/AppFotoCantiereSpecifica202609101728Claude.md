@@ -1,10 +1,10 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 3 dell'11/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 4 del 14/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 >
-> **Rev. 3 — riallineata al collaudo del ricevente** (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
+> **Rev. 4 — esiti del collaudo del 14/09** (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
 >
-> ⚠️ **Due punti restano aperti e non li ho inventati:** la cartella di destinazione su `L:` dove il runbook del venerdì deposita le foto, per commessa (§6), e l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis).
+> ⚠️ **Un punto resta aperto:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis). La destinazione del runbook del venerdì **non è più fra i punti aperti**: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
 
 ## 1. A cosa serve
 
@@ -47,8 +47,11 @@ Se si cambia categoria quando ci sono già foto in attesa, l'app **avvisa** che 
 | `AVANZAMENTO` (2500 px, q. 0,85) | 1,49 MB | ~2,0 MB |
 | `ARCHIVIO` da fotocamera in-app | 3,76 MB | ~5,0 MB |
 | `ARCHIVIO` da fotocamera nativa, byte originali | **4,39 MB** | **~5,9 MB** |
+| `ARCHIVIO`, il più grande arrivato finora (14/09) | **6,17 MB** | **~8,2 MB**, accettato in una sola richiesta |
 
-**L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» non si è verificata**, e il codice conferma il perché: per l'archivio, se il file è già JPEG l'app spedisce i byte originali senza ricodificarli, e un telefono non produce JPEG da 12 MB. Quindi **per le foto il ramo in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger.
+**L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» non si è verificata**, e il codice conferma il perché: per l'archivio, se il file è già JPEG l'app spedisce i byte originali senza ricodificarli, e un telefono non produce JPEG da 12 MB. Quindi **per le foto il ramo in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger. Il collaudo del 14/09 ha alzato il tetto conosciuto da 4,39 a 6,17 MB — sempre accettato in una richiesta sola — senza cambiare la conclusione.
+
+⚠️ Il tetto **conosciuto** non è il tetto **vero**: nessuno ha ancora cercato il punto in cui il flow smette di accettare. La prova di taglia a scaglioni è fra quelle che restano da fare (§5), e va fatta **prima** che qualcuno mandi un video, non dopo.
 
 Il caricamento a blocchi serve ai **video**, che non si comprimono e arrivano al tetto dei 20 MB: 26,7 MB di corpo, circa 107 secondi a 2 Mbit/s. Se il flow rifiuta un corpo, l'app lo dice con un messaggio dedicato (`413` → «foto troppo grande per il flow») e **la foto resta in coda**, non si perde.
 
@@ -181,7 +184,28 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 
 **Sette Response**, tutte con `Access-Control-Allow-Origin: *` e `Content-Type: application/json`: `401` token, `400` payload incompleto, `200 gia_presente`, `200` ok, e tre `500` distinti su creazione file, scrittura colonne e lettura duplicati. **Nessuna via d'uscita muta:** un ramo che esce senza rispondere fa arrivare all'app un `502`, che significa esattamente «il flow è terminato senza rispondere».
 
-**Collaudo sui numeri:** tre foto vere (una `AVANZAMENTO`, due `ARCHIVIO`), tre file in raccolta, tutte le colonne compilate, cartelle `2026/202609` create dal flow, ora di scatto coincidente con `Created`. Quadratura 3 su 3.
+**Collaudo del 10/09/2026, sui numeri:** tre foto vere (una `AVANZAMENTO`, due `ARCHIVIO`), tre file in raccolta, tutte le colonne compilate, cartelle `2026/202609` create dal flow, ora di scatto coincidente con `Created`. Quadratura 3 su 3.
+
+### Collaudo del 14/09/2026 — prima verifica della continuità
+
+Due foto `ARCHIVIO` mandate dall'app **0.27.0**, stesso dispositivo:
+
+| Cosa | Esito |
+|---|---|
+| `Progressivo` | **1 e 2, consecutivi**; `IdDispositivo` valorizzato su entrambe |
+| `DataScatto` `202609140915` contro `Created` `07:15:11Z` | **coincidono** (07:15 UTC = 09:15 italiane): la correzione a 12 cifre tiene |
+| File più grande arrivato finora | **6,17 MB**, circa **8,2 MB** di corpo, **accettato in una sola richiesta** |
+
+**È il primo controllo di continuità sulle foto, ed è pulito.** Prima di questa versione le colonne c'erano ma restavano vuote, quindi la sequenza non esisteva: da qui in poi un numero mancante significa una foto scattata e mai arrivata.
+
+Il dato sul peso corregge in meglio la stima del 10/09, quando il file più grande misurato era 4,39 MB: **l'archivio a risoluzione originale ha più margine di quanto si pensasse** nell'invio in una sola richiesta. Non cambia la conclusione — il caricamento a blocchi serve ai video, non alle foto — ma alza il tetto conosciuto.
+
+**Restano da provare**, e finché non sono provati non si dichiarano funzionanti:
+
+- **token errato → 401**;
+- **payload senza `dataScatto` → 400**, e **mai un 502**: un 502 significherebbe un ramo che esce senza Response;
+- **stessa foto mandata due volte → 200 `gia_presente`**, con **un solo file** in raccolta (la guardia sui duplicati);
+- **prova di taglia a scaglioni**, per sapere dove il flow smette di accettare — **prima che qualcuno mandi un video**, non dopo.
 
 **Quando si aggiungerà il caricamento a blocchi** (§4-bis), lo stesso flow si articola su tre rami, uno `Switch` sul campo `azione` subito dopo il controllo del token:
 
@@ -203,18 +227,34 @@ Il campo `nomeFile` mandato dall'app è **ignorato**: il nome lo compone il flow
 
 ⚠️ **L'estensione va presa dal campo `estensione` del payload, non fissata a `.jpg`.** Un video salvato come `.jpg` non si apre: è l'errore più facile da fare qui, e non dà nessun segnale — il file arriva, il flow è verde, e il problema si scopre in ufficio quando qualcuno prova ad aprirlo. Espressione: `triggerBody()?['estensione']`.
 
-## 6. Il runbook del venerdì — punto aperto
+## 6. Il runbook del venerdì
 
-Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaricate dalla raccolta e depositate **nella cartella di commessa su `L:`**.
+Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaricate dalla raccolta e depositate nella **cartella di commessa sul server**. La procedura completa — passo per passo, con la quadratura e i casi ricorrenti — sta in `docs/AppFotoCantiereRunbookVenerdi….md`, e si esegue in **Cowork**: `L:` è raggiungibile solo dalla rete di sede e nessun connettore cloud ci arriva, quindi Power Automate qui non c'entra.
 
-**Manca il dato e non lo invento:** quale cartella, per ciascuna commessa. Serve il percorso esatto (probabilmente sotto la cartella d'ambito della commessa, ma va confermato) e la regola per le sottocartelle — per data, per mese, per lavorazione.
+**I percorsi di destinazione esistono e sono registrati.** Sono stati verificati sul server il 10/09/2026 e stanno, insieme alla regola sulle sottocartelle, nel **file di conoscenza di progetto su `L:`**. **Non si scrivono qui**: questo repo è pubblicato integralmente su GitHub Pages, e quelli sono percorsi del server interno. Chi esegue il runbook li ha già a disposizione; chi legge da fuori non deve averli.
 
-Da decidere insieme al percorso, perché cambia il runbook:
+Quello che vale la pena dire qui, perché riguarda il contratto e non il server:
 
-1. **Cosa si scarica:** solo `ARCHIVIO`, o anche `AVANZAMENTO`? E i **video** insieme alle foto, o in una sottocartella a parte? Un video da decine di MB nella cartella di commessa è una scelta da fare consapevolmente. L'uso descritto dice solo Archivio: le foto di avanzamento servono a capirsi sul momento e non hanno valore documentale.
-2. **Come si marca il lavorato.** È lo stesso problema già affrontato per le bolle: senza uno stato in raccolta, il venerdì successivo il runbook o riscarica tutto o rischia di saltare qualcosa. Coerente con la scelta fatta per le bolle, la strada è una colonna `Stato` che il runbook aggiorna, non lo spostamento dei file.
-3. **Cosa fa con `Nota` e `Operatore`**: finiscono nel nome del file, in un file di testo accanto, o si perdono? Se la nota ha valore, va deciso adesso.
-4. **Collaudo sui numeri**, mai sull'esito formale: foto di categoria Archivio presenti in raccolta contro file depositati su `L:`. Ogni scarto è un difetto da spiegare.
+- le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più;
+- i **video** vanno in una sottocartella a parte, per non appesantire la cartella delle foto e i backup;
+- si scarica **solo `ARCHIVIO`**. L'avanzamento serve a capirsi sul momento, non ha valore documentale e resta in raccolta.
+
+### Il marcatore dello scarico: `DataScarico`, e nient'altro
+
+**Deciso il 14/09/2026: si usa la colonna `DataScarico` (testo), non una colonna `Stato`.** La rev. 3 di questo documento proponeva uno `Stato` per analogia con le bolle: la proposta è ritirata.
+
+Tre motivi:
+
+1. **`DataScarico` esiste già**, insieme alla vista `Archivio da scaricare` che filtra sul suo essere vuota. Vuota = da scaricare; valorizzata = scaricata il… Costruire un secondo marcatore su qualcosa che funziona significa solo darsi due verità da tenere allineate;
+2. **dice anche QUANDO**, cosa che uno stato non direbbe;
+3. **il ciclo delle foto ha due soli esiti.** Nelle bolle `Stato` ha cinque valori perché lì la lavorazione ne ha davvero cinque; qui una foto è scaricata o non lo è. Copiare il meccanismo delle bolle avrebbe portato la complessità senza il problema che la giustifica.
+
+⚠️ **Conseguenza da non perdere:** il runbook deve trovare **un solo marcatore**. Se un domani comparisse anche uno `Stato`, chi esegue non saprebbe quale guardare — ed è il tipo di ambiguità che si scopre quando una foto viene scaricata due volte, o mai.
+
+### Cosa resta aperto
+
+- **Quando si potano le foto dalla raccolta.** Oggi non si cancella niente: la raccolta è la copia di riferimento. Quando lo spazio diventerà un problema servirà una regola esplicita (per esempio: si cancellano le foto con `DataScarico` più vecchia di N mesi, mai quelle senza). Non è urgente, ma non è improvvisabile.
+- **Le foto di `AVANZAMENTO`** restano in raccolta per sempre e nessuno le pota: vale lo stesso ragionamento.
 
 ## 7. Scelte di costruzione, e perché
 
