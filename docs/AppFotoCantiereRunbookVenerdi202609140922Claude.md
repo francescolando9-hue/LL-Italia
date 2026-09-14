@@ -4,7 +4,7 @@
 >
 > Non è un documento di programmazione: l'app non c'entra, qui si lavora a valle della raccolta. Nessun segreto — token e URL firmati vivono nel flow e sui dispositivi, non qui.
 >
-> ⚠️ **Manca un dato e non lo invento: la radice delle cartelle di commessa su `L:`.** Tutto il resto è deciso. Vedi §3: è una riga da completare, poi il runbook è eseguibile.
+> **Rev. 2 del 14/09/2026 ore 11:40:** radice delle cartelle confermata da Francesco (`L:\DOCUMENTI\`), tabella delle commesse compilata, aggiunto l'`Indice.txt` mensile (§7 non è più un punto aperto), e deciso cosa fare dei file senza colonne rimasti dal collaudo (§8). **Il runbook è eseguibile.**
 
 ## 1. Cosa fa, in una frase
 
@@ -22,29 +22,32 @@ Ogni venerdì prende le foto **Archivio** arrivate dai telefoni durante la setti
 2. **Accesso alla raccolta `FotoCantiere`** sul sito Cantieri LL.
 3. La vista **`Archivio da scaricare`** esiste già in raccolta ed è la coda di lavoro di questo runbook: mostra le foto con `Tipo = ARCHIVIO` e `DataScarico` vuota, ad ambito ricorsivo (quindi vede anche le sottocartelle `AAAA/AAAAMM` create dal flow).
 
-## 3. Dove vanno i file — da completare
+## 3. Dove vanno i file
 
 Destinazione, per ogni foto:
 
 ```
-<RADICE_COMMESSA>\<Commessa>\12 Foto\<AAAA>\<AAAAMM>\
+L:\DOCUMENTI\<Commessa>\12 Foto\<AAAA>\<AAAAMM>\
 ```
 
 e per i video, quando ce ne saranno:
 
 ```
-<RADICE_COMMESSA>\<Commessa>\12 Foto\<AAAA>\<AAAAMM>\Video\
+L:\DOCUMENTI\<Commessa>\12 Foto\<AAAA>\<AAAAMM>\Video\
 ```
 
 **`<AAAA>` e `<AAAAMM>` si calcolano su `DataScatto`, non sulla data di oggi.** Una foto scattata il 30 settembre e scaricata il 3 ottobre appartiene a settembre: se si usasse la data di scarico, le cartelle su `L:` non corrisponderebbero più a quelle in SharePoint e la quadratura del mese smetterebbe di funzionare.
 
-⚠️ **`<RADICE_COMMESSA>` va indicata da Francesco.** La forma attesa è `L:\DOCUMENTI\` o equivalente; la cartella `12 Foto` è la cartella d'ambito 12 della tassonomia di gruppo, quindi quella non è in discussione. Fino a quando questa riga non è completata, **il runbook non si esegue**: depositare file in una cartella inventata è peggio che non depositarli.
+La cartella `12 Foto` è la cartella d'ambito 12 della tassonomia di gruppo; la radice `L:\DOCUMENTI\` è confermata da Francesco il 14/09/2026.
 
 | Codice commessa (quello che manda l'app) | Cartella su `L:` |
 |---|---|
-| `MAR` | `<RADICE_COMMESSA>\MAR\12 Foto\` — **da confermare** |
-| `SNZ2.2` | `<RADICE_COMMESSA>\SNZ2.2\12 Foto\` — **da confermare** |
-| `MNG` | `<RADICE_COMMESSA>\MNG\12 Foto\` — **da confermare** |
+| `MAR` | `L:\DOCUMENTI\MAR\12 Foto\` |
+| `SNZ2.2` | `L:\DOCUMENTI\SNZ2.2\12 Foto\` |
+| `MNG` | `L:\DOCUMENTI\MNG\12 Foto\` |
+
+Esempio, per le due foto d'archivio di SNZ2.2 scattate il 14/09/2026:
+`L:\DOCUMENTI\SNZ2.2\12 Foto\2026\202609\FotoSNZ2.2ARCHIVIO202609141032PaoloSanzarello.jpg`
 
 Sono le tre commesse che l'app può mandare oggi (`core/cantieri.js`). Se se ne aggiunge una nell'app, **va aggiunta anche qui**: una commessa senza riga in questa tabella fa fermare il runbook su quelle foto, che è il comportamento voluto — vedi §6.
 
@@ -56,9 +59,30 @@ Sono le tre commesse che l'app può mandare oggi (`core/cantieri.js`). Se se ne 
    2. individua la cartella di destinazione secondo §3, **creandola se non esiste**;
    3. **copia** il file (copia, non sposta: in SharePoint resta);
    4. **verifica che il file su `L:` abbia la stessa dimensione in byte** dell'originale. È il controllo che distingue una copia riuscita da una copia interrotta, e costa un istante;
-   5. **solo dopo la verifica**, scrivi `DataScarico` con la data e ora di adesso, formato `AAAAMMGGHHMM` (testo, come `DataScatto`: il connettore SharePoint riscrive qualunque valore che somigli a una data, ed è già costato nove ore di scarto).
+   5. **aggiungi una riga all'`Indice.txt`** della cartella del mese (§4-bis), creandolo se non c'è;
+   6. **solo dopo la verifica e la riga nell'indice**, scrivi `DataScarico` con la data e ora di adesso, formato `AAAAMMGGHHMM` (testo, come `DataScatto`: il connettore SharePoint riscrive qualunque valore che somigli a una data, ed è già costato nove ore di scarto).
 3. **Se un passaggio fallisce, non scrivere `DataScarico`.** Un elemento non marcato torna nella vista il venerdì dopo, ed è esattamente quello che deve succedere. Scrivere la data su una copia non riuscita è il modo di perdere una foto senza accorgersene.
 4. **Alla fine, riapri la vista.** Deve essere vuota, o contenere solo gli elementi che hai deliberatamente lasciato indietro (§6), con l'elenco di quali e perché.
+
+## 4-bis. L'`Indice.txt` della cartella
+
+Il file porta con sé l'operatore nel nome, ma **la nota no** — ed è la cosa che l'operatore ha scritto apposta, con le mani sporche, perché serviva. In SharePoint c'è; su `L:`, senza indice, si perde.
+
+In ogni cartella `AAAAMM` sta un `Indice.txt`, a cui il runbook **aggiunge in coda** una riga per ogni file depositato. Una riga per file, campi separati da tabulazione, così si apre con Blocco note e si incolla in Excel:
+
+```
+NomeFile	DataScatto	Operatore	Commessa	Genere	Nota
+FotoSNZ2.2ARCHIVIO202609141032PaoloSanzarello.jpg	202609141032	Paolo Sanzarello	SNZ2.2	foto	Armatura pilastri piano terra
+FotoSNZ2.2ARCHIVIO202609141035PaoloSanzarello.jpg	202609141035	Paolo Sanzarello	SNZ2.2	foto	
+```
+
+Tre regole:
+
+- **si aggiunge in coda, non si riscrive.** Il file cresce a ogni venerdì e non si tocca quello che c'è già;
+- **l'intestazione si scrive solo alla creazione**, quando la cartella del mese nasce;
+- **una nota vuota resta vuota.** Non si inventa una descrizione: una nota assente è un dato, una nota inventata è un errore che sopravvive al runbook.
+
+Se una riga non si riesce a scrivere, vale la regola del §4.3: **non marcare `DataScarico`**. Il file scende di nuovo il venerdì dopo e l'indice si completa allora — meglio una riga doppia, che si vede, di una foto senza riga, che non si vede.
 
 ## 5. La quadratura — il collaudo, sui numeri
 
@@ -101,9 +125,8 @@ Due avvertenze, altrimenti il controllo dà falsi allarmi:
 
 ## 7. Punti aperti — da decidere, non da presumere
 
-1. **`Nota` e `Operatore` non arrivano su `L:`.** Il file porta l'operatore nel nome, ma la nota — che l'operatore scrive apposta — resta solo in SharePoint. **Proposta:** un file `Indice.txt` in ogni cartella `AAAAMM`, con una riga per foto (nome file, operatore, data di scatto, nota), aggiunto in coda a ogni esecuzione. Costa poco e rende la cartella leggibile da sola. Da confermare prima di metterlo nel runbook.
-2. **Quando si potano le foto dalla raccolta.** Oggi non si cancella niente. Quando lo spazio diventerà un problema, la regola dovrà essere esplicita (per esempio: si cancellano le foto con `DataScarico` più vecchia di N mesi, mai quelle senza). Non urgente, ma non improvvisabile.
-3. **Le foto di Avanzamento** restano in raccolta per sempre, e nessuno le pota. Vale lo stesso ragionamento del punto 2.
+1. **Quando si potano le foto dalla raccolta.** Oggi non si cancella niente. Quando lo spazio diventerà un problema, la regola dovrà essere esplicita (per esempio: si cancellano le foto con `DataScarico` più vecchia di N mesi, mai quelle senza). Non urgente, ma non improvvisabile.
+2. **Le foto di Avanzamento** restano in raccolta per sempre, e nessuno le pota. Vale lo stesso ragionamento del punto 1.
 
 ## 8. Prima esecuzione
 
@@ -114,6 +137,18 @@ Alla data di questo documento la raccolta contiene:
 
 Quindi alla prima esecuzione ci si aspetta **A = 4** nella vista `Archivio da scaricare` (due di SNZ2.2 più due del collaudo), salvo altre foto arrivate nel frattempo. Se il numero è diverso, capisci perché **prima** di cominciare a copiare.
 
-⚠️ **Attenzione a una cosa che la vista NON mostra.** Il collaudo del 10/09 ha lasciato in raccolta una ventina di file **entrati senza colonne**, per il difetto dei campi numerici poi corretto lato flow. Avendo `Tipo` vuoto **non compaiono nella vista `Archivio da scaricare`**: non fanno sbagliare la quadratura, ma stanno lì e nessuno sa di chi sono.
+### Da fare una volta sola, PRIMA della prima esecuzione
 
-Vanno guardati **prima** della prima esecuzione, aprendo la raccolta senza filtri, e decisi una volta sola: se sono file di prova si cancellano, altrimenti si compilano a mano le colonne e rientrano nel giro normale. Finché restano lì, chiunque apra la raccolta trova file che sembrano persi.
+Il collaudo del 10/09 ha lasciato in raccolta una **ventina di file entrati senza colonne**, per il difetto dei campi numerici poi corretto lato flow. Avendo `Tipo` vuoto **non compaiono nella vista `Archivio da scaricare`**: non fanno sbagliare la quadratura, ma stanno lì e chiunque apra la raccolta trova file che sembrano persi.
+
+**Decisione di Francesco del 14/09/2026: si cancellano.** Sono file di prova del collaudo, non foto di cantiere.
+
+Procedura, da fare in raccolta e **non** dal runbook settimanale:
+
+1. apri `FotoCantiere` **senza filtri** (non da una vista: le viste filtrano su `Tipo`, che in questi file è vuoto);
+2. ordina per `Created` e isola i file del **10/09/2026** con `Tipo`, `Commessa` e `Operatore` **vuoti**;
+3. **conta quanti sono e scrivilo** nel resoconto prima di cancellare: è l'unico numero che resterà di loro;
+4. verifica che fra quelli non ci sia nulla del **14/09** — le due foto di SNZ2.2 hanno tutte le colonne compilate e **non vanno toccate**;
+5. cancella. La raccolta tiene 3 versioni, quindi restano nel cestino del sito per il periodo di conservazione: se ci si accorge di un errore si recuperano da lì.
+
+Fatto questo, la raccolta contiene solo file attribuiti, e «file senza colonne» torna a essere il sintomo di un difetto (§6) invece che il residuo di un collaudo.
