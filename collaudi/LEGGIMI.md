@@ -37,6 +37,8 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `06-bolle-pagine.js` | Una bolla su più fogli resta una bolla: `idBolla` unico, pagine numerate, e la via d'uscita se il raggruppamento era sbagliato. |
 | `07-foto-invio.js` | Le due categorie preparano l'immagine in modo diverso, il contratto di invio ha tutti i campi e i tipi giusti, un file oltre il limite non entra in coda. |
 | `08-errori-flow.js` | Il flow rifiuta: la bolla resta sul telefono, il messaggio dice dove guardare, e al ritorno riparte da sola senza consumare un numero. |
+| `09-operatore.js` | Il nome dell'operatore si **sceglie** da un elenco chiuso e non si scrive: niente segnaposto firmabile, e un nome salvato da una versione col campo libero viene riportato alla grafia ufficiale o richiesto di nuovo — mai indovinato. |
+| `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto; dove non si può sapere si ripiega e si dichiara (`scattoStimato`). |
 
 ## Le trappole, già pagate
 
@@ -84,3 +86,10 @@ Vanno detti, altrimenti passano per garanzie che non sono:
   telefono.
 - **Il caricamento a blocchi.** È spento in attesa che il tenant permetta di
   aprire la sessione di caricamento (vedi la specifica del modulo Foto, §4-bis).
+- **L'EXIF dei telefoni veri.** Le foto con l'ora dello scatto dentro sono
+  **costruite** (`exif-finto.js`), non uscite da un telefono: provano che il
+  lettore capisce il formato — e lo provano davvero, perché chi scrive i byte e
+  chi li legge sono due pezzi di codice indipendenti — ma non che ogni
+  produttore scriva l'EXIF come dice la specifica. Un iPhone (ordine `MM`, e
+  spesso HEIC, dove l'ora resta stimata) e un Android con l'ora regolata a mano
+  vanno provati sul campo.

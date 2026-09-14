@@ -98,20 +98,28 @@ function avviaFlow(porta = PORTA_FLOW) {
 }
 
 // --- Browser ---------------------------------------------------------------
+// La fotocamera finta serve al collaudo della fotocamera interna: senza, ogni
+// `getUserMedia` fallisce e quel pezzo di app resterebbe non provato. Non
+// cambia niente per gli altri collaudi, che la fotocamera non la aprono.
+const ARGOMENTI = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'];
+
 async function apriBrowser() {
   const { chromium } = require('playwright');
   try {
-    return await chromium.launch();
+    return await chromium.launch({ args: ARGOMENTI });
   } catch {
-    return chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+    return chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ARGOMENTI });
   }
 }
 
 // Telefono: viewport stretto, touch, e raccolta di TUTTI gli errori — un
 // collaudo che passa lasciando errori in console non è passato.
-async function nuovoTelefono(browser) {
+// `opzioni` si passa a Playwright così com'è: serve per esempio a fissare il
+// fuso del telefono (`timezoneId`), senza il quale un collaudo sulle ore
+// darebbe risultati diversi a seconda di dove gira.
+async function nuovoTelefono(browser, opzioni = {}) {
   const contesto = await browser.newContext({
-    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opzioni,
   });
   const pagina = await contesto.newPage();
   const errori = [];

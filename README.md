@@ -127,6 +127,10 @@ C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di 
 
 Ogni foto porta anche **`idDispositivo` e `progressivo`**, come le bolle: senza una sequenza per dispositivo non si può dimostrare che nessuna foto si è persa fra telefono e raccolta, si può solo sperarlo. Il numero si assegna **all'accodamento** (una bozza scartata non lascia buchi), parte da 1 e non si azzera mai; la sequenza è **propria del modulo** e non va confrontata con quella delle bolle. L'identità del telefono invece è una sola per tutta l'app (`core/dispositivo.js`) e un telefono che usava già le bolle **conserva quella che aveva**. Il raggruppamento si fa su `IdDispositivo`, **mai** su `Operatore`, che è testo libero.
 
+**L'ora dello scatto è l'ora dello scatto** (dalla 0.29.0). Prima era l'ora dell'**invio**: due foto d'archivio di SNZ2.2 fatte alle 08:31:39 e alle 08:31:42 sono atterrate in raccolta con la stessa `DataScatto` 202609140915, cioè il momento in cui l'operatore ha premuto Invia — 44 minuti dopo. Ora, per una foto scelta dalla galleria, l'app legge `DateTimeOriginal` dall'**EXIF del file originale**, prima di qualunque ricodifica (la compressione dell'avanzamento passa per un canvas, e dal canvas l'EXIF non esce). Se la foto porta anche `OffsetTimeOriginal` il fuso è quello; altrimenti le cifre si leggono come ora locale del dispositivo, **mai come UTC**. Per gli scatti fatti dentro l'app l'ora è quella dell'istante dello scatto, non quella del *Fine*: con dieci foto di fila la differenza sono minuti.
+
+Quando l'ora non si riesce a sapere — niente EXIF, tag assente, orologio del telefono mai impostato, o un video (l'ora di ripresa sta nel contenitore, non nell'EXIF: **punto aperto**) — l'app ripiega sull'ora di accodamento e **lo dichiara**: il campo `scattoStimato` vale `SI` invece di `NO`. Serve a non dover distinguere a mano una misura da un'approssimazione, che è la condizione che ha reso invisibile il difetto per due settimane. Nessuna libreria: 128 KB di testa del file e una scansione dei marcatori JPEG (`core/exif.js`). **Da fare lato raccolta:** la colonna `ScattoStimato`; finché non c'è, il flow ignora il campo e le foto atterrano lo stesso, con l'ora giusta.
+
 Nelle impostazioni del modulo c'è **Configura un altro telefono**, come in Bolle: un QR porta indirizzo e codice su un altro dispositivo senza digitare nulla. Il link è **solo di questo modulo**, perché la destinazione è un'altra.
 
 **Per i file che non stanno in una richiesta c'è il caricamento a blocchi**, da accendere nelle impostazioni del modulo (*Caricamento a blocchi per i file grandi*, **spento per default**). Il telefono chiede al flow **dove** mettere i byte (`azione: "preparaCaricamento"`), li manda a pezzi in `PUT` diretti a quell'indirizzo — senza passare dal flow, quindi senza limite di taglia del corpo — e alla fine avvisa il flow perché scriva le colonne (`azione: "completaCaricamento"`). Un caricamento interrotto **riprende da dove era**: al tentativo successivo l'app chiede al server quanti byte ha davvero e riparte da lì, invece di rispedire decine di megabyte. Con i blocchi attivi il tetto di peso è un altro, più alto (predefinito 200 MB): il vincolo non è più la richiesta, è il tempo. Su un flow che non sa rispondere il file **resta in coda** con un errore che si legge, non sparisce.
@@ -137,7 +141,7 @@ Collaudato in locale: un video da 28,9 MB passa in 16 blocchi e arriva **intero*
 
 Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~2,0 MB di corpo; archivio da fotocamera nativa 4,39 MB → ~5,9 MB. L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» **non si è verificata**: un telefono non produce JPEG da 12 MB, e per l'archivio l'app spedisce i byte originali senza ricodificarli. Quindi **per le foto l'invio in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger. Se il flow rifiuta un corpo, l'app lo dice e la foto resta in coda.
 
-Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 3). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
+Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 5). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
 
 ## Collaudi
 
@@ -151,7 +155,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Otto collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
+Dieci collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
 
 ## Struttura del repo
 
@@ -182,7 +186,7 @@ docs/                 7 documenti, tutti correnti:
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
                       AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
-                      AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 3
+                      AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 5
                       FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale
                                                         sulla specifica dove divergono)
 ```

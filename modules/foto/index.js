@@ -6,6 +6,8 @@ import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
 import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
+import { timestampDispositivo } from '../../core/orario.js';
+import { dataScattoDaFoto } from '../../core/exif.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
@@ -160,10 +162,34 @@ async function apriScatto() {
     radice.querySelector('#input-camera').click();
     return;
   }
-  await aggiungiFile(esito.file);
+  // Fatte adesso, qui: l'ora dello scatto non va cercata nell'EXIF (un
+  // fotogramma uscito da un canvas non ne ha) perché si sa già.
+  await aggiungiFile(esito.file, true);
 }
 
-async function aggiungiFile(file) {
+// L'ora di uno scatto fatto dentro l'app. Il File viene costruito nell'istante
+// in cui si preme il pulsante, e `lastModified` è quell'istante: contano i
+// minuti, perché con la fotocamera interna si scattano dieci foto di fila e si
+// tocca Fine dopo — con l'ora del Fine risulterebbero tutte fatte insieme.
+// Se il valore manca o è fuori scala si usa l'orologio di adesso: resta un'ora
+// misurata, non stimata, perché lo scatto è appena avvenuto.
+function oraDelloScatto(file) {
+  const quando = Number(file && file.lastModified);
+  const plausibile = Number.isFinite(quando) && Math.abs(Date.now() - quando) < 12 * 3600 * 1000;
+  return plausibile ? timestampDispositivo(new Date(quando)) : timestampDispositivo();
+}
+
+// L'ora dello scatto di una foto che arriva da un file: sta nell'EXIF, e va
+// letta PRIMA di `preparaImmagine`. La compressione dell'avanzamento passa per
+// un canvas, e dal canvas l'EXIF non esce: leggerla dopo vorrebbe dire non
+// leggerla affatto. Stringa vuota = non si è potuta sapere, e la coda ripiegherà
+// sull'ora di accodamento dichiarandola stimata.
+async function oraDaExif(file) {
+  const esito = await dataScattoDaFoto(file);
+  return esito.dataScatto;
+}
+
+async function aggiungiFile(file, daFotocamera = false) {
   if (file.length === 0) return;
   const tipo = radice.querySelector('#categoria').value;
   const scelta = categoria(tipo);
@@ -192,11 +218,17 @@ async function aggiungiFile(file) {
           continue;
         }
         const { anteprima, durata } = await anteprimaVideo(singolo);
+        // Punto aperto dichiarato: l'ora di ripresa di un video sta nel
+        // contenitore (`mvhd`), non nell'EXIF, e fra MP4 e MOV non è scritta
+        // con le stesse convenzioni di fuso. Finché non è letta davvero, il
+        // video parte con l'ora di accodamento e `scattoStimato` = 'SI'.
         await coda.aggiungiBozza(singolo, anteprima, singolo.name, tipo, {
           genere: 'video', estensione: estensioneDi(singolo), durata,
         });
         continue;
       }
+      // Prima la data, poi la preparazione: dopo, l'EXIF non c'è più.
+      const dataScatto = daFotocamera ? oraDelloScatto(singolo) : await oraDaExif(singolo);
       const preparata = await preparaImmagine(singolo, scelta.originale);
       if (preparata.size > limiteByte) {
         troppoGrandi.push(pesoLeggibile(preparata.size));
@@ -204,7 +236,7 @@ async function aggiungiFile(file) {
       }
       const anteprima = await creaAnteprima(singolo);
       await coda.aggiungiBozza(preparata, anteprima, singolo.name, tipo, {
-        genere: 'foto', estensione: 'jpg',
+        genere: 'foto', estensione: 'jpg', dataScatto,
       });
     } catch (errore) {
       // Con la memoria piena il messaggio del browser è in inglese e nel suo

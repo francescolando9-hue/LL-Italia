@@ -3,6 +3,8 @@
 // Stati: bozza (scattata, non ancora confermata con Invia) → in_coda → invio → inviata;
 // errore = invio fallito, resta in coda e si ritenta.
 
+import { timestampDispositivo } from '../../core/orario.js';
+
 const NOME_DB = 'llitalia-bolle';
 const VERSIONE_DB = 4;
 const STORE = 'foto';
@@ -78,16 +80,6 @@ function transazione(nomeStore, modo, operazione) {
     tx.onerror = () => rifiuta(tx.error);
     tx.onabort = () => rifiuta(tx.error);
   }));
-}
-
-// Timestamp del dispositivo in formato ISO con fuso locale (es. 2026-09-01T12:41:07+02:00).
-export function timestampDispositivo(data = new Date()) {
-  const scarto = -data.getTimezoneOffset();
-  const segno = scarto >= 0 ? '+' : '-';
-  const p = n => String(Math.abs(n)).padStart(2, '0');
-  return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())}` +
-    `T${p(data.getHours())}:${p(data.getMinutes())}:${p(data.getSeconds())}` +
-    `${segno}${p(Math.floor(Math.abs(scarto) / 60))}:${p(Math.abs(scarto) % 60)}`;
 }
 
 // La foto entra in IndexedDB già allo scatto (stato bozza): non si perde

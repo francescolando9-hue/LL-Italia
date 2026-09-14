@@ -20,10 +20,18 @@ const motore = creaMotore({
 export const { alCambiamento, avvia, riprova } = motore;
 const notifica = motore.notifica;
 
+// L'ora dello scatto del record. Le foto messe in coda prima della 0.29.0 il
+// campo non ce l'hanno: lì c'è solo l'ora di accodamento, che è quella che si
+// mandava — si usa quella, e `scattoStimato` dirà 'SI', che per quei record è
+// esattamente la verità.
+function quandoScattata(record) {
+  return record.dataScatto || record.timestampDispositivo;
+}
+
 // Nome file di comodo: il flow lo IGNORA (lo compone lui), ma resta utile nei
 // log e nelle diagnosi. Nomenclatura di gruppo, senza separatori.
 export function componiNomeFile(record) {
-  const compatto = String(record.timestampDispositivo).replace(/[-:]/g, '').slice(0, 15).replace('T', '');
+  const compatto = String(quandoScattata(record)).replace(/[-:]/g, '').slice(0, 15).replace('T', '');
   const operatore = String(record.autore).replace(/\s+/g, '');
   const prefisso = record.genere === 'video' ? 'Video' : 'Foto';
   return `${prefisso}${record.commessa}${record.tipo}${compatto}${operatore}.${record.estensione || 'jpg'}`;
@@ -57,7 +65,11 @@ export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = 
     // libero, la spezzerebbe a ogni grafia diversa del nome.
     idDispositivo: dispositivo,
     progressivo: Number.isFinite(record.progressivo) ? record.progressivo : null,
-    dataScatto: record.timestampDispositivo,
+    dataScatto: quandoScattata(record),
+    // 'SI' quando l'ora dello scatto non si è potuta leggere e quella mandata è
+    // l'ora di accodamento: chi legge la raccolta deve poter distinguere una
+    // misura da un ripiego, invece di scoprirlo confrontando i file mesi dopo.
+    scattoStimato: record.scattoStimato === 'NO' ? 'NO' : 'SI',
     versioneApp: versione,
     nomeFile: componiNomeFile(record),
     contenutoBase64,
