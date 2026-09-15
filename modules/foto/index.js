@@ -9,7 +9,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { timestampDispositivo } from '../../core/orario.js';
 import { dataScattoDaFoto } from '../../core/exif.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { opzioniFase } from '../../core/fasi.js';
+import { opzioniFase, etichettaFase } from '../../core/fasi.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
@@ -452,7 +452,7 @@ async function ridisegna() {
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
               <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
               ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(r.fase)}` : ''} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(etichettaFase(r.fase))}` : ''} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
             ${nota}

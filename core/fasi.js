@@ -9,6 +9,17 @@
 // finché non decide lui — togliere una voce è un rigo, aggiungerla dopo che
 // le bolle sono già partite senza è un buco.
 //
+// CODICE ed ETICHETTA, come per i cantieri (core/cantieri.js) e le categorie
+// delle foto. **Viaggia il codice**, senza spazi e in PascalCase; a video si
+// legge l'etichetta, con gli spazi al posto giusto. Deciso il 15/09/2026,
+// quando si è deciso che sul server le foto d'archivio si smistano in una
+// cartella per fase (`…\[Fase]\[AAAAMM]\`): le cartelle non possono avere
+// spazi, e se il valore in colonna fosse «Finitura alloggi» mentre la
+// cartella si chiama «FinituraAlloggi» servirebbe una tabella di conversione
+// — una seconda verità che il giorno che si aggiunge una fase si disallinea
+// in silenzio. Col codice il nome della cartella È il valore della colonna,
+// e non c'è niente da tenere allineato.
+//
 // Quando è obbligatoria (facoltativa il 14/09, poi ristretta il 15/09, tutte
 // e due decisioni di Francesco): **obbligatoria solo nel modulo Foto e solo
 // per la categoria ARCHIVIO**, perché quelle foto vanno sul server nella
@@ -29,46 +40,55 @@
 // Ordine alfabetico, non per frequenza: sono ventisei voci, e in un elenco
 // lungo si cerca per lettera, non per abitudine.
 export const FASI = [
-  'Bonifica',
-  'Cantiere',
-  'Consolidamento',
-  'Demolizione',
-  'Extra',
-  'Finitura alloggi',
-  'Finitura facciata',
-  'Finitura parti comuni interne',
-  'Impermeabilizzazioni',
-  'Impianti di rete condominiali',
-  'Impianto Antincendio',
-  'Impianto ascensore',
-  'Impianto elettrico alloggi',
-  'Impianto elettrico parti comuni',
-  'Impianto fotovoltaico',
-  'Impianto idrosanitario',
-  'Impianto SEFCC',
-  'Impianto termico alloggi',
-  'Impianto termico condominiale',
-  'Interrato',
-  'Marketing',
-  'Murature',
-  'Ponteggio',
-  'Scavi',
-  'Strutture',
-  'Urbanizzazioni',
+  { codice: 'Bonifica', etichetta: 'Bonifica' },
+  { codice: 'Cantiere', etichetta: 'Cantiere' },
+  { codice: 'Consolidamento', etichetta: 'Consolidamento' },
+  { codice: 'Demolizione', etichetta: 'Demolizione' },
+  { codice: 'Extra', etichetta: 'Extra' },
+  { codice: 'FinituraAlloggi', etichetta: 'Finitura alloggi' },
+  { codice: 'FinituraFacciata', etichetta: 'Finitura facciata' },
+  { codice: 'FinituraPartiComuniInterne', etichetta: 'Finitura parti comuni interne' },
+  { codice: 'Impermeabilizzazioni', etichetta: 'Impermeabilizzazioni' },
+  { codice: 'ImpiantiDiReteCondominiali', etichetta: 'Impianti di rete condominiali' },
+  { codice: 'ImpiantoAntincendio', etichetta: 'Impianto Antincendio' },
+  { codice: 'ImpiantoAscensore', etichetta: 'Impianto ascensore' },
+  { codice: 'ImpiantoElettricoAlloggi', etichetta: 'Impianto elettrico alloggi' },
+  { codice: 'ImpiantoElettricoPartiComuni', etichetta: 'Impianto elettrico parti comuni' },
+  { codice: 'ImpiantoFotovoltaico', etichetta: 'Impianto fotovoltaico' },
+  { codice: 'ImpiantoIdrosanitario', etichetta: 'Impianto idrosanitario' },
+  { codice: 'ImpiantoSEFCC', etichetta: 'Impianto SEFCC' },
+  { codice: 'ImpiantoTermicoAlloggi', etichetta: 'Impianto termico alloggi' },
+  { codice: 'ImpiantoTermicoCondominiale', etichetta: 'Impianto termico condominiale' },
+  { codice: 'Interrato', etichetta: 'Interrato' },
+  { codice: 'Marketing', etichetta: 'Marketing' },
+  { codice: 'Murature', etichetta: 'Murature' },
+  { codice: 'Ponteggio', etichetta: 'Ponteggio' },
+  { codice: 'Scavi', etichetta: 'Scavi' },
+  { codice: 'Strutture', etichetta: 'Strutture' },
+  { codice: 'Urbanizzazioni', etichetta: 'Urbanizzazioni' },
 ];
 
-export function faseValida(nome) {
-  return FASI.includes(String(nome || '').trim());
+export function faseValida(codice) {
+  return FASI.some(f => f.codice === String(codice || '').trim());
 }
 
-// Le opzioni del menù a tendina. La prima è «nessuna fase», sempre presente e
-// sempre selezionabile, perché la fase è facoltativa; l'ultima scelta si
-// ripropone, e «nessuna» è una scelta come le altre. Uguale nei due moduli
-// perché è scritto una volta.
+// A video si legge l'etichetta; se arriva un codice che non c'è — una fase
+// tolta dall'elenco, una bolla vecchia — si mostra il codice così com'è
+// invece di far sparire il dato.
+export function etichettaFase(codice) {
+  const trovata = FASI.find(f => f.codice === codice);
+  return trovata ? trovata.etichetta : (codice || '');
+}
+
+// Le opzioni del menù a tendina: valore = codice, testo = etichetta. La prima
+// è «nessuna fase», sempre presente e sempre selezionabile perché la fase è
+// facoltativa dove non è l'archivio; l'ultima scelta si ripropone, e
+// «nessuna» è una scelta come le altre. Uguale nei due moduli perché è
+// scritto una volta.
 export function opzioniFase(ultima, scappaHtml) {
   const nota = faseValida(ultima);
   const nessuna = `<option value=""${nota ? '' : ' selected'}>— nessuna fase —</option>`;
   return nessuna + FASI.map(f =>
-    `<option value="${scappaHtml(f)}"${f === ultima ? ' selected' : ''}>${scappaHtml(f)}</option>`
+    `<option value="${scappaHtml(f.codice)}"${f.codice === ultima ? ' selected' : ''}>${scappaHtml(f.etichetta)}</option>`
   ).join('');
 }

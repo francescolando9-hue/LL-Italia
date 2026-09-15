@@ -1,8 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 7 del 15/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 8 del 15/09/2026, sera.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 >
-> **Rev. 7 — la fase è OBBLIGATORIA per la categoria `ARCHIVIO`** (§4.4), dalla **0.33.0**: quelle foto sul server vanno nella **cartella della fase** (§6), e senza fase non saprebbero dove andare. Per l'`AVANZAMENTO` resta facoltativa. Rev. 6 — campo `fase` (§4, §4.4): la fase di lavoro a cui la foto si attribuisce, da elenco chiuso di gruppo; **serve una colonna `Fase` in raccolta** (§5). Dalla **0.31.0**. Rev. 5 — `dataScatto` è finalmente l'ora dello scatto (§4.1): fino alla 0.28.0 era l'ora dell'invio, misurato in produzione il 14/09. Dalla **0.29.0** l'app legge l'ora dall'EXIF della foto originale e, quando non ci riesce, lo **dichiara** con il campo nuovo `scattoStimato`. **Serve una colonna nuova in raccolta** (§5). Rev. 4 — esiti del collaudo del 14/09 (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
+> **Rev. 8 — la fase viaggia come CODICE senza spazi** (§4.4): in colonna e nel nome della cartella sul server c'è `FinituraAlloggi`, a video l'operatore legge «Finitura alloggi». Dalla **0.34.0**. Rev. 7 — la fase è OBBLIGATORIA per la categoria `ARCHIVIO` (§4.4), dalla **0.33.0**: quelle foto sul server vanno nella **cartella della fase** (§6), e senza fase non saprebbero dove andare. Per l'`AVANZAMENTO` resta facoltativa. Rev. 6 — campo `fase` (§4, §4.4): la fase di lavoro a cui la foto si attribuisce, da elenco chiuso di gruppo; **serve una colonna `Fase` in raccolta** (§5). Dalla **0.31.0**. Rev. 5 — `dataScatto` è finalmente l'ora dello scatto (§4.1): fino alla 0.28.0 era l'ora dell'invio, misurato in produzione il 14/09. Dalla **0.29.0** l'app legge l'ora dall'EXIF della foto originale e, quando non ci riesce, lo **dichiara** con il campo nuovo `scattoStimato`. **Serve una colonna nuova in raccolta** (§5). Rev. 4 — esiti del collaudo del 14/09 (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
 >
 > ⚠️ **Due punti aperti:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis); e l'ora di ripresa dei **video**, che non sta nell'EXIF e per ora resta stimata (§4.1). La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
 
@@ -76,7 +76,7 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
 { "token": "…",
   "tipo": "AVANZAMENTO",              // oppure ARCHIVIO
   "commessa": "MAR",                  // solo il codice
-  "fase": "Murature",                 // dall'elenco chiuso delle fasi, vedi §4.4
+  "fase": "FinituraAlloggi",          // CODICE della fase, senza spazi, vedi §4.4
   "operatore": "Paolo Sanzarello",
   "nota": "Getto solaio piano 3 completato",   // può essere vuota
   "genere": "foto",                   // oppure "video"
@@ -181,7 +181,26 @@ Regola esatta, perché un invio può contenere foto accodate con categorie diver
 
 Il campo arriva **vuoto** quando la fase non è stata indicata (avanzamento, o bolle) e per le foto accodate prima della 0.31.0. **Dalla 0.33.0 nessuna foto `ARCHIVIO` può più partire senza fase:** è la garanzia su cui si regge lo smistamento per cartella del runbook. È la **fase di lavoro** a cui la foto si attribuisce: il gruppo divide il lavoro in fasi → attività → lavorazioni, e si sceglie il livello delle fasi perché è quello che chi è in cantiere sa dire sul momento, senza guardare il cronoprogramma.
 
-**Elenco chiuso**, lo stesso per Bolle e Foto, nella shell (`core/fasi.js`), dato da Francesco il 14/09/2026, in ordine alfabetico: Bonifica · Cantiere · Consolidamento · Demolizione · Extra · Finitura alloggi · Finitura facciata · Finitura parti comuni interne · Impermeabilizzazioni · Impianti di rete condominiali · Impianto Antincendio · Impianto ascensore · Impianto elettrico alloggi · Impianto elettrico parti comuni · Impianto fotovoltaico · Impianto idrosanitario · Impianto SEFCC · Impianto termico alloggi · Impianto termico condominiale · Interrato · Marketing · Murature · Ponteggio · Scavi · Strutture · Urbanizzazioni. **Non si scrive a mano**: «Murature», «murature» e «Muratura» in colonna sarebbero tre fasi. `CMC 128` era nell'elenco d'origine ed è stata **tolta** lo stesso giorno su decisione di Francesco (codice di commessa, non fase); `Impianto SEFCC` era in rosso nell'elenco d'origine e resta finché non decide lui.
+**Elenco chiuso**, lo stesso per Bolle e Foto, nella shell (`core/fasi.js`), dato da Francesco il 14/09/2026, in ordine alfabetico. **Non si scrive a mano**: «Murature», «murature» e «Muratura» in colonna sarebbero tre fasi.
+
+**Codice ed etichetta (dalla 0.34.0).** Come per i cantieri e per le categorie, viaggia il **codice** — senza spazi, PascalCase — mentre a video l'operatore legge l'**etichetta**. Il motivo è lo smistamento sul server (§6): le cartelle non hanno spazi nel nome, e **il codice È il nome della cartella**, senza tabelle di conversione fra colonna e cartella da tenere allineate. Le 26 fasi, `codice` = `etichetta` dove coincidono:
+
+| Codice (in colonna e cartella) | Etichetta (a video) |
+|---|---|
+| `Bonifica` · `Cantiere` · `Consolidamento` · `Demolizione` · `Extra` · `Impermeabilizzazioni` · `Interrato` · `Marketing` · `Murature` · `Ponteggio` · `Scavi` · `Strutture` · `Urbanizzazioni` | identiche al codice |
+| `FinituraAlloggi` | Finitura alloggi |
+| `FinituraFacciata` | Finitura facciata |
+| `FinituraPartiComuniInterne` | Finitura parti comuni interne |
+| `ImpiantiDiReteCondominiali` | Impianti di rete condominiali |
+| `ImpiantoAntincendio` | Impianto Antincendio |
+| `ImpiantoAscensore` | Impianto ascensore |
+| `ImpiantoElettricoAlloggi` | Impianto elettrico alloggi |
+| `ImpiantoElettricoPartiComuni` | Impianto elettrico parti comuni |
+| `ImpiantoFotovoltaico` | Impianto fotovoltaico |
+| `ImpiantoIdrosanitario` | Impianto idrosanitario |
+| `ImpiantoSEFCC` | Impianto SEFCC |
+| `ImpiantoTermicoAlloggi` | Impianto termico alloggi |
+| `ImpiantoTermicoCondominiale` | Impianto termico condominiale | `CMC 128` era nell'elenco d'origine ed è stata **tolta** lo stesso giorno su decisione di Francesco (codice di commessa, non fase); `Impianto SEFCC` era in rosso nell'elenco d'origine e resta finché non decide lui.
 
 **Nell'app** è un menù a tendina accanto al cantiere, **facoltativo**: la prima voce è «— nessuna fase —», sempre selezionabile, e con quella si invia lo stesso. L'ultima scelta si ripropone al prossimo invio, «nessuna» compresa, come il cantiere: non aggiunge tocchi al giro. Vale per tutte le foto di uno stesso invio, come commessa e nota.
 
@@ -241,7 +260,7 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 |---|---|---|
 | `Tipo` | Riga di testo singola, **indicizzata** | `tipo` |
 | `Commessa` | Riga di testo singola | `commessa` |
-| `Fase` | Riga di testo singola | `fase` — **DA AGGIUNGERE**, vedi §4.4. Sempre valorizzata sulle `ARCHIVIO` dalla 0.33.0 |
+| `Fase` | Riga di testo singola | `fase` — **DA AGGIUNGERE**, vedi §4.4. Contiene il **codice** senza spazi (`FinituraAlloggi`), che è anche il nome della cartella sul server. Sempre valorizzata sulle `ARCHIVIO` dalla 0.33.0 |
 | `Operatore` | Riga di testo singola | `operatore` |
 | `Nota` | Più righe di testo | `nota` |
 | `DataScatto` | **Riga di testo singola** | `dataScatto`, **compattato a 12 cifre dal flow** — vedi §4.1 |
@@ -330,7 +349,7 @@ Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaric
 
 Quello che vale la pena dire qui, perché riguarda il contratto e non il server:
 
-- **le foto si smistano per FASE, e sotto per mese** (deciso il 15/09/2026): `[cartella foto della commessa]\[Fase]\[AAAAMM]\`. È il motivo per cui la fase è obbligatoria sull'`ARCHIVIO` (§4.4): senza, una foto non saprebbe in quale cartella andare. La struttura precedente era `AAAA\AAAAMM`; le decisioni ancora aperte — quante sottocartelle creare e quando, il nome esatto delle cartelle, dove finiscono le foto già scaricate e i video — sono in capo a Francesco e vanno chiuse **prima** di creare qualunque cartella;
+- **le foto si smistano per FASE, e sotto per mese** (deciso il 15/09/2026): `[cartella foto della commessa]\[CodiceFase]\[AAAAMM]\`, dove il codice è quello in colonna `Fase` — senza spazi, e identico: **niente conversioni** (§4.4). È il motivo per cui la fase è obbligatoria sull'`ARCHIVIO` (§4.4): senza, una foto non saprebbe in quale cartella andare. La struttura precedente era `AAAA\AAAAMM`; le decisioni ancora aperte — quante sottocartelle creare e quando, il nome esatto delle cartelle, dove finiscono le foto già scaricate e i video — sono in capo a Francesco e vanno chiuse **prima** di creare qualunque cartella;
 - le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più. **Dalla 0.29.0 quel criterio è finalmente affidabile:** fino alla 0.28.0 `DataScatto` era l'ora dell'invio (§4.1), quindi una foto fatta il 30 e mandata il 1º finiva nel mese sbagliato — sia nelle cartelle del flow sia in quelle del runbook. Le foto entrate in raccolta **prima** della 0.29.0 restano archiviate con la data dell'invio: non si correggono a posteriori, ma vale la pena saperlo quando una foto sembra nel mese sbagliato;
 - i **video** vanno in una sottocartella a parte, per non appesantire la cartella delle foto e i backup;
 - si scarica **solo `ARCHIVIO`**. L'avanzamento serve a capirsi sul momento, non ha valore documentale e resta in raccolta.
