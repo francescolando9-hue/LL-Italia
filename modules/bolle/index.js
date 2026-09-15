@@ -7,7 +7,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { opzioniFase } from '../../core/fasi.js';
+import { opzioniFase, etichettaFase } from '../../core/fasi.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -428,7 +428,7 @@ async function ridisegna() {
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
               ${Number(r.pagine) > 1 ? `<span class="bolle-pagina-riga">pag. ${r.pagina}/${r.pagine}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(r.fase)}` : ''} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(etichettaFase(r.fase))}` : ''} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${messaggioErrore}

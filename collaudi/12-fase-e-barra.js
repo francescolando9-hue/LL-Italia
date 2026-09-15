@@ -45,10 +45,27 @@ module.exports = {
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#fase');
     const voci = await pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim(), d: e.disabled })));
-    const nomi = voci.filter(o => o.v).map(o => o.t);
+    const scelte = voci.filter(o => o.v);
+    const nomi = scelte.map(o => o.t);
     registro.dice('fasi a video', `${nomi.length}: ${nomi[0]} … ${nomi[nomi.length - 1]}`);
     registro.controlla(`ci sono le ${QUANTE_FASI} fasi`, nomi.length === QUANTE_FASI, String(nomi.length));
     registro.controlla('«CMC 128» non c\'è più', !nomi.includes('CMC 128'), 'tolta da Francesco il 14/09: è una commessa, non una fase');
+
+    // A video si legge l'etichetta, con gli spazi; quello che viaggia — e che
+    // diventa il nome della cartella sul server — è il codice, senza spazi.
+    // Se il codice avesse spazi servirebbe una tabella di conversione fra
+    // colonna e cartella, cioè una seconda verità da tenere allineata.
+    registro.dice('codice ed etichetta, dove differiscono',
+      scelte.filter(o => o.v !== o.t).slice(0, 3).map(o => `${o.v} = «${o.t}»`));
+    registro.controlla('nessun codice contiene spazi',
+      scelte.every(o => !/\s/.test(o.v)),
+      scelte.filter(o => /\s/.test(o.v)).map(o => o.v).join(', ') || 'nessuno');
+    registro.controlla('i codici sono in PascalCase',
+      scelte.every(o => /^[A-Z][A-Za-z0-9]*$/.test(o.v)),
+      scelte.filter(o => !/^[A-Z][A-Za-z0-9]*$/.test(o.v)).map(o => o.v).join(', ') || 'tutti');
+    registro.controlla('e le etichette restano leggibili, con gli spazi',
+      scelte.some(o => /\s/.test(o.t)) && scelte.every(o => o.t.length > 0),
+      'l\'operatore sceglie leggendo, non decifrando un codice');
     registro.controlla('in ordine alfabetico', nomi[0] === 'Bonifica' && nomi[nomi.length - 1] === 'Urbanizzazioni');
     registro.controlla('la prima voce è «nessuna fase», selezionabile',
       voci[0].v === '' && !voci[0].d && /nessuna/i.test(voci[0].t), voci[0].t);
@@ -67,20 +84,20 @@ module.exports = {
       !/fase/i.test(await pagina.$eval('#avviso-cantiere', e => e.textContent)));
 
     registro.titolo('Scelta una volta, la fase si ripropone; e «nessuna» è una scelta come le altre');
-    await pagina.selectOption('#fase', 'Murature');
+    await pagina.selectOption('#fase', 'FinituraAlloggi');
     await mandaBolla('bolla2.jpg');
     await attendiRicevuti(2);
-    registro.controlla('la fase arriva al flow con la grafia dell’elenco', flow.stato.ricevuti[1].fase === 'Murature');
+    registro.controlla('la fase arriva al flow col codice dell’elenco', flow.stato.ricevuti[1].fase === 'FinituraAlloggi');
     registro.controlla('accanto a commessa e operatore, che non cambiano',
       flow.stato.ricevuti[1].commessa === 'MAR' && flow.stato.ricevuti[1].operatore === 'Paolo Sanzarello');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     registro.controlla('dopo la ricarica la fase è già selezionata',
-      (await pagina.$eval('#fase', e => e.value)) === 'Murature');
+      (await pagina.$eval('#fase', e => e.value)) === 'FinituraAlloggi');
     await mandaBolla('bolla.jpg');
     await attendiRicevuti(3);
     registro.controlla('foto → Invia, senza altri tocchi: la terza bolla porta la stessa fase',
-      flow.stato.ricevuti[2].fase === 'Murature');
+      flow.stato.ricevuti[2].fase === 'FinituraAlloggi');
     await pagina.selectOption('#fase', '');
     await mandaBolla('bolla2.jpg');
     await attendiRicevuti(4);
@@ -90,8 +107,12 @@ module.exports = {
     registro.controlla('e «nessuna» si ricorda come le altre', (await pagina.$eval('#fase', e => e.value)) === '');
     const inCoda = await pagina.$$eval('#lista-coda .bolle-voce .riga', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
     registro.dice('righe della coda', inCoda);
-    registro.controlla('la coda mostra la fase dove c’è, e niente dove non c’è',
-      inCoda.filter(t => /Murature/.test(t)).length === 2 && inCoda.every(t => !/·\s*·/.test(t)));
+    registro.controlla('la coda mostra l’ETICHETTA, non il codice',
+      inCoda.filter(t => /Finitura alloggi/.test(t)).length === 2
+      && !inCoda.some(t => /FinituraAlloggi/.test(t)),
+      'a video si legge la fase, non un codice da decifrare');
+    registro.controlla('e dove la fase non c’è non lascia un separatore vuoto',
+      inCoda.every(t => !/·\s*·/.test(t)));
 
     registro.titolo('Bolle: Fotografa e Invia stanno in una barra fissa in basso');
     const misure = await pagina.evaluate(() => {
@@ -170,13 +191,14 @@ module.exports = {
       /la fase/.test(avvisoArchivio) && /server/.test(avvisoArchivio));
 
     registro.titolo('Scelta la fase, l’archivio parte');
-    await pagina.selectOption('#fase', 'Impianto fotovoltaico');
+    await pagina.selectOption('#fase', 'ImpiantoFotovoltaico');
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.click('#invia');
     await attendiRicevuti(6);
     const foto = flow.stato.ricevuti[5];
     registro.dice('payload foto → fase', foto.fase);
-    registro.controlla('la fase arriva al flow', foto.fase === 'Impianto fotovoltaico');
+    registro.controlla('al flow arriva il CODICE, non l’etichetta', foto.fase === 'ImpiantoFotovoltaico',
+      'è quello che diventa il nome della cartella sul server');
     registro.controlla('insieme al resto del contratto',
       foto.commessa === 'SNZ2.2' && foto.tipo === 'ARCHIVIO' && foto.scattoStimato);
     registro.controlla('nessuna foto ARCHIVIO è mai partita senza fase',
@@ -184,7 +206,7 @@ module.exports = {
       'è la garanzia su cui si regge lo smistamento per cartella sul server');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
-    registro.controlla('e si ripropone alla prossima apertura', (await pagina.$eval('#fase', e => e.value)) === 'Impianto fotovoltaico');
+    registro.controlla('e si ripropone alla prossima apertura', (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoFotovoltaico');
 
     registro.titolo('Un invio misto: basta una foto da archiviare perché la fase serva');
     await pagina.selectOption('#fase', '');
