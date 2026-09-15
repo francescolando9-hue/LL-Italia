@@ -9,9 +9,18 @@
 // finché non decide lui — togliere una voce è un rigo, aggiungerla dopo che
 // le bolle sono già partite senza è un buco.
 //
-// La fase è FACOLTATIVA in tutti i moduli (deciso da Francesco il 14/09):
-// «— nessuna fase —» è una scelta valida, e il campo parte vuoto. Meglio una
-// bolla senza fase che una bolla ferma perché l'operatore non sa quale.
+// Quando è obbligatoria (facoltativa il 14/09, poi ristretta il 15/09, tutte
+// e due decisioni di Francesco): **obbligatoria solo nel modulo Foto e solo
+// per la categoria ARCHIVIO**, perché quelle foto vanno sul server nella
+// cartella della fase e una foto senza fase non saprebbe dove andare.
+// Facoltativa per l'avanzamento lavori, che resta in raccolta e non si
+// smista, e per le bolle: meglio una bolla senza fase che una bolla ferma
+// perché l'operatore non sa quale.
+//
+// La regola sta nei moduli, non qui: questo file dice quali sono le fasi, non
+// chi deve indicarle. «— nessuna fase —» resta quindi una voce selezionabile
+// in tutti i casi, e dov'è obbligatoria è l'invio a fermarsi spiegando —
+// un elenco con due comportamenti diversi sarebbero due elenchi.
 //
 // Perché un elenco e non un campo libero: vale lo stesso ragionamento degli
 // operatori (core/operatori.js). «Murature», «murature», «Muratura» e

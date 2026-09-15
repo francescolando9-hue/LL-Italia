@@ -23,7 +23,7 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 
 | Documento | Cosa contiene |
 |---|---|
-| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 6.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF, `scattoStimato`, **`fase`** da elenco chiuso, campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow — fra cui le **colonne `ScattoStimato` e `Fase` da aggiungere** in raccolta. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, rinominato il 14/09 e da allora stabile: le revisioni si scrivono dentro il documento. |
+| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 7.** Specifica del modulo: categorie, video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF, `scattoStimato`, **`fase`** da elenco chiuso — obbligatoria per le foto da archiviare, che sul server si smistano nella cartella della fase — campi numerici, `idDispositivo` e `progressivo`), esiti dei collaudi del 10 e del 14/09, stato del caricamento a blocchi, requisiti del flow — fra cui le **colonne `ScattoStimato` e `Fase` da aggiungere** in raccolta. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, rinominato il 14/09 e da allora stabile: le revisioni si scrivono dentro il documento. |
 | `FotoCantiereBriefingRicevente.md` | Stato **reale** di raccolta e flow, misurato sul tenant nel collaudo del 10/09/2026. **Dove diverge dalla specifica qui sopra, fa fede questo:** contiene ciò che è stato misurato, non ciò che era previsto. Nome stabile per la stessa ragione di questo indice. |
 
 ## Non in questo repo

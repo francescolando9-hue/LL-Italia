@@ -34,6 +34,14 @@ const ETICHETTE_STATO = {
 let radice = null;
 let urlAperti = [];
 
+// La fase è obbligatoria SOLO per le foto da archiviare (deciso da Francesco
+// il 15/09/2026), perché sul server finiscono nella cartella della fase e una
+// foto senza fase non saprebbe dove andare. Per l'avanzamento resta
+// facoltativa: quelle restano in raccolta e non si smistano. Lo stabilisce il
+// ridisegno, che è l'unico a sapere cosa c'è in attesa, e se lo ricorda qui
+// per `invia()`.
+let faseObbligatoria = false;
+
 function assicuraStile() {
   if (document.getElementById('stile-foto')) return;
   const link = document.createElement('link');
@@ -103,6 +111,7 @@ async function vista(el) {
       <div class="campo">
         <label for="fase">Fase di lavoro</label>
         <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
+        <p id="aiuto-fase" class="aiuto tenue"></p>
       </div>
       <div id="avviso-categoria"></div>
       <p class="didascalia-alternative">Altri modi per aggiungere foto o video</p>
@@ -285,9 +294,10 @@ async function aggiungiFile(file, daFotocamera = false) {
 
 async function invia() {
   const commessa = radice.querySelector('#commessa').value;
-  // Facoltativa: vuota è legittima, e si ricorda anche quella.
+  // Facoltativa per l'avanzamento — vuota è legittima, e si ricorda anche
+  // quella — obbligatoria se in attesa c'è almeno una foto da archiviare.
   const fase = radice.querySelector('#fase').value;
-  if (!commessa) return;
+  if (!commessa || (faseObbligatoria && !fase)) return;
   const nota = radice.querySelector('#nota').value.trim();
   const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota, fase);
   if (quante > 0) {
@@ -338,6 +348,11 @@ async function ridisegna() {
       : 'Compressa per partire veloce anche con poca rete.'
     : '';
 
+  radice.querySelector('#aiuto-fase').textContent =
+    tipoScelto === 'ARCHIVIO' || bozze.some(r => r.tipo === 'ARCHIVIO')
+      ? 'Obbligatoria per le foto da archiviare: sul server finiscono nella cartella della fase.'
+      : '';
+
   // Cambiare categoria con foto già pronte cambierebbe il significato di
   // quelle foto, non come sono state preparate: si avvisa invece di tacere.
   const tipiInAttesa = [...new Set(bozze.map(r => r.tipo))];
@@ -370,16 +385,28 @@ async function ridisegna() {
   }
 
   const commessaScelta = radice.querySelector('#commessa').value;
+  const faseScelta = radice.querySelector('#fase').value;
+  // A decidere è ciò che sta per PARTIRE, non la categoria selezionata adesso:
+  // un invio può contenere foto accodate con categorie diverse, e la fase vale
+  // per tutte quelle dell'invio.
+  faseObbligatoria = bozze.some(r => r.tipo === 'ARCHIVIO');
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta;
+  pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta
+    || (faseObbligatoria && !faseScelta);
   const quantiVideo = bozze.filter(r => r.genere === 'video').length;
   const quanteFoto = bozze.length - quantiVideo;
   const parti = [];
   if (quanteFoto) parti.push(`${quanteFoto} ${quanteFoto === 1 ? 'foto' : 'foto'}`);
   if (quantiVideo) parti.push(`${quantiVideo} ${quantiVideo === 1 ? 'video' : 'video'}`);
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
-  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && !commessaScelta
-    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
+  const mancanti = [
+    !commessaScelta && 'il cantiere',
+    faseObbligatoria && !faseScelta && 'la fase',
+  ].filter(Boolean);
+  radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && mancanti.length > 0
+    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.${
+      faseObbligatoria && !faseScelta ? ' Le foto da archiviare si ordinano per fase sul server.' : ''}</p>`
+    : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
