@@ -32,3 +32,49 @@ Commit piccoli e frequenti, messaggi in italiano, imperativi ("Aggiunge coda off
 README aggiornato a ogni feature: cosa fa, come si prova da telefono.
 Definition of done: provata su mobile (o emulazione), funziona offline dove pertinente, nessun errore console, README aggiornato, gli altri moduli e la shell non regrediscono. I collaudi automatici stanno in collaudi/ (node collaudi/esegui.js): vanno eseguiti prima di ogni rilascio e ampliati quando si aggiunge una funzione. In collaudi/aiuto.js, in cima, ci sono le trappole gia' pagate — la prima: page.waitForFunction con un predicato async NON aspetta niente, perche' una Promise e' sempre vera.
 Modello di collaborazione: proporre, non decidere — le scelte di prodotto spettano a Francesco; in dubbio, opzioni con pro/contro e chiedere.
+
+# Regole di condotta (estratto dalla skill organizzativa ll-italia v2.7 del 14/09/2026)
+
+Stanno qui perché una sessione di Claude Code non carica la skill organizzativa del gruppo e non vede il server aziendale. Riportate come sono state consegnate.
+
+## Passaggio di consegne fra ambienti
+
+Il lavoro attraversa due ambienti. In **chat e Cowork** si prendono le decisioni, si ragiona sull'impostazione, si scrivono relazioni e documenti di conoscenza, si aggiornano le cartelle di progetto sul server aziendale e si fanno le letture di riscontro sui sistemi. In **Claude Code** si scrive e si mantiene il codice. Nessuno dei due fa il mestiere dell'altro.
+
+**Chi arriva al punto in cui la parte successiva tocca all'altro chiude il turno scrivendo il prompt da incollare nell'altro ambiente.** Vale nei due versi e si ripete a ogni passaggio, non una volta per progetto. Da Claude Code verso Cowork: quando il codice è a un punto fermo, esaurite le domande all'utente, e restano documenti di conoscenza, relazioni, segnalazioni o verifiche sui sistemi.
+
+Contenuto minimo del prompt di consegna, in quest'ordine: **cosa si è pensato** (il ragionamento e le alternative scartate, non solo l'esito); **cosa si è deciso** (decisioni esecutive e vincoli, in forma affermativa); **cosa c'è da fare** (elenco puntuale, nell'ordine); **cosa non si deve fare** (limiti espliciti); **dove stanno i documenti** (nomi senza data); **come si collauda** (i numeri attesi). Se non c'è niente da consegnare si scrive «niente da passare a Cowork»: una chiusura vuota è valida, un prompt inventato no.
+
+**Il prompt non è una fonte**, è un messaggio: chi lo riceve rilegge i documenti indicati invece di fidarsi del riassunto.
+
+## Riservatezza nei repository
+
+I repository nascono **privati**; il passaggio a pubblico è una decisione esplicita, caso per caso. **Nessun dato di cliente** entra in un repository, quale che sia la visibilità: importi contrattuali, nomi di acquirenti, identificativi riconducibili, estratti di atti — vale anche per commenti nel codice, dati di prova e configurazioni. I dati di prova si inventano, non si copiano da casi reali.
+
+**In nessun file del repository** — codice, documentazione, `README`, `CLAUDE.md`, esempi di configurazione — entrano percorsi del server interno, percorsi UNC, ID di tenant o di applicazione, thumbprint di certificati, token o URL firmati. Vivono nella configurazione sul server, il cui percorso arriva al programma come parametro; nel repository ne resta un esempio con valori finti.
+
+I documenti aziendali portati in un repository sono **copie depurate**, con una nota in testa che dichiara la depurazione e indica dove sta il master.
+
+## Come si lavora
+
+**Lingua italiana**, tono professionale e operativo, si dà del tu.
+
+**Collaudo sui numeri, mai sull'esito formale.** Un'esecuzione riuscita non è un risultato corretto: si collauda contando, e si dichiarano i numeri. Un «fatto» senza numeri non dimostra niente. Una prova va scelta sul caso che può fallire: provare un caso in cui il funzionamento e il guasto danno lo stesso risultato non prova niente.
+
+**Revisione critica dell'impostazione.** Davanti a un'impostazione nuova, prima di eseguire: esplicitare almeno un'alternativa credibile con pro e contro, dichiarare quale si sceglierebbe e perché anche se diversa da quella proposta, elencare i punti deboli di quella proposta. L'accordo senza analisi non è un output valido; se un'alternativa seria non esiste, dirlo invece di inventarne una di facciata.
+
+**Non si presume: si chiede.** Un dato mancante — una colonna, un percorso, una mappatura, un comportamento non documentato — si chiede all'utente e non si deduce. Un dato che non si può verificare non si scrive come certo.
+
+**Un'automazione non è attiva perché è stata creata: è attiva quando la si rilegge e risulta configurata.**
+
+## Nomenclatura dei file
+
+PascalCase senza spazi, underscore o trattini, con suffisso data-ora `AAAAMMGGHHMM`. I documenti generati da Claude aggiungono `Claude` in coda prima dell'estensione; le revisioni fatte da una persona aggiungono `Rev` più l'iniziale.
+
+Due eccezioni che riguardano il codice. **Documenti in un repository versionato:** la storia del repository fa da archivio, quindi il nome porta la data-ora della **creazione** e resta stabile; niente copie datate e niente rinomina a ogni revisione; nome nuovo con data odierna solo al cambio di natura o perimetro, in un commit dedicato. **File prodotti da una procedura automatica** (resoconti di esecuzione, registri, log): niente suffisso `Claude`, perché non sono documenti scritti da Claude; i registri periodici portano il periodo coperto (`AAAAMM`) e non la data-ora di creazione.
+
+## Dove sta il resto
+
+Questo è un estratto. Gli standard di gruppo completi — identità, commesse, regole contabili, convenzioni, registro degli standard — vivono nella skill organizzativa `ll-italia`, il cui master sta sul server aziendale e **non** in questo repository. Quando serve una regola che qui non c'è, **non la si deduce**: la si chiede a Francesco, che la legge dal master.
+
+Se emerge una regola che vale per tutto il gruppo, non si scrive nel repository: si segnala a Cowork nel prompt di consegna, che la registra come segnalazione alla skill.

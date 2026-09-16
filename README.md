@@ -249,7 +249,7 @@ POST {endpoint}?api-version=2024-10-01
 Content-Type: application/json
 
 { "token": "collaudo",
-  "commessa": "MAR",                       // solo il codice: MAR | SNZ2.2 | MNG
+  "commessa": "MAR",                       // solo il codice, vedi Cantieri
   "operatore": "Paolo Sanzarello",
   "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
@@ -276,13 +276,21 @@ L'URL contiene una firma di accesso: il repo è pubblico, quindi l'URL non vi en
 
 ## Cantieri
 
-L'elenco è in `modules/bolle/cantieri.js` e **non è modificabile dal dispositivo**: un codice commessa errato arriverebbe al magazzino come commessa inesistente. A video l'etichetta estesa, nel payload solo il codice.
+L'elenco è in `core/cantieri.js` — nella shell, perché è di tutti i moduli — e **non è modificabile dal dispositivo**: un codice commessa errato arriverebbe al magazzino come commessa inesistente. A video l'etichetta estesa, nel payload solo il codice.
+
+**Sette commesse dal 16/09/2026** (erano tre), in ordine alfabetico di codice:
 
 | Codice nel payload | Etichetta a video |
 |---|---|
+| `BRU` | BRU - urbanizzazioni via Bardonecchia |
 | `MAR` | MAR - Caselle Torinese |
-| `SNZ2.2` | SNZ2.2 - Settimo Torinese |
 | `MNG` | MNG - via Monginevro 181 |
+| `MRS` | MRS - via Marsigli 11-13-15 |
+| `SNU` | SNU - urbanizzazioni Settimo Torinese |
+| `SNZ2.1` | SNZ2.1 - via Eva Mameli Calvino 7 |
+| `SNZ2.2` | SNZ2.2 - Settimo Torinese |
+
+**L'ordine del menù non dipende dall'ordine nel file:** lo impone un `sort()` sul codice al caricamento, così chi aggiunge una commessa la scrive dove capita e il menù resta in ordine. Il codice nel payload non cambia forma — è il lato ricevente a derivarne la cartella con una regola, non con una tabella, quindi una commessa nuova non richiede nient'altro nel contratto.
 
 Al primo utilizzo la scelta è esplicita (`— scegli il cantiere —`, Invia resta disabilitato); poi l'ultimo cantiere usato è preselezionato.
 

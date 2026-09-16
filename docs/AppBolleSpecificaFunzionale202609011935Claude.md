@@ -1,5 +1,7 @@
 # App LL Italia — Specifica funzionale upload bolle (rev. 3, capture-only)
 
+> **Revisione 4 del 16/09/2026** — **sette commesse selezionabili** (erano tre): `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2`, elencate in `core/cantieri.js` con la loro etichetta. Il menù è in **ordine alfabetico di codice**, imposto da un `sort()` e non dall'ordine nel file. Il campo `commessa` non cambia forma: viaggia il solo codice, come prima, e il lato ricevente ne deriva la cartella con una regola — nessun campo nuovo nel contratto. Dalla **0.35.0**.
+>
 > **Revisione 3 del 14/09/2026** — due cose dal collaudo sul campo. (1) **Campo `fase`** nel contratto: la fase di lavoro a cui la bolla si attribuisce, da **elenco chiuso di gruppo** (26 voci date da Francesco, `core/fasi.js`, lo stesso del modulo Foto), **facoltativa nelle bolle** — deciso da Francesco: obbligatoria solo nel modulo Foto e solo per le foto da archiviare, che sul server vanno nella cartella della fase — con l'ultima usata preselezionata, «nessuna» compresa; non aggiunge tocchi al giro. **Serve la colonna `Fase` in `BolleInArrivo`** (vedi *Ricezione*); finché non c'è il flow ignora il campo, quindi il rilascio (0.31.0) è indipendente. (2) **Barra dei comandi fissa in basso** con *Fotografa* e *Invia* sempre visibili: con dieci bolle da mandare si finiva a scorrere su e giù per ritrovarli. Registrato anche che gli **operatori sono da elenco chiuso** dal 14/09/2026 (supera il «campo libero» della rev. 2, punto 4 delle schermate). Il nome del file resta stabile: per i documenti in repository la storia la tiene git (standard di gruppo, skill §9).
 >
 > **Revisione 2 del 01/09/2026 ore 19:35** — allinea la specifica al **flow di ricezione realmente costruito e collaudato**, che prevale: il token viaggia **nel corpo** (non nell'header) e i campi si chiamano `token`, `commessa`, `operatore`, `idClient`, `dataInvio`, `nomeFile`, `contenutoBase64`; la risposta è **202 Accepted senza corpo**; l'URL richiede `api-version=2024-10-01`. Discrepanza rispetto alla rev. 1 ratificata da Francesco il 01/09/2026. La rev. 1 resta nella storia del repo (commit precedenti). **Aggiornata il 03/09/2026** con i campi `progressivo` e `idDispositivo` (paragrafo dedicato).
@@ -27,7 +29,7 @@ POST {endpoint}?api-version=2024-10-01
 Content-Type: application/json
 
 { "token": "collaudo",
-  "commessa": "MAR",            // solo il codice: MAR | SNZ2.2 | MNG
+  "commessa": "MAR",            // solo il codice; sette commesse dal 16/09/2026
   "fase": "FinituraAlloggi",    // CODICE della fase, senza spazi (rev. 3, codici dalla 0.34.0)
   "operatore": "Paolo Sanzarello",
   "idClient": "fe7e5c81-…",     // GUID della bolla, per la deduplica

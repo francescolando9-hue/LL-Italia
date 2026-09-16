@@ -25,7 +25,7 @@ Gli ultimi due vanno letti insieme: sono il controllo di continuità descritto a
 | Campo | Contenuto |
 |---|---|
 | `token` | token statico condiviso col flow |
-| `commessa` | **solo il codice**: `MAR` \| `SNZ2.2` \| `MNG` (a video l'operatore vede l'etichetta estesa) |
+| `commessa` | **solo il codice**: `BRU` \| `MAR` \| `MNG` \| `MRS` \| `SNU` \| `SNZ2.1` \| `SNZ2.2` — sette dal 16/09/2026, erano tre (a video l'operatore vede l'etichetta estesa) |
 | `operatore` | nome e cognome, digitati alla prima apertura dell'app. **Campo libero**, nessun elenco vincolato |
 | `idClient` | GUID della bolla |
 | `idDispositivo` | GUID dell'installazione: il titolare della sequenza |
