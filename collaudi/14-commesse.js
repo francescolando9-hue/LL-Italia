@@ -89,7 +89,9 @@ module.exports = {
     // codice, che è la forma più facile da rompere lungo la strada.
     await pagina.selectOption('#categoria', 'ARCHIVIO');
     await pagina.selectOption('#commessa', 'BRU');
-    await pagina.selectOption('#fase', 'Urbanizzazioni');
+    // BRU è un'urbanizzazione: dalla 0.36.0 al posto delle fasi mostra i
+    // LOTTI, e il lotto viaggia nello stesso campo `fase`.
+    await pagina.selectOption('#fase', 'Lotto2');
     await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
@@ -102,7 +104,8 @@ module.exports = {
       'in colonna deve arrivare BRU, non «BRU - urbanizzazioni via Bardonecchia»');
     registro.controlla('senza spazi e senza l’etichetta',
       !/\s/.test(foto.commessa) && !foto.commessa.includes('-'));
-    registro.controlla('e la fase resta il suo codice', foto.fase === 'Urbanizzazioni');
+    registro.controlla('e il lotto viaggia nel campo fase, col suo codice', foto.fase === 'Lotto2',
+      'per un\u2019urbanizzazione il lotto prende il posto della fase: a valle è sempre la cartella sotto la commessa');
 
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#cantiere');

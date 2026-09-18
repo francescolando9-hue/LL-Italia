@@ -80,15 +80,8 @@ export function etichettaFase(codice) {
   return trovata ? trovata.etichetta : (codice || '');
 }
 
-// Le opzioni del menù a tendina: valore = codice, testo = etichetta. La prima
-// è «nessuna fase», sempre presente e sempre selezionabile perché la fase è
-// facoltativa dove non è l'archivio; l'ultima scelta si ripropone, e
-// «nessuna» è una scelta come le altre. Uguale nei due moduli perché è
-// scritto una volta.
-export function opzioniFase(ultima, scappaHtml) {
-  const nota = faseValida(ultima);
-  const nessuna = `<option value=""${nota ? '' : ' selected'}>— nessuna fase —</option>`;
-  return nessuna + FASI.map(f =>
-    `<option value="${scappaHtml(f.codice)}"${f.codice === ultima ? ' selected' : ''}>${scappaHtml(f.etichetta)}</option>`
-  ).join('');
-}
+// Le opzioni del menù a tendina NON si costruiscono qui: le costruisce
+// `core/anagrafica.js` (`opzioniFaseOLotto`), perché dalla 0.36.0 dipendono
+// dalla commessa — un'urbanizzazione mostra i lotti al posto delle fasi, e una
+// commessa senza piani interrati non mostra `Interrato`. Questo file resta
+// quello che era: l'elenco chiuso, e niente di più.

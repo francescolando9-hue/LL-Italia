@@ -53,7 +53,10 @@ module.exports = {
     await pagina.waitForSelector('#categoria');
     await pagina.selectOption('#categoria', 'AVANZAMENTO');
     await pagina.selectOption('#commessa', 'MAR');
-    await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
+    // Una foto CON l'ora dello scatto: dalla 0.36.0 una copia senza EXIF
+    // viene fermata con un avviso, e qui si sta provando la versione nel
+    // payload, non quello.
+    await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 60000);
     await pagina.click('#invia');
     await aiuto.attendi(pagina,

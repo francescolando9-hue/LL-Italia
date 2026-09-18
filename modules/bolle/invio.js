@@ -7,7 +7,7 @@ import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
-import { creaMotore } from '../../core/coda-invio.js';
+import { creaMotore, eGiaPresente } from '../../core/coda-invio.js';
 
 const CHIAVE_MOCK = 'llitalia.bolle.mock';
 
@@ -34,6 +34,9 @@ const motore = creaMotore({
   },
   async segnaInviato(record, risposta) {
     record.idServer = risposta.id || '';
+    // «Era già in raccolta»: vedi il modulo Foto. Serve a «Rimanda» senza
+    // modifiche, che riusa lo stesso idClient per farsi dire questo.
+    record.giaPresente = Boolean(risposta.giaPresente);
     await coda.registraInvio(record);
   },
 });
@@ -61,6 +64,15 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo,
     // Fase di lavoro a cui la bolla si attribuisce, dall'elenco chiuso della
     // shell (core/fasi.js). Testo; vuoto solo per le bolle accodate prima
     // della 0.31.0, che il campo non lo avevano.
+    // Fase, o LOTTO per le urbanizzazioni (`Lotto2`): stesso campo, perché a
+    // valle è sempre «la cartella sotto la commessa».
+    //
+    // I tre livelli dell'archivio — `piano`, `unita`, `prospetto` — NON sono
+    // qui, e non è una dimenticanza: la raccolta delle bolle non ha le colonne
+    // per riceverli (verificato sul tenant il 18/09/2026 alle 16:05), e un
+    // campo che arriva e viene scartato in silenzio è peggio di un campo che
+    // non parte. Il giorno che quelle colonne ci fossero, si riaccendono qui e
+    // nel modulo (`campiLivelli(prefisso, true)`).
     fase: record.fase || '',
     operatore: record.autore,
     idClient: record.id,
@@ -106,8 +118,10 @@ async function inviaSingola(record) {
   if (!risposta.ok) {
     throw new Error(`Errore del server: ${risposta.status}${spiegazioneStato(risposta.status)}`);
   }
-  // 202 Accepted senza corpo: la conferma è lo stato HTTP.
-  return { id: '' };
+  // 202 Accepted senza corpo: la conferma è lo stato HTTP. Il corpo si legge
+  // comunque, perché la guardia sui duplicati risponde con `gia_presente`
+  // quando la bolla c'era già — ed è ciò che «Rimanda» deve poter dire.
+  return { id: '', giaPresente: await eGiaPresente(risposta) };
 }
 
 // Mock per sviluppo e demo senza backend: stessa forma del contratto reale,
@@ -124,7 +138,10 @@ async function inviaMock(record) {
   }
   dati.inviati = dati.inviati || {};
   if (dati.inviati[corpo.idClient]) {
-    return { id: dati.inviati[corpo.idClient] };
+    // Il mock si comporta come il flow: lo stesso idClient non crea un
+    // doppione e lo dichiara, altrimenti «Rimanda» in mock racconterebbe una
+    // cosa diversa da quella che succede in produzione.
+    return { id: dati.inviati[corpo.idClient], giaPresente: true };
   }
   dati.contatore = (dati.contatore || 0) + 1;
   const id = `mock-${String(dati.contatore).padStart(4, '0')}`;

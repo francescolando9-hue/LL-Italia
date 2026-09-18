@@ -11,6 +11,11 @@
 // compresa) e che al flow arriva con la grafia esatta. La barra:
 // con dieci bolle da mandare si finiva a scorrere su e giù per ritrovare ora
 // Fotografa ora Invia — devono stare tutti e due sempre a portata di pollice.
+// Nota dalla 0.36.0: qui si usano fasi SENZA livelli (`ImpiantoAscensore`,
+// `ImpiantoFotovoltaico`), perché questo collaudo prova che la fase si ricorda
+// e non costa tocchi in più. `FinituraAlloggi` pretende l'unità e bloccherebbe
+// l'invio: i livelli hanno il loro collaudo (15-livelli.js), e provare due
+// regole nello stesso posto vuol dire non sapere quale ha fallito.
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
 // 27 date da Francesco, meno «CMC 128» che lui stesso ha tolto: era un codice
@@ -84,20 +89,20 @@ module.exports = {
       !/fase/i.test(await pagina.$eval('#avviso-cantiere', e => e.textContent)));
 
     registro.titolo('Scelta una volta, la fase si ripropone; e «nessuna» è una scelta come le altre');
-    await pagina.selectOption('#fase', 'FinituraAlloggi');
+    await pagina.selectOption('#fase', 'ImpiantoAscensore');
     await mandaBolla('bolla2.jpg');
     await attendiRicevuti(2);
-    registro.controlla('la fase arriva al flow col codice dell’elenco', flow.stato.ricevuti[1].fase === 'FinituraAlloggi');
+    registro.controlla('la fase arriva al flow col codice dell’elenco', flow.stato.ricevuti[1].fase === 'ImpiantoAscensore');
     registro.controlla('accanto a commessa e operatore, che non cambiano',
       flow.stato.ricevuti[1].commessa === 'MAR' && flow.stato.ricevuti[1].operatore === 'Paolo Sanzarello');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     registro.controlla('dopo la ricarica la fase è già selezionata',
-      (await pagina.$eval('#fase', e => e.value)) === 'FinituraAlloggi');
+      (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoAscensore');
     await mandaBolla('bolla.jpg');
     await attendiRicevuti(3);
     registro.controlla('foto → Invia, senza altri tocchi: la terza bolla porta la stessa fase',
-      flow.stato.ricevuti[2].fase === 'FinituraAlloggi');
+      flow.stato.ricevuti[2].fase === 'ImpiantoAscensore');
     await pagina.selectOption('#fase', '');
     await mandaBolla('bolla2.jpg');
     await attendiRicevuti(4);
@@ -108,8 +113,8 @@ module.exports = {
     const inCoda = await pagina.$$eval('#lista-coda .bolle-voce .riga', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
     registro.dice('righe della coda', inCoda);
     registro.controlla('la coda mostra l’ETICHETTA, non il codice',
-      inCoda.filter(t => /Finitura alloggi/.test(t)).length === 2
-      && !inCoda.some(t => /FinituraAlloggi/.test(t)),
+      inCoda.filter(t => /Impianto ascensore/.test(t)).length === 2
+      && !inCoda.some(t => /ImpiantoAscensore/.test(t)),
       'a video si legge la fase, non un codice da decifrare');
     registro.controlla('e dove la fase non c’è non lascia un separatore vuoto',
       inCoda.every(t => !/·\s*·/.test(t)));
@@ -216,7 +221,9 @@ module.exports = {
     registro.controlla('con la sola foto d’avanzamento in attesa, Invia è acceso',
       !(await pagina.$eval('#invia', e => e.disabled)));
     await pagina.selectOption('#categoria', 'ARCHIVIO');
-    await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
+    // Una foto CON l'ora dello scatto: una copia senza EXIF verrebbe fermata
+    // dall'avviso della 0.36.0, che qui non è la cosa in prova.
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 2, 'seconda anteprima', 90000);
     await aiuto.attendi(pagina, () => document.querySelector('#invia').disabled, 'Invia spento', 10000);
     registro.controlla('aggiunta una foto da archiviare, Invia si spegne',

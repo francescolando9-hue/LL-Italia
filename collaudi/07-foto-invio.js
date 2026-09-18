@@ -8,6 +8,10 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 const CAMPI_ATTESI = [
   'token', 'tipo', 'commessa', 'fase', 'operatore', 'nota', 'genere', 'estensione', 'mimeType',
   'durataSecondi', 'idClient', 'idDispositivo', 'progressivo', 'dataScatto', 'scattoStimato',
+  // Dalla 0.36.0: i tre livelli dell'archivio. Viaggiano SEMPRE, anche
+  // quando la fase non li prevede — in quel caso valgono `null`, che in
+  // raccolta è «non si applica», mentre una stringa vuota somiglia a un dato.
+  'piano', 'unita', 'prospetto',
   'versioneApp', 'nomeFile', 'contenutoBase64',
 ];
 

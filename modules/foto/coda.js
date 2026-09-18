@@ -83,6 +83,12 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     durata: extra.durata || 0,
     commessa: '',
     fase: '',
+    // I tre livelli dell'archivio (dalla 0.36.0). `null`, non stringa vuota:
+    // dove il livello non si applica il campo deve arrivare in raccolta come
+    // assente, e `''` in una colonna somiglia a un dato che non c'è mai stato.
+    piano: null,
+    unita: null,
+    prospetto: null,
     autore: '',
     nota: '',
     foto: fotoBlob,
@@ -107,7 +113,12 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     // dato misurato. Testo 'SI'/'NO' e non un booleano: le colonne di tipo Sì/No
     // in SharePoint sono quelle che il connettore riscrive più volentieri.
     dataScatto: extra.dataScatto || timestampDispositivo(),
-    scattoStimato: extra.dataScatto ? 'NO' : 'SI',
+    // Dichiarato da chi accoda, non dedotto dalla presenza della data: una
+    // copia ridotta senza EXIF può partire con la data del FILE — più vicina
+    // allo scatto dell'ora dell'invio — e resta comunque una stima, mentre
+    // uno scatto fatto dall'app ha un'ora misurata. Dedurlo dalla data
+    // confonderebbe i due casi, che sono quelli che si devono distinguere.
+    scattoStimato: extra.scattoStimato || (extra.dataScatto ? 'NO' : 'SI'),
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
     tentativi: 0,
@@ -174,7 +185,7 @@ export function progressivoRaggiunto() {
 // Invia: le bozze passano in coda con categoria, commessa, autore e nota
 // correnti. La categoria è già sul record dallo scatto, perché decide come
 // l'immagine è stata preparata.
-export async function confermaBozze(commessa, autore, nota, fase = '') {
+export async function confermaBozze(commessa, autore, nota, fase = '', livelli = {}) {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
   if (bozze.length === 0) return 0;
   // I numeri si prendono tutti insieme e si distribuiscono in ordine di
@@ -185,6 +196,9 @@ export async function confermaBozze(commessa, autore, nota, fase = '') {
     record.stato = 'in_coda';
     record.commessa = commessa;
     record.fase = fase;
+    record.piano = livelli.piano || null;
+    record.unita = livelli.unita || null;
+    record.prospetto = livelli.prospetto || null;
     record.autore = autore;
     record.nota = nota;
     record.progressivo = progressivo;
@@ -235,4 +249,66 @@ export function incrementaInviate(quante) {
   const dati = contatoriOggi();
   dati.inviate += quante;
   salvaContatori(dati);
+}
+
+// ---------------------------------------------------------------------------
+// «Rimanda», in due casi che vanno tenuti distinti (deciso il 18/09/2026).
+//
+// SENZA modifiche — «temo che non sia arrivata»: STESSO idClient, stesso
+// progressivo. Il flow ha una guardia sui duplicati e risponde
+// `gia_presente`: se era già arrivata non se ne crea una seconda, e l'app lo
+// dice. È il caso che prima non c'era, e che costringeva a rimandare alla
+// cieca creando doppioni che poi l'ufficio doveva annullare a mano.
+//
+// CON modifiche — foto venuta male, dato sbagliato: idClient NUOVO e
+// progressivo NUOVO, perché in raccolta deve comparire una riga diversa. Quella
+// già mandata resta dov'è: annullarla è dell'ufficio, e il telefono non ha modo
+// di sapere se è già stata lavorata.
+// ---------------------------------------------------------------------------
+
+export async function rimandaStessa(id) {
+  const record = (await elenca()).find(r => r.id === id);
+  if (!record || record.stato !== 'inviata') return null;
+  record.stato = 'in_coda';
+  record.tentativi = 0;
+  record.ultimoErrore = '';
+  record.inviatoIl = null;
+  record.giaPresente = false;
+  // Non va contato fra le «inviate oggi»: in raccolta non arriva niente di
+  // nuovo, e quel contatore serve a essere confrontato coi file atterrati.
+  record.nonContare = true;
+  // La sessione di caricamento a blocchi di prima è chiusa da tempo: si
+  // riparte da zero, invece di chiedere al server byte di una sessione che
+  // non esiste più.
+  record.urlCaricamento = '';
+  record.byteInviati = 0;
+  record.byteCaricati = false;
+  await aggiorna(record);
+  return record;
+}
+
+export async function rimandaCorretta(id, dati) {
+  const originale = (await elenca()).find(r => r.id === id);
+  if (!originale || !originale.foto) return null;
+  const nuovo = await aggiungiBozza(
+    originale.foto, originale.anteprima, originale.nome, originale.tipo, {
+      genere: originale.genere,
+      estensione: originale.estensione,
+      durata: originale.durata,
+      // L'ora dello scatto è della FOTO, non dell'invio: rimandarla non la
+      // cambia, e non cambia nemmeno se era misurata o stimata.
+      dataScatto: originale.dataScatto,
+      scattoStimato: originale.scattoStimato,
+    });
+  nuovo.stato = 'in_coda';
+  nuovo.commessa = dati.commessa;
+  nuovo.fase = dati.fase || '';
+  nuovo.piano = dati.piano || null;
+  nuovo.unita = dati.unita || null;
+  nuovo.prospetto = dati.prospetto || null;
+  nuovo.autore = dati.autore || originale.autore;
+  nuovo.nota = dati.nota || '';
+  nuovo.progressivo = await riservaProgressivi(1);
+  await aggiorna(nuovo);
+  return nuovo;
 }

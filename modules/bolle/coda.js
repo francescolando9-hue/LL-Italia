@@ -96,7 +96,8 @@ export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impront
     qualita,
     motivoQualita,
     nome: nomeOriginale || '',
-    // Fase di lavoro: si sceglie con Invia, come il cantiere.
+    // Fase di lavoro (o lotto, per le urbanizzazioni): si sceglie con Invia,
+    // come il cantiere.
     fase: '',
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
@@ -370,4 +371,54 @@ export async function allineaStorico() {
     aggiunte += 1;
   }
   return aggiunte;
+}
+
+// ---------------------------------------------------------------------------
+// «Rimanda», in due casi che vanno tenuti distinti (deciso il 18/09/2026).
+//
+// SENZA modifiche — «temo che non sia arrivata»: STESSO idClient, stesso
+// progressivo. Il flow ha una guardia sui duplicati e risponde
+// `gia_presente`: se era già arrivata non se ne crea una seconda, e l'app lo
+// dice. È il caso che prima non c'era, e che costringeva a rimandare alla
+// cieca creando doppioni che poi l'ufficio doveva annullare a mano.
+//
+// CON modifiche — foto venuta male, dato sbagliato: idClient NUOVO e
+// progressivo NUOVO, perché in raccolta deve comparire una riga diversa. Quella
+// già mandata resta dov'è: annullarla è dell'ufficio, e il telefono non ha modo
+// di sapere se è già stata lavorata.
+// ---------------------------------------------------------------------------
+
+export async function rimandaStessa(id) {
+  const record = (await elenca()).find(r => r.id === id);
+  if (!record || record.stato !== 'inviata') return null;
+  record.stato = 'in_coda';
+  record.tentativi = 0;
+  record.ultimoErrore = '';
+  record.inviatoIl = null;
+  record.giaPresente = false;
+  // Non va contato fra le «inviate oggi»: in raccolta non arriva niente di
+  // nuovo, e quel contatore serve a essere confrontato coi file atterrati.
+  record.nonContare = true;
+  await aggiorna(record);
+  return record;
+}
+
+export async function rimandaCorretta(id, dati) {
+  const originale = (await elenca()).find(r => r.id === id);
+  if (!originale || !originale.foto) return null;
+  const nuovo = await aggiungiBozza(
+    originale.foto, originale.nome, originale.miniatura,
+    originale.impronta, originale.qualita, originale.motivoQualita);
+  nuovo.stato = 'in_coda';
+  nuovo.cantiere = dati.cantiere;
+  nuovo.fase = dati.fase || '';
+  nuovo.autore = dati.autore || originale.autore;
+  nuovo.progressivo = await riservaProgressivi(1);
+  // La pagina corretta resta la stessa pagina della stessa bolla: altrimenti
+  // rimandarne una spezzerebbe in due una bolla di più pagine.
+  nuovo.idBolla = originale.idBolla || crypto.randomUUID();
+  nuovo.pagina = originale.pagina || 1;
+  nuovo.pagine = originale.pagine || 1;
+  await aggiorna(nuovo);
+  return nuovo;
 }

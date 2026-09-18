@@ -9,7 +9,9 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { timestampDispositivo } from '../../core/orario.js';
 import { dataScattoDaFoto } from '../../core/exif.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { opzioniFase, etichettaFase } from '../../core/fasi.js';
+import {
+  sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA,
+} from '../../core/anagrafica.js';
 import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
@@ -42,6 +44,30 @@ let urlAperti = [];
 // per `invia()`.
 let faseObbligatoria = false;
 
+// I livelli scelti (o derivati) all'ultimo ridisegno: `invia()` li prende da
+// qui invece di rileggere i menù, così il valore che parte è esattamente
+// quello su cui il ridisegno ha deciso di sbloccare il pulsante.
+let livelliCorrenti = { piano: null, unita: null, prospetto: null, mancanti: [] };
+
+// I file scelti dalla galleria che NON hanno l'ora dello scatto: restano qui,
+// fuori dalla coda, finché l'operatore non decide. Sono quasi sempre copie
+// ridotte — Google Foto dopo «Libera spazio», WhatsApp — e il 17/09/2026 cinque
+// di queste sono finite in archivio con l'ora dell'invio al posto dell'ora
+// dello scatto: se scatto e invio cadono in due mesi diversi la foto va nella
+// cartella del mese sbagliato, e non lo segnala nessuno.
+//
+// Non sono in coda di proposito: un file scelto dalla galleria è ancora nella
+// galleria, quindi qui non si perde niente — mentre accodarlo in silenzio
+// significherebbe archiviare un'ora falsa. Le foto SCATTATE dall'app non
+// passano mai da qui: quelle l'ora ce l'hanno.
+let senzaData = [];
+
+// L'id della foto inviata che si sta rimandando, o stringa vuota. Il riquadro
+// sta FUORI dalla lista della coda e si ricostruisce solo quando cambia questo
+// valore: dentro la lista, che si ridisegna a ogni cambio di stato di un
+// invio, le correzioni appena scritte verrebbero cancellate a metà.
+let rimandoAperto = '';
+
 function assicuraStile() {
   if (document.getElementById('stile-foto')) return;
   const link = document.createElement('link');
@@ -68,6 +94,14 @@ function portaInVista(elemento) {
   if (elemento && typeof elemento.scrollIntoView === 'function') {
     elemento.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
+}
+
+// I livelli sulla riga della coda: sono il percorso in cui la foto finirà sul
+// server, e leggerli è il solo modo che ha l'operatore di accorgersi di un
+// piano sbagliato prima che l'archivio se lo porti dietro.
+function scritturaLivelli(record) {
+  const pezzi = [record.piano, record.unita, record.prospetto].filter(Boolean);
+  return pezzi.length > 0 ? ` \u00b7 ${pezzi.join(' \u00b7 ')}` : '';
 }
 
 function pesoLeggibile(byte) {
@@ -108,11 +142,11 @@ async function vista(el) {
         <label for="commessa">Cantiere</label>
         <select id="commessa" required>${opzioniCommessa}</select>
       </div>
-      <div class="campo">
-        <label for="fase">Fase di lavoro</label>
-        <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
-        <p id="aiuto-fase" class="aiuto tenue"></p>
-      </div>
+      <!-- Fase (o lotto), piano, unità e prospetto: il blocco sta nella shell,
+           perché è lo stesso del modulo Bolle e perché gli id sono un
+           contratto con la funzione che li accende e li spegne secondo
+           l'anagrafica. -->
+      ${campiLivelli()}
       <div id="avviso-categoria"></div>
       <p class="didascalia-alternative">Altri modi per aggiungere foto o video</p>
       <div class="azioni-alternative">
@@ -126,6 +160,7 @@ async function vista(el) {
       <input id="input-video" class="nascosto" type="file" accept="video/*" capture="environment">
       <input id="input-galleria" class="nascosto" type="file" accept="image/*,video/*" multiple>
       <div id="avviso-foto"></div>
+      <div id="avviso-senza-data"></div>
       <div id="anteprime" class="foto-anteprime"></div>
       <div class="campo" id="campo-nota">
         <label for="nota">Nota (facoltativa)</label>
@@ -137,6 +172,7 @@ async function vista(el) {
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="foto-coda"></ul>
+      <div id="riquadro-rimando"></div>
     </section>
     <p style="text-align:center"><a class="tenue" href="#/foto/impostazioni">Impostazioni del modulo Foto</a></p>
     <div class="spazio-barra" aria-hidden="true"></div>
@@ -152,6 +188,9 @@ async function vista(el) {
   el.querySelector('#categoria').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#commessa').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
+  for (const id of ['#piano', '#unita', '#prospetto']) {
+    el.querySelector(id).addEventListener('change', () => { ridisegna(); });
+  }
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
@@ -163,11 +202,16 @@ async function vista(el) {
   invio.avvia();
 }
 
+// Da dove arriva un file cambia cosa si sa della sua ora, ed è l'unica cosa
+// che lo dice: `input-camera` è la fotocamera del telefono aperta DALL'APP —
+// la foto è stata scattata in questo momento, l'ora del file dista secondi
+// dallo scatto anche se l'EXIF manca. Dalla galleria no: lì un file senza EXIF
+// può essere di tre mesi fa.
 async function gestisciFile(evento) {
   const input = evento.target;
   const file = [...input.files];
   input.value = '';
-  await aggiungiFile(file);
+  await aggiungiFile(file, input.id === 'input-camera' ? 'fotocamera-telefono' : 'galleria');
 }
 
 // Fotocamera interna: si scatta più volte di fila senza uscire dall'app.
@@ -197,7 +241,7 @@ async function apriScatto() {
   }
   // Fatte adesso, qui: l'ora dello scatto non va cercata nell'EXIF (un
   // fotogramma uscito da un canvas non ne ha) perché si sa già.
-  await aggiungiFile(esito.file, true);
+  await aggiungiFile(esito.file, 'fotocamera-app');
 }
 
 // L'ora di uno scatto fatto dentro l'app. Il File viene costruito nell'istante
@@ -212,17 +256,56 @@ function oraDelloScatto(file) {
   return plausibile ? timestampDispositivo(new Date(quando)) : timestampDispositivo();
 }
 
-// L'ora dello scatto di una foto che arriva da un file: sta nell'EXIF, e va
-// letta PRIMA di `preparaImmagine`. La compressione dell'avanzamento passa per
-// un canvas, e dal canvas l'EXIF non esce: leggerla dopo vorrebbe dire non
-// leggerla affatto. Stringa vuota = non si è potuta sapere, e la coda ripiegherà
-// sull'ora di accodamento dichiarandola stimata.
-async function oraDaExif(file) {
-  const esito = await dataScattoDaFoto(file);
-  return esito.dataScatto;
+// Sotto il 2020 la data di un file di cantiere non è una data: è un orologio
+// azzerato, o un file passato per troppe mani. Meglio l'ora dell'invio, che
+// almeno si sa cos'è.
+const ANNO_MINIMO_RIPIEGO = 2020;
+
+// La data di ripiego per una foto che non ha l'ora dello scatto: `lastModified`
+// se è plausibile — non nel futuro, non prima del 2020 — altrimenti l'ora
+// dell'invio. Regola data da Francesco il 18/09/2026. La data del file è quasi
+// sempre molto più vicina allo scatto dell'ora in cui si preme Invia: una copia
+// ridotta viene creata poco dopo lo scatto, e conserva quella.
+function oraDiRipiego(file) {
+  const quando = Number(file && file.lastModified);
+  const plausibile = Number.isFinite(quando) && quando <= Date.now()
+    && new Date(quando).getFullYear() >= ANNO_MINIMO_RIPIEGO;
+  return plausibile ? timestampDispositivo(new Date(quando)) : timestampDispositivo();
 }
 
-async function aggiungiFile(file, daFotocamera = false) {
+// L'ora dello scatto, e se è misurata o stimata. Tre casi, che vanno tenuti
+// distinti perché a valle servono distinti:
+//
+//  - scattata DENTRO l'app: l'istante lo conosce l'app, è lei che scatta.
+//    Misurata, `scattoStimato` = 'NO'. Niente EXIF da leggere: un fotogramma
+//    uscito da un canvas non ne ha.
+//  - scattata dalla fotocamera del telefono aperta dall'app: l'EXIF di solito
+//    c'è; se manca, la foto è comunque di un istante fa e l'ora del file dista
+//    secondi. Misurata anche questa.
+//  - scelta dalla galleria: l'EXIF è l'unica fonte. Se manca non si inventa
+//    niente — si ferma e si chiede (`senzaData`).
+//
+// L'EXIF si legge PRIMA di `preparaImmagine`: la compressione dell'avanzamento
+// passa per un canvas, e dal canvas l'EXIF non esce. Leggerla dopo vorrebbe
+// dire non leggerla affatto.
+async function oraDiScatto(file, provenienza) {
+  // L'operatore ha già visto l'avviso e ha scelto di mandarla comunque:
+  // l'EXIF non c'è, si è già cercato, non si rilegge.
+  if (provenienza === 'ripiego') {
+    return { dataScatto: oraDiRipiego(file), scattoStimato: 'SI' };
+  }
+  if (provenienza === 'fotocamera-app') {
+    return { dataScatto: oraDelloScatto(file), scattoStimato: 'NO' };
+  }
+  const esito = await dataScattoDaFoto(file);
+  if (esito.dataScatto) return { dataScatto: esito.dataScatto, scattoStimato: 'NO' };
+  if (provenienza === 'fotocamera-telefono') {
+    return { dataScatto: oraDelloScatto(file), scattoStimato: 'NO' };
+  }
+  return { dataScatto: '', scattoStimato: 'SI', senzaData: true, motivo: esito.motivo };
+}
+
+async function aggiungiFile(file, provenienza = 'galleria') {
   if (file.length === 0) return;
   const tipo = radice.querySelector('#categoria').value;
   const scelta = categoria(tipo);
@@ -261,7 +344,14 @@ async function aggiungiFile(file, daFotocamera = false) {
         continue;
       }
       // Prima la data, poi la preparazione: dopo, l'EXIF non c'è più.
-      const dataScatto = daFotocamera ? oraDelloScatto(singolo) : await oraDaExif(singolo);
+      const quando = await oraDiScatto(singolo, provenienza);
+      // Senza ora dello scatto la foto NON entra in coda: si mette da parte e
+      // si chiede. Accodarla e stimare in silenzio è esattamente il difetto
+      // misurato il 17/09/2026.
+      if (quando.senzaData) {
+        senzaData.push(singolo);
+        continue;
+      }
       const preparata = await preparaImmagine(singolo, scelta.originale);
       if (preparata.size > limiteByte) {
         troppoGrandi.push(pesoLeggibile(preparata.size));
@@ -269,7 +359,8 @@ async function aggiungiFile(file, daFotocamera = false) {
       }
       const anteprima = await creaAnteprima(singolo);
       await coda.aggiungiBozza(preparata, anteprima, singolo.name, tipo, {
-        genere: 'foto', estensione: 'jpg', dataScatto,
+        genere: 'foto', estensione: 'jpg',
+        dataScatto: quando.dataScatto, scattoStimato: quando.scattoStimato,
       });
     } catch (errore) {
       // Con la memoria piena il messaggio del browser è in inglese e nel suo
@@ -292,14 +383,32 @@ async function aggiungiFile(file, daFotocamera = false) {
   await ridisegna();
 }
 
+// «Invia comunque»: le foto messe da parte entrano in coda con la data di
+// ripiego e `scattoStimato` = 'SI'. Ripassano da `aggiungiFile` invece di
+// avere una strada propria, così il limite di peso, la preparazione secondo
+// la categoria e la gestione della memoria piena restano scritti una volta.
+async function accodaSenzaData() {
+  const attesa = senzaData;
+  senzaData = [];
+  await aggiungiFile(attesa, 'ripiego');
+}
+
 async function invia() {
   const commessa = radice.querySelector('#commessa').value;
   // Facoltativa per l'avanzamento — vuota è legittima, e si ricorda anche
   // quella — obbligatoria se in attesa c'è almeno una foto da archiviare.
   const fase = radice.querySelector('#fase').value;
   if (!commessa || (faseObbligatoria && !fase)) return;
+  // Un livello che la fase pretende e che non c'è ferma l'invio: la guardia sta
+  // anche qui e non solo sul pulsante, perché il pulsante lo si può premere
+  // nell'istante fra due ridisegni.
+  if (livelliCorrenti.mancanti.length > 0) return;
   const nota = radice.querySelector('#nota').value.trim();
-  const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota, fase);
+  const quante = await coda.confermaBozze(commessa, impostazioniApp.autore, nota, fase, {
+    piano: livelliCorrenti.piano,
+    unita: livelliCorrenti.unita,
+    prospetto: livelliCorrenti.prospetto,
+  });
   if (quante > 0) {
     coda.incrementaScattate(quante);
     const tipo = radice.querySelector('#categoria').value;
@@ -348,10 +457,23 @@ async function ridisegna() {
       : 'Compressa per partire veloce anche con poca rete.'
     : '';
 
+  // Il cantiere si legge qui perché da lui dipendono TUTTI i menù sotto: per
+  // un'urbanizzazione al posto delle fasi ci sono i lotti, e per un edificio
+  // compaiono i livelli che la fase pretende.
+  const commessaScelta = radice.querySelector('#commessa').value;
+  const conLotti = eUrbanizzazione(commessaScelta);
   radice.querySelector('#aiuto-fase').textContent =
     tipoScelto === 'ARCHIVIO' || bozze.some(r => r.tipo === 'ARCHIVIO')
-      ? 'Obbligatoria per le foto da archiviare: sul server finiscono nella cartella della fase.'
+      ? conLotti
+        ? 'Obbligatorio per le foto da archiviare: sul server finiscono nella cartella del lotto.'
+        : 'Obbligatoria per le foto da archiviare: sul server finiscono nella cartella della fase.'
       : '';
+
+  // Fase (o lotto), piano, unità, prospetto: li accende, li spegne e li
+  // ricostruisce la shell, con le regole dell'anagrafica. Torna quello che
+  // partirà — piano derivato compreso — e cosa manca ancora all'appello.
+  livelliCorrenti = sincronizzaLivelli(radice, commessaScelta, scappaHtml, '',
+    { fase: impostazioniFoto().ultimaFase });
 
   // Cambiare categoria con foto già pronte cambierebbe il significato di
   // quelle foto, non come sono state preparate: si avvisa invece di tacere.
@@ -360,6 +482,34 @@ async function ridisegna() {
     tipoScelto && tipiInAttesa.length > 0 && tipiInAttesa.some(t => t !== tipoScelto)
       ? `<p class="avviso avviso-attenzione">In attesa ci sono foto di tipo <strong>${scappaHtml(etichettaCategoria(tipiInAttesa[0]))}</strong>: partono con quel tipo, non con quello scelto adesso.</p>`
       : '';
+
+  // Foto senza ora dello scatto: fermate prima dell'invio, con le due vie
+  // d'uscita scritte. La prima è quella giusta e va detta per prima — l'album
+  // «Fotocamera» ha l'originale con l'EXIF intatto; la seconda esiste perché
+  // in cantiere non si può bloccare qualcuno su un file che non tornerà.
+  const avvisoSenzaData = radice.querySelector('#avviso-senza-data');
+  if (senzaData.length === 0) {
+    avvisoSenzaData.innerHTML = '';
+  } else {
+    const una = senzaData.length === 1;
+    avvisoSenzaData.innerHTML = `
+      <div class="avviso avviso-attenzione">
+        <p><strong>${una ? 'Questa foto non ha' : `Queste ${senzaData.length} foto non hanno`} la data di scatto.</strong>
+        Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>: lì la data c’è.</p>
+        <p class="tenue">${una ? 'È' : 'Sono'} quasi certamente ${una ? 'una copia ridotta' : 'copie ridotte'}
+        (Google Foto, WhatsApp). ${una ? 'Non è' : 'Non sono'} ancora in coda: se ${una ? 'la mandi' : 'le mandi'}
+        comunque, in archivio ${una ? 'va' : 'vanno'} con la data del file e dichiarata stimata.</p>
+        <div class="azioni-alternative">
+          <button id="senza-data-comunque" class="btn btn-secondario btn-minore" type="button">Aggiungi comunque ${una ? 'questa foto' : `queste ${senzaData.length} foto`}</button>
+          <button id="senza-data-scarta" class="btn btn-secondario btn-minore" type="button">Cerco ${una ? 'l’originale' : 'gli originali'}</button>
+        </div>
+      </div>`;
+    avvisoSenzaData.querySelector('#senza-data-comunque')
+      .addEventListener('click', () => { accodaSenzaData(); });
+    avvisoSenzaData.querySelector('#senza-data-scarta')
+      .addEventListener('click', () => { senzaData = []; ridisegna(); });
+    portaInVista(avvisoSenzaData);
+  }
 
   const anteprime = radice.querySelector('#anteprime');
   anteprime.innerHTML = bozze.map(r => {
@@ -384,15 +534,18 @@ async function ridisegna() {
     pulsante.addEventListener('click', () => eliminaBozza(pulsante.dataset.id));
   }
 
-  const commessaScelta = radice.querySelector('#commessa').value;
-  const faseScelta = radice.querySelector('#fase').value;
+  const faseScelta = livelliCorrenti.fase;
   // A decidere è ciò che sta per PARTIRE, non la categoria selezionata adesso:
   // un invio può contenere foto accodate con categorie diverse, e la fase vale
   // per tutte quelle dell'invio.
   faseObbligatoria = bozze.some(r => r.tipo === 'ARCHIVIO');
   const pulsanteInvia = radice.querySelector('#invia');
+  // I livelli non sono mai facoltativi: dove la fase li pretende, senza la
+  // scelta non si parte. Il ripiego non esiste di proposito — una foto
+  // d'archivio senza piano non saprebbe in quale cartella andare, e una foto
+  // che parte con un livello a caso è peggio di una foto ferma.
   pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta
-    || (faseObbligatoria && !faseScelta);
+    || (faseObbligatoria && !faseScelta) || livelliCorrenti.mancanti.length > 0;
   const quantiVideo = bozze.filter(r => r.genere === 'video').length;
   const quanteFoto = bozze.length - quantiVideo;
   const parti = [];
@@ -401,7 +554,8 @@ async function ridisegna() {
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
   const mancanti = [
     !commessaScelta && 'il cantiere',
-    faseObbligatoria && !faseScelta && 'la fase',
+    faseObbligatoria && !faseScelta && (conLotti ? 'il lotto' : 'la fase'),
+    ...livelliCorrenti.mancanti,
   ].filter(Boolean);
   radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && mancanti.length > 0
     ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.${
@@ -439,6 +593,16 @@ async function ridisegna() {
         ? `<div class="tenue">Caricato ${percentuale}%</div>` : '';
       const riprova = r.stato === 'errore'
         ? `<button class="btn btn-secondario btn-piccolo foto-riprova" data-id="${r.id}">Riprova</button>` : '';
+      // «Rimanda» su OGNI foto inviata, non solo quando si è sbagliato
+      // cantiere: una foto venuta male o con un dato sbagliato si corregge, e
+      // una che si teme non sia arrivata si rimanda per sentirselo dire.
+      // Serve la foto sul dispositivo: rimandare una miniatura al posto
+      // dell'originale consegnerebbe all'ufficio una foto peggiore.
+      const rimanda = r.stato === 'inviata' && r.foto
+        ? `<button class="btn btn-secondario btn-piccolo foto-rimanda" data-id="${r.id}">${
+          rimandoAperto === r.id ? 'Chiudi' : 'Rimanda'}</button>` : '';
+      const giaPresente = r.giaPresente
+        ? '<div class="tenue">Era già in raccolta: nessun doppione creato.</div>' : '';
       const nota = r.nota ? `<div class="tenue">${scappaHtml(r.nota)}</div>` : '';
       return `
         <li class="foto-voce">
@@ -452,16 +616,18 @@ async function ridisegna() {
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
               <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
               ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(etichettaFase(r.fase))}` : ''} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''}${scappaHtml(scritturaLivelli(r))} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
             ${nota}
+            ${giaPresente}
             ${avanzamento}
             ${messaggioErrore}
           </div>
           <div class="foto-azioni">
             <span class="badge ${stato.classe}">${stato.testo}</span>
             ${riprova}
+            ${rimanda}
           </div>
         </li>
       `;
@@ -469,7 +635,132 @@ async function ridisegna() {
     for (const pulsante of lista.querySelectorAll('.foto-riprova')) {
       pulsante.addEventListener('click', () => invio.riprova(pulsante.dataset.id));
     }
+    for (const pulsante of lista.querySelectorAll('.foto-rimanda')) {
+      pulsante.addEventListener('click', () => {
+        rimandoAperto = rimandoAperto === pulsante.dataset.id ? '' : pulsante.dataset.id;
+        ridisegna();
+      });
+    }
   }
+
+  disegnaRimando(record);
+}
+
+// Quello che c'è scritto nel riquadro adesso, e se differisce dall'invio
+// originale. Lo leggono sia il ridisegno — per l'etichetta del pulsante — sia
+// l'azione: una sola lettura, così il pulsante non può dire una cosa e fare
+// l'altra.
+function lettureRimando(riquadro, record) {
+  const commessa = riquadro.querySelector('#r-commessa').value;
+  const livelli = sincronizzaLivelli(riquadro, commessa, scappaHtml, 'r-', {
+    fase: record.fase || '',
+    piano: record.piano || '',
+    unita: record.unita || '',
+    prospetto: record.prospetto || '',
+  });
+  const nota = riquadro.querySelector('#r-nota').value.trim();
+  const uguale = (a, b) => (a || '') === (b || '');
+  const cambiato = !uguale(commessa, record.commessa)
+    || !uguale(livelli.fase, record.fase)
+    || !uguale(livelli.piano, record.piano)
+    || !uguale(livelli.unita, record.unita)
+    || !uguale(livelli.prospetto, record.prospetto)
+    || !uguale(nota, record.nota);
+  const mancanti = [!commessa && 'il cantiere', ...livelli.mancanti].filter(Boolean);
+  return { commessa, livelli, nota, cambiato, mancanti };
+}
+
+function disegnaRimando(tutti) {
+  const riquadro = radice.querySelector('#riquadro-rimando');
+  if (!riquadro) return;
+  const record = tutti.find(r => r.id === rimandoAperto && r.stato === 'inviata');
+  if (!record) {
+    if (riquadro.dataset.id) {
+      riquadro.dataset.id = '';
+      riquadro.innerHTML = '';
+    }
+    return;
+  }
+  // Si ricostruisce solo al cambio di foto: a ogni ridisegno si aggiornano i
+  // menù e il pulsante, non il markup — altrimenti una correzione a metà
+  // sparirebbe perché nel frattempo è finito un invio.
+  if (riquadro.dataset.id !== record.id) {
+    riquadro.dataset.id = record.id;
+    riquadro.innerHTML = `
+      <div class="riquadro-rimando">
+        <p class="titolo">Rimanda questa foto</p>
+        <div class="campo">
+          <label for="r-commessa">Cantiere</label>
+          <select id="r-commessa">${CANTIERI.map(c =>
+            `<option value="${scappaHtml(c.codice)}"${c.codice === record.commessa ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`).join('')}</select>
+        </div>
+        ${campiLivelli('r-')}
+        <div class="campo">
+          <label for="r-nota">Nota</label>
+          <input id="r-nota" type="text" maxlength="255" value="${scappaHtml(record.nota || '')}">
+        </div>
+        <p id="r-spiegazione" class="aiuto tenue"></p>
+        <div class="azioni-alternative">
+          <button id="r-manda" class="btn btn-secondario btn-minore" type="button">Rimanda</button>
+        </div>
+        <p id="r-esito" class="tenue"></p>
+      </div>`;
+    riquadro.querySelector('#r-commessa').addEventListener('change', () => { ridisegna(); });
+    for (const id of ['#r-fase', '#r-piano', '#r-unita', '#r-prospetto']) {
+      riquadro.querySelector(id).addEventListener('change', () => { ridisegna(); });
+    }
+    riquadro.querySelector('#r-nota').addEventListener('input', () => { ridisegna(); });
+    riquadro.querySelector('#r-manda').addEventListener('click', () => { eseguiRimando(record.id); });
+    portaInVista(riquadro);
+  }
+
+  const letture = lettureRimando(riquadro, record);
+  const pulsante = riquadro.querySelector('#r-manda');
+  pulsante.disabled = letture.mancanti.length > 0;
+  // Le due strade sono scritte sul pulsante, non nascoste dietro un unico
+  // «Rimanda»: sono due cose diverse in raccolta, e chi preme deve sapere
+  // quale delle due sta facendo.
+  pulsante.textContent = letture.cambiato ? 'Rimanda corretta' : 'Rimanda la stessa';
+  riquadro.querySelector('#r-spiegazione').textContent = letture.mancanti.length > 0
+    ? `Scegli ${letture.mancanti.join(' e ')} per rimandarla.`
+    : letture.cambiato
+      ? 'Invio nuovo, con un identificativo nuovo: quella già mandata resta in raccolta e va annullata dall’ufficio.'
+      : 'Stesso identificativo: se era già arrivata non si crea un doppione, e l’app te lo dice.';
+}
+
+async function eseguiRimando(id) {
+  const riquadro = radice.querySelector('#riquadro-rimando');
+  const record = (await coda.elenca()).find(r => r.id === id);
+  if (!riquadro || !record) return;
+  const letture = lettureRimando(riquadro, record);
+  if (letture.mancanti.length > 0) return;
+  riquadro.querySelector('#r-manda').disabled = true;
+  riquadro.querySelector('#r-esito').textContent = 'In coda…';
+  try {
+    if (letture.cambiato) {
+      await coda.rimandaCorretta(id, {
+        commessa: letture.commessa,
+        fase: letture.livelli.fase,
+        piano: letture.livelli.piano,
+        unita: letture.livelli.unita,
+        prospetto: letture.livelli.prospetto,
+        nota: letture.nota,
+        autore: impostazioniApp.autore || record.autore,
+      });
+      // Una foto in più che deve atterrare: va contata, altrimenti il
+      // confronto «scattate contro atterrate» non torna.
+      coda.incrementaScattate(1);
+    } else {
+      await coda.rimandaStessa(id);
+    }
+  } catch {
+    riquadro.querySelector('#r-esito').textContent = 'Non è stato possibile rimetterla in coda: riprova.';
+    riquadro.querySelector('#r-manda').disabled = false;
+    return;
+  }
+  rimandoAperto = '';
+  await ridisegna();
+  invio.avvia();
 }
 
 invio.alCambiamento(() => { ridisegna(); });
@@ -500,6 +791,10 @@ export default {
       oggi: coda.contatoriOggi(),
       righe: [
         ['Numero progressivo raggiunto', progressivo ? String(progressivo) : '—'],
+        // Quale copia dell'anagrafica sta girando su questo telefono. Quando
+        // l'ufficio dice «ho aggiornato piani e unità» questo numero è la
+        // risposta: se è quello vecchio, l'app non ha ancora la copia nuova.
+        ['Anagrafica dei livelli', VERSIONE_ANAGRAFICA],
       ],
     };
   },

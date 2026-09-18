@@ -1,10 +1,14 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 9 del 16/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 10 del 18/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
 >
-> **Rev. 9 — sette commesse selezionabili** (erano tre): `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2`, in `core/cantieri.js`, menù in ordine alfabetico di codice imposto da un `sort()`. Il campo `commessa` non cambia forma — viaggia il solo codice — e nessun campo nuovo entra nel contratto: il lato ricevente deriva la cartella dal codice con una regola. Dalla **0.35.0**. Rev. 8 — la fase viaggia come CODICE senza spazi (§4.4): in colonna e nel nome della cartella sul server c'è `FinituraAlloggi`, a video l'operatore legge «Finitura alloggi». Dalla **0.34.0**. Rev. 7 — la fase è OBBLIGATORIA per la categoria `ARCHIVIO` (§4.4), dalla **0.33.0**: quelle foto sul server vanno nella **cartella della fase** (§6), e senza fase non saprebbero dove andare. Per l'`AVANZAMENTO` resta facoltativa. Rev. 6 — campo `fase` (§4, §4.4): la fase di lavoro a cui la foto si attribuisce, da elenco chiuso di gruppo; **serve una colonna `Fase` in raccolta** (§5). Dalla **0.31.0**. Rev. 5 — `dataScatto` è finalmente l'ora dello scatto (§4.1): fino alla 0.28.0 era l'ora dell'invio, misurato in produzione il 14/09. Dalla **0.29.0** l'app legge l'ora dall'EXIF della foto originale e, quando non ci riesce, lo **dichiara** con il campo nuovo `scattoStimato`. **Serve una colonna nuova in raccolta** (§5). Rev. 4 — esiti del collaudo del 14/09 (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
+> **Rev. 10 — i LIVELLI dell'archivio** (§4.5), dalla **0.36.0**, decisi da Francesco il 18/09/2026. Sotto la fase l'archivio di commessa guadagna un livello, e dove quel livello è obbligatorio **sostituisce la cartella del mese** (§6). Quattro cose nel contratto: (1) per le **urbanizzazioni** (`SNU`, `BRU`) il **lotto prende il posto della fase** e viaggia nello stesso campo `fase` col suo codice (`Lotto2`); (2) tre campi nuovi — **`piano`**, **`unita`**, **`prospetto`** — codici senza spazi, `null` dove non si applicano e **mai stringa vuota**; (3) con l'unità il **piano non si chiede**: si ricava dalla mappa dell'anagrafica e si manda comunque; (4) **servono tre colonne nuove in raccolta** (§5). Più due cose che il contratto non tocca: **«Rimanda» su ogni elemento inviato** (§2, due casi distinti) e l'**avviso sulle foto senza data di scatto** (§4.1). L'anagrafica di piani, unità, prospetti e lotti sta in `core/anagrafica.js`, è la **copia di un master su `L:`** e si sostituisce in blocco: la sua `versione` compare nella pagina Informazioni. Rev. 9 — **sette commesse selezionabili** (erano tre): `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2`, in `core/cantieri.js`, menù in ordine alfabetico di codice imposto da un `sort()`. Il campo `commessa` non cambia forma — viaggia il solo codice — e nessun campo nuovo entra nel contratto: il lato ricevente deriva la cartella dal codice con una regola. Dalla **0.35.0**. Rev. 8 — la fase viaggia come CODICE senza spazi (§4.4): in colonna e nel nome della cartella sul server c'è `FinituraAlloggi`, a video l'operatore legge «Finitura alloggi». Dalla **0.34.0**. Rev. 7 — la fase è OBBLIGATORIA per la categoria `ARCHIVIO` (§4.4), dalla **0.33.0**: quelle foto sul server vanno nella **cartella della fase** (§6), e senza fase non saprebbero dove andare. Per l'`AVANZAMENTO` resta facoltativa. Rev. 6 — campo `fase` (§4, §4.4): la fase di lavoro a cui la foto si attribuisce, da elenco chiuso di gruppo; **serve una colonna `Fase` in raccolta** (§5). Dalla **0.31.0**. Rev. 5 — `dataScatto` è finalmente l'ora dello scatto (§4.1): fino alla 0.28.0 era l'ora dell'invio, misurato in produzione il 14/09. Dalla **0.29.0** l'app legge l'ora dall'EXIF della foto originale e, quando non ci riesce, lo **dichiara** con il campo nuovo `scattoStimato`. **Serve una colonna nuova in raccolta** (§5). Rev. 4 — esiti del collaudo del 14/09 (§5), marcatore dello scarico deciso e percorsi di destinazione non più «mancanti» (§6). Rev. 3 — riallineata al collaudo del ricevente (`docs/FotoCantiereBriefingRicevente.md`, 10/09/2026 sera): raccolta e flow esistono e sono collaudati, `DataScatto` viaggia come 12 cifre, i campi numerici vogliono un numero vero, le foto portano `idDispositivo` e `progressivo`, il caricamento a blocchi resta fermo. **Dove questo documento e il briefing divergessero ancora, fa fede il briefing:** lì c'è ciò che è stato misurato sul tenant.
 >
-> ⚠️ **Due punti aperti:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis); e l'ora di ripresa dei **video**, che non sta nell'EXIF e per ora resta stimata (§4.1). La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
+> ⚠️ **Due punti aperti:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis); e l'ora di ripresa dei **video**, che non sta nell'EXIF e per ora resta stimata (§4.1).
+>
+> ✅ **Il lato ricevente è pronto per le foto, dal 18/09/2026 ore 16:05.** Le tre colonne esistono in `FotoCantiere` (testo 255, non obbligatorie, nome interno identico al visualizzato) e il flow le mappa su `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. Verificato con un invio vero: le colonne di sempre si compilano, le tre nuove arrivano `null` — cioè il ramo regge, **ma l'aggancio quando i campi ci sono resta da dimostrare**, e lo dimostra il primo invio dalla 0.36.0. Per questo il rilascio si fa **presidiato**, guardando la prima foto di ognuna delle quattro famiglie: piano, unità, prospetto, nessun livello.
+>
+> 🔴 **`BolleInArrivo` non ha quelle colonne e non le prende.** Conseguenza: **il modulo Bolle non chiede i livelli e non li manda** — vedi la specifica Bolle, rev. 6. Il lotto invece sì, perché viaggia nel campo `fase`. Resta aperto lo smistamento del venerdì (§6): finché non è riscritto, i livelli arrivano in raccolta e nessuno li usa — le foto però sono a posto, e si smistano appena il runbook c'è. La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
 
 ## 1. A cosa serve
 
@@ -23,12 +27,16 @@ Una sola schermata di lavoro, con la stessa impostazione di Bolle:
 
 1. **Tipo di foto** (obbligatorio) — le due categorie sopra. Sotto, una riga che dice cosa comporta la scelta: *«Compressa per partire veloce anche con poca rete»* oppure *«Inviata a risoluzione originale: pesa di più e con poca rete parte più lentamente»*.
 2. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice.
-   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js` più «nessuna fase», lo stesso delle bolle, ultima scelta preselezionata. **Obbligatoria se fra le foto in attesa ce n'è almeno una `ARCHIVIO`**, facoltativa altrimenti (§4.4).
+   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js` più «nessuna fase», lo stesso delle bolle, ultima scelta preselezionata. **Obbligatoria se fra le foto in attesa ce n'è almeno una `ARCHIVIO`**, facoltativa altrimenti (§4.4). Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
+   **Piano**, **Unità**, **Prospetto** — compaiono **solo dove la fase li pretende**, e dove compaiono sono obbligatori: non esistono livelli facoltativi (§4.5). Con l'unità il piano non si chiede — lo ricava l'app — ma si legge sotto il menù, perché l'operatore non l'ha scelto e vederlo è il solo modo che ha di accorgersi se non torna. **Nessuno dei tre è preselezionato:** un livello è il nome di una cartella sul server, e una scelta preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato senza fare rumore. Costa un tocco per invio, non per foto.
 3. **Scatta foto** — apre la **fotocamera dentro l'app** (`core/fotocamera.js`, la stessa del modulo Bolle): si scatta più volte di fila senza uscire, con rullino e contatore, poi *Fine*. Accanto restano **Usa la fotocamera del telefono** e **Scegli dalla galleria** (multi-foto). Anteprime rimovibili, ognuna con categoria e peso reale del file che partirà.
    Qui gli scatti di una sessione **non** vengono raggruppati: ogni foto è una foto. Il gesto però è identico a quello delle bolle, così chi usa l'app impara una sola cosa.
 4. **Nota** (facoltativa, max 255 caratteri) — vale per tutte le foto di quell'invio. Si svuota dopo l'invio, perché la nota successiva è un'altra cosa.
 5. **Invia** — resta disabilitato finché non c'è almeno una foto e un cantiere, e finché manca la fase se fra le foto in attesa ce n'è una da archiviare. L'avviso accanto al pulsante dice cosa manca e perché.
-6. **Coda invii** con gli stati e i contatori del giorno, come in Bolle. Ogni riga porta il **numero progressivo** (`n. 47`), che si legge a voce quando l'ufficio segnala un buco nella sequenza. Gli stati usano le classi del design system della shell: quelle sbagliate — e per un giorno lo sono state — fanno uscire «Inviata» senza colore, cioè senza conferma visiva che la foto sia arrivata.
+6. **Rimanda** — sotto ogni elemento **già inviato**, foto e bolle, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Prima esisteva solo per le bolle, solo dallo storico, e solo per correggere il cantiere. Si apre un riquadro con i campi dell'invio già compilati, e il pulsante **dice quale delle due cose sta per fare**, perché in raccolta sono due cose diverse:
+   - **«Rimanda la stessa»** (niente modificato) → **stesso `idClient` e stesso progressivo**. Il flow riconosce il duplicato, risponde `gia_presente` e non crea un secondo file; l'app scrive *«Era già in raccolta: nessun doppione creato»*. Non conta fra le «inviate oggi», perché in raccolta non è arrivato niente di nuovo — e quel contatore serve a essere confrontato coi file atterrati.
+   - **«Rimanda corretta»** (cantiere, fase, livelli o nota cambiati) → **`idClient` nuovo e progressivo nuovo**: è un invio nuovo a tutti gli effetti. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può saperlo se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta.
+7. **Coda invii** con gli stati e i contatori del giorno, come in Bolle. Ogni riga porta il **numero progressivo** (`n. 47`), che si legge a voce quando l'ufficio segnala un buco nella sequenza. Gli stati usano le classi del design system della shell: quelle sbagliate — e per un giorno lo sono state — fanno uscire «Inviata» senza colore, cioè senza conferma visiva che la foto sia arrivata.
 
 Nelle impostazioni del modulo c'è **Configura un altro telefono**: genera un QR che porta indirizzo e codice su un altro dispositivo senza digitare nulla. Il link è **solo di questo modulo** — le bolle hanno una destinazione propria e un link proprio. Serve prima di distribuire l'app agli operai: l'URL del trigger è lungo e firmato, e sulle bolle una copia manuale è già costata un'ora di diagnosi per una lettera cambiata nel nome di un parametro e un carattere perso dalla firma.
 
@@ -76,7 +84,11 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
 { "token": "…",
   "tipo": "AVANZAMENTO",              // oppure ARCHIVIO
   "commessa": "MAR",                  // solo il codice; sette commesse dal 16/09/2026
-  "fase": "FinituraAlloggi",          // CODICE della fase, senza spazi, vedi §4.4
+  "fase": "FinituraAlloggi",          // CODICE della fase senza spazi (§4.4);
+                                      //   per SNU e BRU qui c'è il LOTTO: "Lotto2" (§4.5)
+  "piano": "P1",                      // livelli dell'archivio (§4.5), codici senza spazi.
+  "unita": "1A",                      //   null dove il livello non si applica,
+  "prospetto": null,                  //   MAI stringa vuota
   "operatore": "Paolo Sanzarello",
   "nota": "Getto solaio piano 3 completato",   // può essere vuota
   "genere": "foto",                   // oppure "video"
@@ -88,7 +100,7 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
   "progressivo": 47,                  // NUMERO, sequenza per dispositivo
   "dataScatto": "2026-09-14T08:31:39+02:00",   // ora dello SCATTO, non dell'invio
   "scattoStimato": "NO",              // "SI" = è un ripiego, vedi §4.1
-  "versioneApp": "0.29.0",
+  "versioneApp": "0.36.0",
   "nomeFile": "…",                    // IGNORATO dal backend: lo compone il flow
   "contenutoBase64": "…" }
 ```
@@ -105,14 +117,30 @@ La prova: due foto `ARCHIVIO` della commessa SNZ2.2 sono in raccolta con `DataSc
 
 Perché è grave: per l'archivio di commessa **l'ora dello scatto è il dato**, ed è il criterio con cui il flow sceglie le cartelle `AAAA/AAAAMM`. Una foto fatta il 30 del mese e mandata il 1º del mese dopo finiva nella cartella sbagliata. E soprattutto **non faceva rumore**: in colonna si legge un'ora plausibile, e nessuno ha modo di accorgersi che è l'ora sbagliata.
 
-#### Da dove viene l'ora, dalla 0.29.0
+#### Da dove viene l'ora, dalla 0.36.0
+
+**Conta da dove arriva il file, e non solo cosa c'è scritto dentro.** È l'unica cosa che distingue «scattata adesso, su richiesta dell'app» da «scelta dalla galleria, e può essere di tre mesi fa»: nel primo caso l'ora del file dista secondi dallo scatto anche senza EXIF, nel secondo non dista niente di conoscibile.
 
 | Come arriva la foto | Ora usata | `scattoStimato` |
 |---|---|---|
-| Scelta dalla galleria, o scattata con la fotocamera **di sistema** | `DateTimeOriginal` (tag EXIF `0x9003`) letto dal file **originale** | `NO` |
 | Scattata con la fotocamera **dentro l'app** | l'orologio del telefono **all'istante dello scatto** (il file nasce lì: nessun EXIF da leggere, e nessuno da cercare) | `NO` |
-| Foto senza EXIF, senza quel tag, o con una data assurda | l'ora di accodamento — il comportamento di prima | `SI` |
+| Scattata con la fotocamera **del telefono aperta dall'app** — e l'EXIF c'è | `DateTimeOriginal` (tag EXIF `0x9003`) letto dal file **originale** | `NO` |
+| Scattata con la fotocamera **del telefono aperta dall'app** — e l'EXIF manca | la data del file: la foto è di un istante fa, lo scarto è di secondi | `NO` |
+| **Scelta dalla galleria** — e l'EXIF c'è | `DateTimeOriginal` dal file originale | `NO` |
+| **Scelta dalla galleria** — e l'EXIF manca, o la data è assurda | **la foto NON entra in coda:** l'app avvisa e chiede (vedi sotto). Mandata comunque: la data del file se plausibile, altrimenti l'ora dell'invio | `SI` |
 | **Video** | l'ora di accodamento — punto aperto, vedi sotto | `SI` |
+
+#### Le copie ridotte, e perché si fermano (dalla 0.36.0)
+
+**Il caso, misurato il 17/09/2026.** Cinque foto scelte dalla galleria erano **copie ridotte** — Google Foto dopo «Libera spazio», oppure WhatsApp — con lato lungo 1600 px e **nessun EXIF**. L'app ha stimato `dataScatto` = ora dell'invio, e in archivio sono finite con un'ora falsa nel nome. Se scatto e invio cadono in due mesi diversi, la foto finisce **nel mese sbagliato** e non se ne accorge nessuno: la stima è plausibile, e lo `scattoStimato` = `SI` lo dice a chi va a guardare — cioè a nessuno, prima che sia tardi.
+
+**Cosa fa l'app adesso.** Un file di galleria senza `DateTimeOriginal` **non entra in coda**. Compare un avviso, con la via d'uscita giusta **per prima**: *«Questa foto non ha la data di scatto. Cerca l'originale nell'album Fotocamera: lì la data c'è»*, e sotto le due azioni — *Aggiungi comunque* e *Cerco l'originale*. Non è un blocco: in cantiere non si può fermare qualcuno su un file che non tornerà. È una scelta consapevole al posto di una stima silenziosa.
+
+Se si manda comunque: **`dataScatto` = data del file** (`lastModified`) quando è plausibile — **non nel futuro e non prima del 2020** — altrimenti l'ora dell'invio; `scattoStimato` = `SI` in ogni caso. La data del file è quasi sempre molto più vicina allo scatto dell'ora in cui si preme Invia: una copia ridotta viene creata poco dopo lo scatto e conserva quella.
+
+**Non si perde niente a fermarle:** un file scelto dalla galleria è ancora nella galleria. Le foto **scattate** dall'app non passano mai da qui — quelle l'ora ce l'hanno.
+
+Una data EXIF **assurda** (l'orologio mai impostato: `1970`, `2001`, `2008`) vale come assente e segue la stessa strada. Il tag c'è, il valore no.
 
 **La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la preparazione dell'`AVANZAMENTO` (2500 px, qualità 0,85) passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo mai — e il difetto sarebbe tornato su una categoria sola, che è il modo più efficace di non accorgersene.
 
@@ -126,7 +154,9 @@ Se non c'è — e su molti telefoni non c'è — le cifre si leggono come **ora 
 
 #### `scattoStimato`: `SI` / `NO`
 
-Campo **nuovo**, testo, sempre presente. Vale `NO` quando l'ora è stata misurata e `SI` quando è un ripiego, cioè quando in `dataScatto` c'è l'ora di accodamento perché quella dello scatto non si è potuta sapere.
+Campo **nuovo dalla 0.29.0**, testo, sempre presente. Vale `NO` quando l'ora è stata misurata e `SI` quando è un ripiego, cioè quando in `dataScatto` non c'è l'ora dello scatto perché non si è potuta sapere.
+
+**Dalla 0.36.0 il confine è più netto:** `NO` copre tutte le foto **scattate** — dentro l'app o con la fotocamera del telefono aperta dall'app — e tutte quelle che portano l'EXIF; `SI` resta alle **copie senza data** (e ai video, punto aperto). I due casi prima si confondevano, e in colonna si leggevano uguali.
 
 Serve a **non dover distinguere a mano una misura da un'approssimazione**: senza, in colonna ci sarebbero due dati diversi con lo stesso aspetto, ed è esattamente la condizione che ha reso invisibile il difetto per due settimane. È testo `SI`/`NO` e **non una colonna Sì/No**: le colonne booleane sono fra quelle che il connettore riscrive più volentieri, e qui il rischio non vale il risparmio.
 
@@ -183,6 +213,10 @@ Il campo arriva **vuoto** quando la fase non è stata indicata (avanzamento, o b
 
 **Elenco chiuso**, lo stesso per Bolle e Foto, nella shell (`core/fasi.js`), dato da Francesco il 14/09/2026, in ordine alfabetico. **Non si scrive a mano**: «Murature», «murature» e «Muratura» in colonna sarebbero tre fasi.
 
+**Per le urbanizzazioni il LOTTO prende il posto della fase (dalla 0.36.0).** Su `SNU` e `BRU` il menù non mostra le fasi ma i lotti di quella commessa — `Lotto1`…`Lotto4` per SNU, `Lotto1`…`Lotto3` per BRU — e il valore viaggia **nello stesso campo `fase`**, col suo codice senza spazi, come `FinituraAlloggi`. A valle è sempre la stessa cosa: la cartella immediatamente sotto la commessa. A video l'etichetta ha lo spazio («Lotto 2»), nel campo no. Il selettore è **condiviso col modulo Bolle**, quindi anche una bolla di SNU prende il lotto: è voluto.
+
+**Un filtro sulle fasi (dalla 0.36.0).** Una commessa senza piani interrati **non vede la fase `Interrato`** — è il caso di `MAR`: offrirla vorrebbe dire offrire una cartella che non esisterà mai. Una commessa **senza anagrafica** (le concluse `SNZ2.1` e `MRS`, o una nuova) non si filtra: non sapere com'è fatta non è un motivo per togliere voci a chi sta scattando.
+
 **Codice ed etichetta (dalla 0.34.0).** Come per i cantieri e per le categorie, viaggia il **codice** — senza spazi, PascalCase — mentre a video l'operatore legge l'**etichetta**. Il motivo è lo smistamento sul server (§6): le cartelle non hanno spazi nel nome, e **il codice È il nome della cartella**, senza tabelle di conversione fra colonna e cartella da tenere allineate. Le 26 fasi, `codice` = `etichetta` dove coincidono:
 
 | Codice (in colonna e cartella) | Etichetta (a video) |
@@ -205,6 +239,38 @@ Il campo arriva **vuoto** quando la fase non è stata indicata (avanzamento, o b
 **Nell'app** è un menù a tendina accanto al cantiere, **facoltativo**: la prima voce è «— nessuna fase —», sempre selezionabile, e con quella si invia lo stesso. L'ultima scelta si ripropone al prossimo invio, «nessuna» compresa, come il cantiere: non aggiunge tocchi al giro. Vale per tutte le foto di uno stesso invio, come commessa e nota.
 
 **Lato raccolta serve la colonna `Fase`** (riga di testo singola), mappata sul campo omonimo. Finché non c'è, il flow ignora il campo e le foto atterrano lo stesso: il rilascio è indipendente. Vuota = fase non indicata (solo `AVANZAMENTO`, dalla 0.33.0), oppure foto di una versione precedente alla 0.31.0.
+
+### 4.5 I livelli dell'archivio: `piano`, `unita`, `prospetto`
+
+Tre campi **nuovi dalla 0.36.0**, decisi da Francesco il 18/09/2026. Sotto la fase l'archivio di commessa guadagna un livello, e **dove quel livello è obbligatorio sostituisce la cartella del mese** (§6):
+
+```
+Bonifica\202609\<file>                  fase senza livelli: resta il mese
+Strutture\P1\<file>                     piano obbligatorio
+FinituraAlloggi\P1\1.01\<file>          unità obbligatoria, piano derivato
+FinituraFacciata\Nord\<file>            prospetto obbligatorio
+Lotto2\202609\<file>                    urbanizzazioni: il lotto fa da fase
+```
+
+**Non esistono livelli facoltativi: ogni fase o pretende il livello, o non lo chiede.** È la regola che rende il percorso calcolabile senza eccezioni, e il motivo per cui la tabella ha tre valori e non quattro. Delle 26 fasi: **10 vogliono il piano, 4 l'unità, 1 il prospetto** (`FinituraFacciata`), **11 niente**.
+
+| Valore in anagrafica | Cosa fa l'app |
+|---|---|
+| `O` — obbligatorio | il menù compare e **senza la scelta non si invia**: Invia resta spento e l'avviso dice cosa manca |
+| `D` — derivato | il menù **non** compare: il valore si ricava dall'anagrafica e **viaggia comunque** |
+| `-` | il menù non compare e il campo **non viaggia**: arriva `null` |
+
+**Il piano derivato.** Dove la fase pretende l'unità (`FinituraAlloggi`, `ImpiantoElettricoAlloggi`, `ImpiantoIdrosanitario`, `ImpiantoTermicoAlloggi`) il piano è `D`: non si chiede — sarebbe un tocco in più per un dato che l'unità già determina — ma si manda, perché il percorso a valle è `[Fase]\[Piano]\[Unità]\` e senza il piano la cartella non si costruisce.
+
+⚠️ **La mappa unità → piano NON si deduce dal codice dell'unità.** Le commesse numerano diversamente: `1.01` in MAR, `1A` in MNG e in SNZ2.2. Una regola «primo carattere» funzionerebbe su `1A` → `P1` e **sbaglierebbe su `10A`**, che sta al `P10` e finirebbe al `P1` — in una cartella che esiste, nell'appartamento di un altro. Si legge dalla mappa, sempre. Il collaudo `15-livelli.js` prova proprio `10A`, perché è il caso su cui le due strade danno risultati diversi.
+
+**Il filtro sui piani.** Per la fase `Interrato` l'app offre **solo i piani con ordine negativo**: «Interrato, piano terzo» è una scelta che non vuol dire niente, e in cartella diventerebbe un percorso che nessuno cerca.
+
+**`null`, mai stringa vuota.** Dove il livello non si applica il campo arriva `null` e non `''`. Vale la regola già registrata dei campi vuoti: una colonna con `''` somiglia a un dato e non lo è, e sui campi numerici una stringa vuota è già costata venti foto entrate senza colonne il 10/09. I tre campi **viaggiano sempre**, anche quando valgono `null`: un campo assente e un campo nullo si comportano diversamente in un flow, e meglio uno solo dei due casi.
+
+**Commesse senza anagrafica.** `SNZ2.1` e `MRS` sono concluse e in anagrafica non ci sono; una commessa nuova non ce l'ha ancora. Per loro non c'è nessun livello da offrire: le fasi restano tutte disponibili e i tre campi arrivano `null`. A valle la foto finisce nella cartella del mese con un'anomalia — **voluto**: non si blocca chi sta scattando in cantiere per un dato che manca in ufficio.
+
+**Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, e la tabella `livelliPerFase`. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (`202609181330`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
 
 ## 4-bis. Caricamento a blocchi — scritto nell'app, FERMO in attesa del presupposto
 
@@ -272,6 +338,9 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 | `DurataSecondi` | Numero, 0 decimali | `durataSecondi` — vedi §4.2 |
 | `DataScarico` | — | scritta dal runbook del venerdì, non dall'app |
 | `ScattoStimato` | Riga di testo singola | `scattoStimato` — **DA AGGIUNGERE**, vedi sotto |
+| `Piano` | Riga di testo singola (255) | `piano` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Codice senza spazi (`P1`, `P-2`, `P10`), che è anche il nome della cartella. Vuota dove la fase non prevede il piano |
+| `Unita` | Riga di testo singola (255) | `unita` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Nome interno senza accento. Codice così com'è in anagrafica (`1.01` su MAR, `1A` su MNG): **niente normalizzazioni**, il punto fa parte del codice |
+| `Prospetto` | Riga di testo singola (255) | `prospetto` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. `Nord`, `Sud`, `Est` o `Ovest`; valorizzata solo su `FinituraFacciata` |
 
 **Colonna da aggiungere, con la 0.29.0: `ScattoStimato`** (riga di testo singola), mappata sul campo omonimo del payload. Finché non c'è, il flow **ignora** il campo — che è il motivo per cui l'app può essere rilasciata subito e senza coordinamento: le foto continuano ad atterrare, con l'ora giusta, e si perde solo l'indicazione se quell'ora sia misurata o stimata. Valori attesi: `SI` e `NO`, nient'altro. Una vista con filtro `ScattoStimato = SI` dice al volo quali foto hanno un'ora approssimativa.
 
@@ -321,6 +390,38 @@ Provato in locale con i collaudi automatici del repo (`node collaudi/esegui.js`,
 
 **Cosa questo NON dimostra:** la prova è su foto costruite, non su foto vere di un telefono vero. Sul campo restano da verificare **un iPhone** (che scrive l'ordine `MM` e spesso HEIC: in HEIC l'ora resta stimata) e **un Android** con l'ora regolata a mano. Il modo di verificarlo è quello solito: mandare una foto vecchia dalla galleria e confrontare `DataScatto` in raccolta con l'ora che il telefono mostra nella galleria — **non** con `Created`.
 
+### Rilascio 0.36.0 — i livelli dell'archivio
+
+**Stato al 18/09/2026 ore 16:05.**
+
+1. ✅ **Tre colonne in `FotoCantiere`** — `Piano`, `Unita`, `Prospetto`, testo 255, non obbligatorie, nome interno identico al visualizzato. **Fatte.**
+2. ✅ **Tre mappature in `Update file properties`** — `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. **Fatte**, e verificate con un invio vero: le tre colonne arrivano `null`, che è il comportamento giusto per una 0.35.0 che non manda quei campi. **Che la mappatura agganci quando i campi ci sono lo dimostra il primo invio dalla 0.36.0**, non questo: un `null` che arriva da un campo assente e un `null` che arriva da una mappatura rotta si leggono uguali.
+3. ❌ **In `BolleInArrivo` NON si aggiungono.** Deciso il 18/09: quelle colonne non ci sono e non ci saranno, quindi il modulo Bolle **non chiede i livelli e non li manda** (specifica Bolle, rev. 6). Un campo che arriva e viene scartato in silenzio è peggio di un campo che non parte — peggio ancora se per sceglierlo l'operatore si è fermato.
+4. ⏳ **Lo smistamento del runbook del venerdì** va riscritto secondo la tabella di §6: dove il livello c'è, **sostituisce la cartella del mese**. **Aperto.** Non blocca il rilascio: finché non c'è, i livelli restano in raccolta senza essere usati.
+
+🔴 **Il rilascio si fa presidiato.** La prova dell'aggancio è la prima foto di **ognuna delle quattro famiglie** — una con il piano, una con l'unità, una con il prospetto, una senza livelli — guardata in raccolta subito dopo l'invio. Tre famiglie su quattro non bastano: una mappatura può agganciare su un campo e non sull'altro, e la famiglia «senza livelli» è quella che dimostra che il `null` non rompe la scrittura delle altre colonne.
+
+⚠️ **Niente conversioni sui codici.** `1.01` resta `1.01` col punto, `P-2` resta `P-2` col segno. Quello che arriva in colonna **è** il nome della cartella: è la scelta che evita una tabella di corrispondenza fra due posti, che il giorno che si aggiunge un piano si disallinea in silenzio.
+
+Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda.js`), sui numeri:
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| SNU e BRU, menù della fase | 4 e 3 lotti, etichetta del campo «Lotto» | ✓ |
+| `MAR`, elenco delle fasi | 25 voci: `Interrato` non c'è (MAR non ha interrati) | ✓ |
+| `MNG` + `Interrato`, piani offerti | solo `P-2` e `P-1` | ✓ |
+| `MAR` + `Strutture` senza piano scelto | Invia spento, avviso «Scegli il piano per inviare» | ✓ |
+| `MNG` + `FinituraAlloggi` + unità `1A` | `unita` `1A` e `piano` `P1` **derivato** | ✓ |
+| `SNZ2.2` + `FinituraAlloggi` + unità **`10A`** | `piano` **`P10`**, non `P1` | ✓ |
+| `MAR` + `FinituraAlloggi` + unità `1.01` | `piano` `P1`, punto del codice intatto | ✓ |
+| `MRS` (senza anagrafica) + `Strutture` | nessun menù di livello, tre campi `null`, invio permesso | ✓ |
+| Tutti gli invii del collaudo | i tre campi sono un codice **oppure `null`, mai `""`** | ✓ |
+| «Rimanda la stessa» | stesso `idClient` e stesso progressivo, `gia_presente`, **zero file in più** | ✓ |
+| «Rimanda corretta» | `idClient` e progressivo nuovi, livelli corretti, piano ricalcolato | ✓ |
+| Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
+
+**Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
 **Quando si aggiungerà il caricamento a blocchi** (§4-bis), lo stesso flow si articola su tre rami, uno `Switch` sul campo `azione` subito dopo il controllo del token:
 
 | `azione` | Cosa fa il ramo | Response |
@@ -349,7 +450,17 @@ Una volta a settimana, il venerdì, le foto di categoria `ARCHIVIO` vanno scaric
 
 Quello che vale la pena dire qui, perché riguarda il contratto e non il server:
 
-- **le foto si smistano per FASE, e sotto per mese** (deciso il 15/09/2026): `[cartella foto della commessa]\[CodiceFase]\[AAAAMM]\`, dove il codice è quello in colonna `Fase` — senza spazi, e identico: **niente conversioni** (§4.4). È il motivo per cui la fase è obbligatoria sull'`ARCHIVIO` (§4.4): senza, una foto non saprebbe in quale cartella andare. La struttura precedente era `AAAA\AAAAMM`; le decisioni ancora aperte — quante sottocartelle creare e quando, il nome esatto delle cartelle, dove finiscono le foto già scaricate e i video — sono in capo a Francesco e vanno chiuse **prima** di creare qualunque cartella;
+- **le foto si smistano per FASE, e sotto per LIVELLO o per mese** (fase e mese decisi il 15/09/2026, il livello il 18/09/2026). La regola è una sola, e dipende da cosa la fase pretende (§4.5):
+
+  | Cosa pretende la fase | Percorso sotto la cartella foto della commessa |
+  |---|---|
+  | niente (11 fasi) | `[CodiceFase]\[AAAAMM]\` |
+  | il piano (10 fasi) | `[CodiceFase]\[Piano]\` |
+  | l'unità (4 fasi) | `[CodiceFase]\[Piano]\[Unità]\` |
+  | il prospetto (`FinituraFacciata`) | `[CodiceFase]\[Prospetto]\` |
+  | urbanizzazioni (`SNU`, `BRU`) | `[CodiceLotto]\[AAAAMM]\` — il lotto arriva in colonna `Fase` |
+
+  **Dove il livello c'è, SOSTITUISCE la cartella del mese**: non si annida sotto. I codici sono quelli in colonna, **senza spazi e identici**: niente conversioni, né sui codici di fase (§4.4) né su quelli dei livelli (§4.5) — `1.01` resta `1.01`, punto compreso. Una foto `ARCHIVIO` di una commessa **senza anagrafica** (§4.5) arriva coi tre livelli vuoti: finisce nella cartella del mese, e **va segnalata come anomalia** invece di essere indovinata. Le decisioni ancora aperte — quante sottocartelle creare e quando, il nome esatto delle cartelle, dove finiscono le foto già scaricate e i video — sono in capo a Francesco e vanno chiuse **prima** di creare qualunque cartella;
 - le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più. **Dalla 0.29.0 quel criterio è finalmente affidabile:** fino alla 0.28.0 `DataScatto` era l'ora dell'invio (§4.1), quindi una foto fatta il 30 e mandata il 1º finiva nel mese sbagliato — sia nelle cartelle del flow sia in quelle del runbook. Le foto entrate in raccolta **prima** della 0.29.0 restano archiviate con la data dell'invio: non si correggono a posteriori, ma vale la pena saperlo quando una foto sembra nel mese sbagliato;
 - i **video** vanno in una sottocartella a parte, per non appesantire la cartella delle foto e i backup;
 - si scarica **solo `ARCHIVIO`**. L'avanzamento serve a capirsi sul momento, non ha valore documentale e resta in raccolta.

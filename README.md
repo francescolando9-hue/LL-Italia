@@ -63,6 +63,15 @@ I dati viaggiano dentro l'hash dell'indirizzo, che il browser **non** invia al s
 
 ⚠️ Quel codice **vale come una password**: si mostra solo a chi deve usare l'app, non si appende in bacheca e si manda per messaggio diretto, non in un gruppo.
 
+## Rimanda una foto o una bolla già inviata
+
+Dalla 0.36.0, sotto **ogni** elemento inviato — foto e bolle — c'è **Rimanda**, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Si apre un riquadro coi campi già compilati, e il pulsante dice **quale delle due cose** sta per fare, perché in raccolta sono due cose diverse:
+
+- **Rimanda la stessa** (niente modificato) — riusa lo **stesso identificativo**. Il flow riconosce il duplicato, non crea un doppione e l'app scrive *«Era già in raccolta»*. Non conta fra le inviate di oggi: in raccolta non è arrivato niente di nuovo, e quel numero serve a essere confrontato coi file atterrati.
+- **Rimanda corretta** (cantiere, fase, livelli o nota cambiati; su una bolla solo cantiere e fase, che sono i campi che una bolla ha) — è un **invio nuovo**, con identificativo e numero progressivo nuovi. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può sapere se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta. Per una pagina di una bolla di più fogli l'`idBolla` resta quello dell'originale, così la correzione non spezza la bolla in due.
+
+Serve che la foto sia ancora sul telefono: rimandare una miniatura al posto dell'originale consegnerebbe all'ufficio una foto peggiore.
+
 ## Cantiere sbagliato
 
 Nello storico, aprendo una bolla si può **rimandarla su un altro cantiere** — capita di inviare col picker rimasto sull'ultimo cantiere usato. Possibile solo se la foto originale è ancora sul dispositivo: rimandare la miniatura significherebbe consegnare al magazzino una bolla meno leggibile.
@@ -125,7 +134,19 @@ La categoria si sceglie prima perché **decide come l'immagine viene preparata**
 
 **Si può inviare anche un video** (*Registra un video*), che parte con la fotocamera **di sistema**: registrare in-app darebbe formati diversi fra Android e iPhone e non userebbe l'encoder del telefono. Il video **non viene compresso** — transcodificare in un browser non è realistico — quindi conta il **tetto di peso** nelle impostazioni del modulo (predefinito 20 MB): un file più grande non entra in coda e l'app lo dice subito, invece di farlo ritentare a vuoto. Anteprima e durata si ricavano da un fotogramma del filmato. Foto e video possono stare nello stesso invio.
 
-Accanto al cantiere c'è la **fase di lavoro** (dalla 0.31.0), dallo stesso elenco chiuso del modulo Bolle, con l'ultima scelta preselezionata; vale per tutte le foto di un invio. **È obbligatoria per le foto da archiviare** (dalla 0.33.0): quelle vanno sul server nella cartella della fase, e senza fase non saprebbero dove andare — se fra le foto in attesa ce n'è almeno una d'archivio, Invia resta spento e l'avviso dice perché. Per l'avanzamento lavori resta facoltativa. Lato raccolta serve la colonna `Fase`; finché non c'è il flow ignora il campo. C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
+Accanto al cantiere c'è la **fase di lavoro** (dalla 0.31.0), dallo stesso elenco chiuso del modulo Bolle, con l'ultima scelta preselezionata; vale per tutte le foto di un invio. **È obbligatoria per le foto da archiviare** (dalla 0.33.0): quelle vanno sul server nella cartella della fase, e senza fase non saprebbero dove andare — se fra le foto in attesa ce n'è almeno una d'archivio, Invia resta spento e l'avviso dice perché. Per l'avanzamento lavori resta facoltativa. Lato raccolta serve la colonna `Fase`; finché non c'è il flow ignora il campo.
+
+**Sotto la fase, un livello** (dalla 0.36.0). L'archivio di commessa sul server ha una cartella in più sotto la fase, e **dove c'è sostituisce la cartella del mese**: `Strutture\P1\`, `FinituraAlloggi\P1\1.01\`, `FinituraFacciata\Nord\`, mentre una fase senza livelli resta `Bonifica\202609\`. L'app chiede quindi **piano**, **unità** o **prospetto**, ma solo dove la fase li pretende — 10 fasi vogliono il piano, 4 l'unità, 1 il prospetto, 11 niente — e **dove li chiede sono obbligatori**: non esistono livelli facoltativi, perché una cartella non si indovina. Con l'unità il **piano non si chiede**: lo ricava l'app dalla mappa dell'anagrafica e lo manda comunque, e sotto il menù si legge quale ha ricavato. La mappa **non si deduce dal codice**: le commesse numerano diversamente (`1.01` su MAR, `1A` su MNG) e `10A` su SNZ2.2 sta al `P10`, non al `P1`. Due filtri: per la fase `Interrato` solo i piani sotto quota, e una commessa senza interrati non vede nemmeno la fase (è il caso di MAR).
+
+**Per le urbanizzazioni il lotto prende il posto della fase.** Su `SNU` e `BRU` il campo si chiama **Lotto** e mostra i lotti di quella commessa; il valore viaggia nello stesso campo `fase` (`Lotto2`), perché a valle è sempre la cartella immediatamente sotto la commessa. Il selettore è condiviso col modulo Bolle, quindi anche una bolla di SNU prende il lotto.
+
+**I tre livelli sono solo nel modulo Foto.** Nelle bolle non ci sono, e non è una dimenticanza: sono le cartelle dell'archivio di commessa, dove le bolle non vanno, e la raccolta delle bolle non ha le colonne per riceverli. Chiederli su una bolla vorrebbe dire fermare l'operatore per un dato che viene scartato all'arrivo. Il **lotto** invece c'è anche là, perché viaggia nel campo `fase`.
+
+Piani, unità, prospetti e lotti stanno in `core/anagrafica.js`: è **dato, non logica**, è la copia di un master che vive su `L:` e si sostituisce in blocco. La sua versione si legge nella pagina Informazioni. Le commesse concluse (`SNZ2.1`, `MRS`) non hanno anagrafica: le loro fasi restano tutte e i tre campi non viaggiano — a valle la foto va nella cartella del mese con un'anomalia, che è meglio di un operatore bloccato in cantiere per un dato che manca in ufficio.
+
+**Una copia ridotta senza data di scatto si ferma** (dalla 0.36.0). Il 17/09 cinque foto scelte dalla galleria erano copie fatte da Google Foto dopo «Libera spazio», o da WhatsApp: senza EXIF, e l'app ha stimato l'ora dell'invio — con scatto e invio in due mesi diversi, la foto finisce nel mese sbagliato. Ora un file di galleria senza `DateTimeOriginal` **non entra in coda**: l'app avvisa, dice di cercare l'originale nell'album *Fotocamera*, e lascia la via d'uscita *Aggiungi comunque* — in quel caso parte con la **data del file** (se plausibile: non nel futuro, non prima del 2020) e `scattoStimato` `SI`. Le foto **scattate** dall'app non passano da qui: quelle l'ora ce l'hanno.
+
+C'è una **nota facoltativa** (max 255 caratteri) che vale per tutte le foto di un invio, e si svuota dopo. Coda offline, retry e contatori del giorno funzionano come in Bolle, con un database e un endpoint propri: i due moduli non si toccano.
 
 Ogni foto porta anche **`idDispositivo` e `progressivo`**, come le bolle: senza una sequenza per dispositivo non si può dimostrare che nessuna foto si è persa fra telefono e raccolta, si può solo sperarlo. Il numero si assegna **all'accodamento** (una bozza scartata non lascia buchi), parte da 1 e non si azzera mai; la sequenza è **propria del modulo** e non va confrontata con quella delle bolle. L'identità del telefono invece è una sola per tutta l'app (`core/dispositivo.js`) e un telefono che usava già le bolle **conserva quella che aveva**. Il raggruppamento si fa su `IdDispositivo`, **mai** su `Operatore`, che è testo libero.
 
@@ -157,7 +178,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Dodici collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
+Sedici collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, sette commesse, **livelli dell'archivio** e **Rimanda**. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
 
 ## Struttura del repo
 
@@ -171,6 +192,8 @@ core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/operatori.js     chi può firmare un invio: elenco chiuso, condiviso
 core/fasi.js          le fasi di lavoro: elenco chiuso, codice + etichetta, condiviso
+core/anagrafica.js    piani, unità, prospetti, lotti e cosa ogni fase pretende:
+                      copia di un master su L:, si sostituisce in blocco
 core/endpoint.js      api-version dei flow Power Automate, condivisa
 core/fotocamera.js    fotocamera dentro l'app, multiscatto, condivisa dai moduli
 core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
@@ -250,6 +273,11 @@ Content-Type: application/json
 
 { "token": "collaudo",
   "commessa": "MAR",                       // solo il codice, vedi Cantieri
+  "fase": "FinituraAlloggi",               // codice della fase senza spazi;
+                                           //   per SNU e BRU è il lotto: "Lotto2".
+                                           //   I livelli dell'archivio (piano, unità,
+                                           //   prospetto) NON sono qui: sono solo
+                                           //   nel modulo Foto
   "operatore": "Paolo Sanzarello",
   "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
@@ -258,7 +286,7 @@ Content-Type: application/json
   "pagina": 2,                             // intero, da 1
   "pagine": 3,                             // intero: pagine che compongono la bolla
   "dataInvio": "2026-09-01T17:27:53+02:00",
-  "versioneApp": "0.15.0",                 // versione che sta girando sul telefono
+  "versioneApp": "0.36.0",                 // versione che sta girando sul telefono
   "nomeFile": "BollaMAR20260901172753PaoloSanzarello.jpg",   // IGNORATO dal backend
   "contenutoBase64": "…" }
 
@@ -328,6 +356,19 @@ Quattro richieste di Francesco, emerse dall'uso in cantiere della 0.29.x. Si aff
 3. ~~**Fase di lavoro nel modulo Foto.**~~ **Fatta nella 0.31.0, in entrambi i moduli** (deciso da Francesco il 14/09, con l'elenco delle fasi: 26 dopo che ha tolto `CMC 128`). Deciso da Francesco: facoltativa nelle bolle e sull'avanzamento, **obbligatoria sulle foto da archiviare** (0.33.0), che sul server si smistano nella cartella della fase; ultima scelta preselezionata; campo `fase` nei due contratti e **colonna `Fase` da aggiungere** in entrambe le raccolte (Cowork). Resta da verificare `Impianto SEFCC` (in rosso nell'elenco originale).
 4. ~~**Scatti in serie nel modulo Bolle.**~~ **Fatta nella 0.31.0** con la **barra fissa in basso** (Fotografa + Invia sempre visibili). Resta **proposto, non fatto**: il pulsante «Prossima bolla» dentro la fotocamera, che chiuderebbe e manderebbe la bolla corrente senza uscire — un tocco per bolla invece di tre, ma con invio implicito, senza vedere anteprima e avviso di leggibilità. Da decidere dopo aver provato la barra in cantiere.
 
+## Decisioni del 18/09/2026, fatte nella 0.36.0
+
+Sei punti dati da Francesco. Tutti fatti; le prime tre cambiano il contratto e **richiedono il lato ricevente prima della pubblicazione**.
+
+1. **Il lotto al posto della fase** per le urbanizzazioni (`SNU`, `BRU`): viaggia nel campo `fase` col suo codice, selettore condiviso coi due moduli.
+2. **`piano`, `unita`, `prospetto`** nel payload **del modulo Foto**, comparsa guidata dall'anagrafica fase per fase: obbligatorio, derivato, o assente. `null` dove non si applica, mai stringa vuota. **Nelle bolle no** (deciso il 18/09 alle 16:05, quando si è visto che `BolleInArrivo` non ha quelle colonne): un campo che arriva e viene scartato in silenzio è peggio di un campo che non parte.
+3. **I due filtri su `Interrato`**: solo i piani sotto quota, e una commessa senza interrati non vede la fase.
+4. **«Rimanda» su ogni elemento inviato**, nei suoi due casi distinti (sezione sopra).
+5. **Le copie ridotte senza data di scatto si fermano** prima dell'invio, con la via d'uscita scritta.
+6. **`scattoStimato` = `NO` per gli scatti dell'app.** Era **già così** per la fotocamera interna dalla 0.29.0, e il collaudo `10-ora-scatto.js` lo dimostrava; il caso che restava scoperto era la **fotocamera del telefono aperta dall'app** su una foto senza EXIF, che dichiarava `SI` pur essendo stata scattata un istante prima. Ora l'app distingue **da dove arriva il file**: quella strada dichiara `NO`, e `SI` resta alle copie di galleria senza data e ai video.
+
 ## Fuori perimetro (in capo a Francesco)
 
-Sul flow e sulla raccolta: colonne `Progressivo`, `IdDispositivo`, `IdBolla`, `Pagina` e `Pagine` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`). Deciso e chiuso: token riservato al posto di `collaudo`, autori da elenco chiuso (dal 14/09/2026, prima a campo libero), deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
+Sul flow e sulla raccolta: colonne `Progressivo`, `IdDispositivo`, `IdBolla`, `Pagina` e `Pagine` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`).
+
+Per la 0.36.0: `Piano`, `Unita` e `Prospetto` **esistono in `FotoCantiere`** dal 18/09/2026 ore 16:05, mappate nel flow e verificate con un invio vero. Resta aperto lo **smistamento del venerdì** (specifica Foto, §6): finché non è riscritto, i livelli arrivano in raccolta e nessuno li usa. Il rilascio si fa **presidiato**, guardando in raccolta la prima foto di ognuna delle quattro famiglie — piano, unità, prospetto, nessun livello — perché l'invio di prova fatto con la 0.35.0 ha dimostrato che il ramo regge, non che la mappatura agganci quando i campi ci sono. Deciso e chiuso: token riservato al posto di `collaudo`, autori da elenco chiuso (dal 14/09/2026, prima a campo libero), deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.

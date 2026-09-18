@@ -544,3 +544,21 @@ body:has(.barra-aggiornamento) .barra-comandi {
 /* Spazio in fondo alla pagina pari alla barra: l'ultima riga della coda non
    deve finirci sotto. */
 .spazio-barra { height: calc(64px + 22px + env(safe-area-inset-bottom)); }
+
+/* Il riquadro di «Rimanda»: si apre sotto la coda e deve leggersi come una
+   cosa a parte, non come la continuazione della lista — dentro c'è un invio
+   nuovo, non una riga in più. Il bordo colorato e lo stacco servono a questo. */
+.riquadro-rimando {
+  margin-top: 12px;
+  padding: 12px;
+  border: 2px solid var(--blu);
+  border-radius: var(--raggio);
+  background: var(--carta);
+}
+
+.riquadro-rimando .titolo {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.riquadro-rimando .campo { margin-bottom: 10px; }

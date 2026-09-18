@@ -6,7 +6,7 @@ import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
-import { creaMotore } from '../../core/coda-invio.js';
+import { creaMotore, eGiaPresente } from '../../core/coda-invio.js';
 import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
 // Il motore della coda vive nella shell. Qui il modulo Foto non ha niente da
@@ -15,6 +15,13 @@ const motore = creaMotore({
   coda,
   conservaUltime: () => impostazioniFoto().conservaUltime,
   inviaRecord: record => inviaSingola(record),
+  async segnaInviato(record, risposta) {
+    // «Era già in raccolta»: si scrive sul record perché la vista lo dica.
+    // Chi ha premuto Rimanda senza correggere niente ha premuto proprio per
+    // sapere questo, e un «Inviata» verde identico all'altro caso non gli
+    // risponde.
+    record.giaPresente = Boolean(risposta.giaPresente);
+  },
 });
 
 export const { alCambiamento, avvia, riprova } = motore;
@@ -52,8 +59,19 @@ export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = 
     tipo: record.tipo,
     commessa: record.commessa,
     // Fase di lavoro, dall'elenco chiuso della shell (core/fasi.js). Vuota
-    // solo per le foto accodate prima della 0.31.0.
+    // solo per le foto accodate prima della 0.31.0. Per un'urbanizzazione qui
+    // c'è il LOTTO — `Lotto2` — che ne prende il posto: stesso campo, perché a
+    // valle è sempre «la cartella sotto la commessa».
     fase: record.fase || '',
+    // I tre livelli dell'archivio (dalla 0.36.0), codici senza spazi perché
+    // diventano nomi di cartella. **`null` dove il livello non si applica, mai
+    // stringa vuota:** una colonna con `''` somiglia a un dato e non lo è. Il
+    // piano viaggia anche quando non è stato scelto — con l'unità lo ricava
+    // l'app dalla mappa dell'anagrafica — perché a valle il percorso è
+    // `[Fase]\[Piano]\[Unità]\` e il piano serve lo stesso.
+    piano: record.piano || null,
+    unita: record.unita || null,
+    prospetto: record.prospetto || null,
     operatore: record.autore,
     nota: record.nota || '',
     genere: record.genere || 'foto',
@@ -109,7 +127,7 @@ async function inviaSingola(record) {
   if (!risposta.ok) {
     throw new Error(`Errore del server: ${risposta.status}${spiegazioneStato(risposta.status)}`);
   }
-  return { id: '' };
+  return { id: '', giaPresente: await eGiaPresente(risposta) };
 }
 
 // Caricamento in due fasi. Ogni passo riuscito viene scritto sul record:

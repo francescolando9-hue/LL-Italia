@@ -2,7 +2,7 @@
 // Da cambiare a ogni rilascio INSIEME a VERSIONE_CODICE in core/versione.js:
 // quella dice cosa sta girando, questa cosa è installato, e l'app avvisa
 // quando non coincidono.
-const VERSIONE = '0.35.0';
+const VERSIONE = '0.36.0';
 const CACHE = `llitalia-${VERSIONE}`;
 const RISORSE = [
   './',
@@ -24,6 +24,7 @@ const RISORSE = [
   './core/orario.js',
   './core/exif.js',
   './core/fasi.js',
+  './core/anagrafica.js',
   './core/coda-invio.js',
   './core/configurazione-link.js',
   './core/vendor/qrcode.mjs',
