@@ -38,10 +38,12 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `07-foto-invio.js` | Le due categorie preparano l'immagine in modo diverso, il contratto di invio ha tutti i campi e i tipi giusti, un file oltre il limite non entra in coda. |
 | `08-errori-flow.js` | Il flow rifiuta: la bolla resta sul telefono, il messaggio dice dove guardare, e al ritorno riparte da sola senza consumare un numero. |
 | `09-operatore.js` | Il nome dell'operatore si **sceglie** da un elenco chiuso e non si scrive: niente segnaposto firmabile, e un nome salvato da una versione col campo libero viene riportato alla grafia ufficiale o richiesto di nuovo — mai indovinato. |
-| `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto; dove non si può sapere si ripiega e si dichiara (`scattoStimato`). |
+| `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto. Una **copia ridotta senza EXIF** (Google Foto, WhatsApp) **non entra in coda**: l'app avvisa e chiede, e mandata comunque parte con la **data del file** — provato su un file con la data messa ad agosto, che se l'app ripiegasse sull'ora dell'invio finirebbe in settembre: è l'unico modo di distinguere il ripiego giusto da quello sbagliato. Una foto **scattata** dall'app è sempre `scattoStimato` `NO`. |
 | `11-obiettivo.js` | La fotocamera in-app sceglie la lente **principale** dai nomi che i telefoni dichiarano (Samsung e Pixel con Chrome, iPhone con Safari), lascia fare al browser dove i nomi non aiutano, registra cosa ha visto per Informazioni; e i comandi stanno al posto giusto: scatto al centro, Fine a sinistra, niente a destra. |
 | `14-commesse.js` | Le **sette commesse**: codice ed etichetta come concordate, menù in **ordine alfabetico di codice** e non nell'ordine del file — provato leggendo il file servito dall'app e verificando che i due ordini NON coincidano, altrimenti la prova non distinguerebbe un `sort()` che funziona da un elenco ordinato a mano — stesso elenco nei due moduli, e nel payload il **codice** (`BRU`, `SNZ2.1` col punto intero), non l'etichetta. |
 | `13-gerarchia.js` | L'azione principale è **la cosa più grande a video**, in entrambi i moduli: barra appoggiata al fondo, 64 px, nessun pulsante pieno di colore o alto uguale fuori dalla barra, alternative su una riga sola e **col nome per esteso** — accorciare l'etichetta per far stare il pulsante è una scorciatoia sulla chiarezza. Più: il perché Invia è spento si legge **dentro la barra**, e l'avviso di aggiornamento non copre i comandi. |
+| `15-livelli.js` | I **livelli dell'archivio**. Per `SNU` e `BRU` il menù mostra i **lotti** al posto delle fasi e il campo si chiama «Lotto»; `MAR` non vede `Interrato` perché non ha interrati, e su `MNG` la fase `Interrato` offre solo `P-2` e `P-1`. Dove la fase pretende un livello, **senza la scelta Invia resta spento** e l'app dice cosa manca. Col piano **derivato** dall'unità la prova è su **`10A` di SNZ2.2**, che deve arrivare a `P10` e non a `P1`: è il caso su cui una deduzione dal codice e la lettura dalla mappa danno risultati diversi — con `1A` passerebbero entrambe. E i tre campi sono un codice **oppure `null`, mai `""`**, in tutti gli invii. |
+| `16-rimanda.js` | **«Rimanda»** nei suoi due casi, foto e bolle. Senza modifiche: **stesso `idClient` e stesso progressivo**, il flow risponde `gia_presente`, l'app lo dice e il contatore delle inviate **non si gonfia** — 6 richieste, 4 file distinti, 2 `gia_presente`. Con modifiche: `idClient` e progressivo nuovi, i livelli corretti, **il piano ricalcolato** dalla nuova unità, l'ora dello scatto invariata, e per le bolle l'`idBolla` dell'originale conservato. |
 | `12-fase-e-barra.js` | La **fase di lavoro** si sceglie da un elenco chiuso in entrambi i moduli. È **obbligatoria solo sulle foto da archiviare**: lì Invia resta spento e l'app dice perché, e basta una foto d'archivio in un invio misto perché serva; per bolle e avanzamento si invia col campo vuoto. Scelta una volta si ripropone («nessuna» compresa), e arriva al flow con la grafia esatta. E nel modulo Bolle **Fotografa** e **Invia** stanno in una barra fissa in basso, visibili anche in fondo a una coda lunga. |
 
 ## Le trappole, già pagate
@@ -90,6 +92,17 @@ Vanno detti, altrimenti passano per garanzie che non sono:
   telefono.
 - **Il caricamento a blocchi.** È spento in attesa che il tenant permetta di
   aprire la sessione di caricamento (vedi la specifica del modulo Foto, §4-bis).
+- **L'anagrafica dei livelli.** Piani, unità e prospetti sono la **copia** di un
+  master che vive su `L:` (`core/anagrafica.js`): il collaudo prova che l'app
+  li usa come si è deciso, non che i dati siano giusti. Che l'unità `8B` di MNG
+  esista davvero e stia all'ottavo piano lo sa solo chi tiene il master.
+- **La guardia sui duplicati.** Il flow finto di `16-rimanda.js` riconosce un
+  `idClient` già visto e risponde `gia_presente` come quello vero, ma è una
+  simulazione: che il flow vero lo faccia, e con quale forma nel corpo della
+  risposta, va verificato sul tenant. L'app riconosce «era già in raccolta»
+  cercando la stringa `gia_presente` nel corpo, perché **il nome del campo non
+  è documentato** — da stringere quando il ricevente lo conferma. Non
+  riconoscerlo non fa danni: la foto è arrivata comunque.
 - **L'EXIF dei telefoni veri.** Le foto con l'ora dello scatto dentro sono
   **costruite** (`exif-finto.js`), non uscite da un telefono: provano che il
   lettore capisce il formato — e lo provano davvero, perché chi scrive i byte e

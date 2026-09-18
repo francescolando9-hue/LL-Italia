@@ -70,7 +70,7 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
   fs.mkdirSync(MATERIALE, { recursive: true });
   const atteso = [
     'bolla.jpg', 'bolla2.jpg', 'foto-cantiere.jpg', 'foto-pesante.jpg', 'video-finto.mp4',
-    'scatto-exif.jpg', 'scatto-exif-mm.jpg', 'scatto-exif-assurda.jpg',
+    'scatto-exif.jpg', 'scatto-exif-mm.jpg', 'scatto-exif-assurda.jpg', 'copia-whatsapp.jpg',
   ];
   if (atteso.every(n => fs.existsSync(path.join(MATERIALE, n)))) {
     console.log('Materiale già presente in', MATERIALE);
@@ -92,13 +92,20 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
     ['bolla.jpg', { larghezza: 1600, altezza: 2133, qualita: 0.8, rumore: 10, testo: 'BOLLA DI CONSEGNA 1' }],
     ['bolla2.jpg', { larghezza: 1600, altezza: 2133, qualita: 0.8, rumore: 10, testo: 'BOLLA DI CONSEGNA 2' }],
     // Come una foto di telefono: 4032 x 3024.
-    ['foto-cantiere.jpg', { larghezza: 4032, altezza: 3024, qualita: 0.85, rumore: 40, testo: 'CANTIERE MAR' }],
+    // **Con l'EXIF**, dalla 0.36.0: è la foto «normale» di quasi tutti i
+    // collaudi, e una foto che arriva da un telefono vero l'ora dello scatto
+    // ce l'ha. Senza, l'app la fermerebbe con l'avviso delle copie ridotte —
+    // giustamente — e ogni collaudo che aggiunge una foto dalla galleria
+    // misurerebbe quell'avviso invece della cosa che vuole provare.
+    ['foto-cantiere.jpg', { larghezza: 4032, altezza: 3024, qualita: 0.85, rumore: 40, testo: 'CANTIERE MAR' },
+      { data: '2026:09:12 10:22:05', offset: '+02:00' }],
   ];
-  for (const [nome, opzioni] of files) {
+  for (const [nome, opzioni, exif] of files) {
     if (!serve(nome)) continue;
-    const dati = Buffer.from(await generaJpeg(pagina, opzioni), 'base64');
+    let dati = Buffer.from(await generaJpeg(pagina, opzioni), 'base64');
+    if (exif) dati = conExif(dati, exif);
     fs.writeFileSync(path.join(MATERIALE, nome), dati);
-    console.log('  scritto', nome, mb(dati.length));
+    console.log('  scritto', nome, mb(dati.length), exif ? `(DateTimeOriginal ${exif.data})` : '');
   }
 
   // Il caso peggiore dichiarato nel README: una foto d'archivio pesante.
@@ -108,8 +115,9 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
       { larghezza: 4032, altezza: 3024, qualita: 0.92, rumore: 120, testo: 'CANTIERE MAR — ARCHIVIO' },
       11 * 1048576,
     );
-    fs.writeFileSync(path.join(MATERIALE, 'foto-pesante.jpg'), pesante);
-    console.log('  scritto foto-pesante.jpg', mb(pesante.length));
+    const conOra = conExif(pesante, { data: '2026:09:12 10:24:40', offset: '+02:00' });
+    fs.writeFileSync(path.join(MATERIALE, 'foto-pesante.jpg'), conOra);
+    console.log('  scritto foto-pesante.jpg', mb(conOra.length), '(DateTimeOriginal 2026:09:12 10:24:40)');
   }
 
   // Foto con l'ora dello scatto scritta dentro, come le fa un telefono.
@@ -140,6 +148,28 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
       fs.writeFileSync(path.join(MATERIALE, nome), dati);
       console.log('  scritto', nome, mb(dati.length), `(DateTimeOriginal ${exif.data}${exif.offset ? ' ' + exif.offset : ', senza fuso'})`);
     }
+  }
+
+  // La copia ridotta SENZA EXIF: il caso vero del 17/09/2026. Cinque foto
+  // scelte dalla galleria erano copie fatte da Google Foto dopo «Libera
+  // spazio», o da WhatsApp: lato lungo 1600 px e nessun EXIF. L'app ha stimato
+  // `DataScatto` = ora dell'invio e in archivio sono finite con un'ora falsa.
+  //
+  // **La data del FILE si mette indietro di proposito, a un mese prima.** È
+  // l'unico modo di provare la regola sul caso che può fallire: se l'app
+  // ripiegasse sull'ora dell'invio invece che su `lastModified`, la foto
+  // finirebbe nella cartella del mese sbagliato — e con una data di file di
+  // oggi il collaudo non saprebbe distinguere le due cose. Con la data
+  // indietro, sì.
+  if (serve('copia-whatsapp.jpg')) {
+    const copia = Buffer.from(await generaJpeg(pagina, {
+      larghezza: 1600, altezza: 1200, qualita: 0.7, rumore: 20, testo: 'COPIA RIDOTTA — SENZA EXIF',
+    }), 'base64');
+    const dove = path.join(MATERIALE, 'copia-whatsapp.jpg');
+    fs.writeFileSync(dove, copia);
+    const dataFile = new Date('2026-08-20T10:15:00+02:00');
+    fs.utimesSync(dove, dataFile, dataFile);
+    console.log('  scritto copia-whatsapp.jpg', mb(copia.length), '(senza EXIF, data del file 2026-08-20)');
   }
 
   // Un «video» che serve solo per il controllo del peso: l'app rifiuta i file

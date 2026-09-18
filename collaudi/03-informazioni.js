@@ -29,7 +29,9 @@ module.exports = {
     await pagina.waitForSelector('#categoria');
     await pagina.selectOption('#categoria', 'AVANZAMENTO');
     await pagina.selectOption('#commessa', 'MAR');
-    await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg'), materiale('bolla2.jpg')]);
+    // Due foto CON l'ora dello scatto: dalla 0.36.0 le copie senza EXIF
+    // vengono fermate con un avviso e non entrano in coda.
+    await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg'), materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 2, 'anteprime', 60000);
     await pagina.click('#invia');
     await aiuto.attendi(pagina,

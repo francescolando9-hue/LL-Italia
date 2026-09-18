@@ -3,7 +3,7 @@
 // sopravvive alla potatura delle immagini a piena risoluzione.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { etichettaFase } from '../../core/fasi.js';
+import { etichettaFaseOLotto } from '../../core/anagrafica.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 
@@ -192,7 +192,8 @@ function disegnaElenco() {
             <span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
             <span class="cantiere">${Number.isInteger(riga.progressivo)
               ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${Number(riga.pagine) > 1
-              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}${riga.fase ? ` · ${scappaHtml(etichettaFase(riga.fase))}` : ''}</span>
+              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}${riga.fase ? ` · ${scappaHtml(etichettaFaseOLotto(riga.fase))}` : ''}${
+                scappaHtml([riga.piano, riga.unita, riga.prospetto].filter(Boolean).map(p => ` · ${p}`).join(''))}</span>
             <span class="tenue">${scappaHtml(riga.operatore)}</span>
             <span class="lente" aria-hidden="true">&#128269;</span>
           </button>

@@ -17,6 +17,28 @@
 // vanno sistemati prima di partire. Il motore non sa, e non deve sapere, che
 // le bolle hanno uno storico e le foto no.
 
+// La risposta del flow quando l'elemento c'è già: la guardia sui duplicati
+// risponde 200 con `gia_presente` nel corpo. Serve a «Rimanda» senza
+// modifiche, che riusa lo stesso idClient proprio per farsi dire questo.
+//
+// Si riconosce dal CONTENUTO e non dal nome del campo, perché **il nome del
+// campo non è documentato**: il briefing del ricevente dice «200
+// `gia_presente`» e si ferma lì. Inventare `{ esito: … }` sarebbe dare per
+// certo un dato che nessuno ha verificato, e sbagliarlo qui significa dire
+// all'operatore «è un invio nuovo» quando era un doppione. Da stringere
+// quando il ricevente conferma la forma esatta del corpo.
+//
+// Non riconoscerlo non fa danni: la foto è arrivata comunque e il flow non ha
+// creato doppioni. Si perde solo la frase all'operatore.
+export async function eGiaPresente(risposta) {
+  try {
+    const testo = await risposta.clone().text();
+    return /gia_presente/i.test(testo);
+  } catch {
+    return false;
+  }
+}
+
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
 
@@ -102,8 +124,16 @@ export function creaMotore(descrittore) {
             // storico delle bolle — si scrive adesso, perché la foto verrà
             // eliminata dal dispositivo.
             if (segnaInviato) await segnaInviato(record, risposta);
+            // Un «Rimanda la stessa» non aggiunge niente in raccolta: il flow
+            // riconosce l'idClient e risponde `gia_presente`. Contarlo fra le
+            // «inviate oggi» gonfierebbe l'unico numero che serve a dimostrare
+            // che nulla si è perso — quello da confrontare con i file atterrati
+            // — e un collaudo che non torna per un motivo innocuo è un
+            // collaudo che poi nessuno guarda.
+            const daContare = !record.nonContare;
+            record.nonContare = false;
             await coda.aggiorna(record);
-            coda.incrementaInviate(1);
+            if (daContare) coda.incrementaInviate(1);
             await coda.potaInviate(conservaUltime());
           } catch (errore) {
             record.stato = 'errore';

@@ -85,7 +85,7 @@ module.exports = {
     await pagina.waitForSelector('#categoria');
     await pagina.selectOption('#categoria', 'AVANZAMENTO');
     await pagina.selectOption('#commessa', 'MAR');
-    await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     const rientrata = await aiuto.attendi(pagina,
       () => document.querySelectorAll('.foto-anteprima').length >= 1, 'foto in coda', 60000).catch(() => false);
     registro.controlla('la foto torna a entrare in coda', Boolean(rientrata));

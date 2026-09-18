@@ -7,7 +7,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { opzioniFase, etichettaFase } from '../../core/fasi.js';
+import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto } from '../../core/anagrafica.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -104,6 +104,12 @@ function revocaUrl() {
 // scelta è sempre scritta a video: mai da indovinare al momento di Invia.
 let unaSolaBolla = false;
 
+// I livelli scelti (o derivati) all'ultimo ridisegno, e la bolla inviata che
+// si sta rimandando. Come nel modulo Foto: il riquadro sta fuori dalla lista
+// della coda, che si ridisegna a ogni cambio di stato di un invio.
+let livelliCorrenti = { fase: '', piano: null, unita: null, prospetto: null, mancanti: [] };
+let rimandoAperto = '';
+
 async function vista(el) {
   if (!impostazioniApp.autore) {
     naviga('#/benvenuto', true);
@@ -133,10 +139,11 @@ async function vista(el) {
         <label for="cantiere">Cantiere</label>
         <select id="cantiere" required>${opzioniCantiere}</select>
       </div>
-      <div class="campo">
-        <label for="fase">Fase di lavoro</label>
-        <select id="fase" required>${opzioniFase(impostazioni.ultimaFase, scappaHtml)}</select>
-      </div>
+      <!-- Fase (o lotto, per le urbanizzazioni), piano, unità, prospetto: lo
+           stesso blocco del modulo Foto, dalla shell. Il selettore è condiviso
+           di proposito — deciso il 18/09/2026 — quindi anche una bolla di SNU
+           prende il lotto. -->
+      ${campiLivelli()}
       <p class="didascalia-alternative">Altri modi per aggiungere una foto</p>
       <div class="azioni-alternative">
         ${fotocameraDisponibile()
@@ -159,6 +166,7 @@ async function vista(el) {
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="bolle-coda"></ul>
+      <div id="riquadro-rimando"></div>
     </section>
     <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
     <div class="spazio-barra" aria-hidden="true"></div>
@@ -173,6 +181,9 @@ async function vista(el) {
 
   el.querySelector('#cantiere').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
+  for (const id of ['#piano', '#unita', '#prospetto']) {
+    el.querySelector(id).addEventListener('change', () => { ridisegna(); });
+  }
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
@@ -297,9 +308,16 @@ async function invia() {
   const selezioneFase = radice.querySelector('#fase');
   const fase = selezioneFase ? selezioneFase.value : '';
   if (!cantiere) return;
+  // Dove la fase pretende un livello, senza la scelta non si parte: la guardia
+  // è anche qui e non solo sul pulsante, che si può premere fra due ridisegni.
+  if (livelliCorrenti.mancanti.length > 0) return;
   // Con una sola foto in attesa il raggruppamento non fa differenza:
   // pagina 1 di 1 in ogni caso.
-  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
+  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase, {
+    piano: livelliCorrenti.piano,
+    unita: livelliCorrenti.unita,
+    prospetto: livelliCorrenti.prospetto,
+  });
   if (quante > 0) {
     coda.incrementaScattate(quante);
     // Cantiere e fase si ripropongono al prossimo invio: il giro felice resta
@@ -383,8 +401,13 @@ async function ridisegna() {
 
   const selezione = radice.querySelector('#cantiere');
   const cantiereScelto = selezione ? selezione.value : '';
+  // Fase (o lotto) e livelli: li accende e li spegne la shell, con le stesse
+  // regole del modulo Foto.
+  livelliCorrenti = sincronizzaLivelli(radice, cantiereScelto, scappaHtml, '',
+    { fase: impostazioniBolle().ultimaFase });
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
+  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto
+    || livelliCorrenti.mancanti.length > 0;
   pulsanteInvia.textContent = bozze.length === 0
     ? 'Invia'
     : numeraPagine
@@ -393,8 +416,9 @@ async function ridisegna() {
         ? 'Invia 1 bolla'
         : `Invia ${bozze.length} bolle separate`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
-  avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
-    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
+  const mancanti = [!cantiereScelto && 'il cantiere', ...livelliCorrenti.mancanti].filter(Boolean);
+  avvisoCantiere.innerHTML = bozze.length > 0 && mancanti.length > 0
+    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
@@ -421,6 +445,13 @@ async function ridisegna() {
         ? `<div class="errore-msg">${scappaHtml(r.ultimoErrore)}</div>` : '';
       const riprova = r.stato === 'errore'
         ? `<button class="btn btn-secondario btn-piccolo bolle-riprova" data-id="${r.id}">Riprova</button>` : '';
+      // «Rimanda» su OGNI bolla inviata, per qualunque motivo: prima si poteva
+      // solo correggere il cantiere, e solo dallo storico.
+      const rimanda = r.stato === 'inviata' && r.foto
+        ? `<button class="btn btn-secondario btn-piccolo bolle-rimanda" data-id="${r.id}">${
+          rimandoAperto === r.id ? 'Chiudi' : 'Rimanda'}</button>` : '';
+      const giaPresente = r.giaPresente
+        ? '<div class="tenue">Era già in raccolta: nessun doppione creato.</div>' : '';
       return `
         <li class="bolle-voce">
           <img class="bolle-miniatura" src="${urlFoto(r.foto)}" alt="">
@@ -428,14 +459,16 @@ async function ridisegna() {
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
               ${Number(r.pagine) > 1 ? `<span class="bolle-pagina-riga">pag. ${r.pagina}/${r.pagine}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(etichettaFase(r.fase))}` : ''} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''}${scappaHtml(scritturaLivelli(r))} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
+            ${giaPresente}
             ${messaggioErrore}
           </div>
           <div class="bolle-azioni">
             <span class="badge ${stato.classe}">${stato.testo}</span>
             ${riprova}
+            ${rimanda}
           </div>
         </li>
       `;
@@ -443,5 +476,121 @@ async function ridisegna() {
     for (const pulsante of lista.querySelectorAll('.bolle-riprova')) {
       pulsante.addEventListener('click', () => invio.riprova(pulsante.dataset.id));
     }
+    for (const pulsante of lista.querySelectorAll('.bolle-rimanda')) {
+      pulsante.addEventListener('click', () => {
+        rimandoAperto = rimandoAperto === pulsante.dataset.id ? '' : pulsante.dataset.id;
+        ridisegna();
+      });
+    }
   }
+
+  disegnaRimando(record);
+}
+
+// I livelli sulla riga della coda: sono il percorso della cartella a valle, e
+// leggerli è il solo modo di accorgersi di un piano sbagliato prima che
+// l'archivio se lo porti dietro.
+function scritturaLivelli(record) {
+  const pezzi = [record.piano, record.unita, record.prospetto].filter(Boolean);
+  return pezzi.length > 0 ? ` \u00b7 ${pezzi.join(' \u00b7 ')}` : '';
+}
+
+// Quello che c'è scritto nel riquadro adesso, e se differisce dall'invio
+// originale: lo leggono sia il ridisegno, per l'etichetta del pulsante, sia
+// l'azione — una sola lettura, così il pulsante non può dire una cosa e farne
+// un'altra.
+function lettureRimando(riquadro, record) {
+  const cantiere = riquadro.querySelector('#r-cantiere').value;
+  const livelli = sincronizzaLivelli(riquadro, cantiere, scappaHtml, 'r-', {
+    fase: record.fase || '',
+    piano: record.piano || '',
+    unita: record.unita || '',
+    prospetto: record.prospetto || '',
+  });
+  const uguale = (a, b) => (a || '') === (b || '');
+  const cambiato = !uguale(cantiere, record.cantiere)
+    || !uguale(livelli.fase, record.fase)
+    || !uguale(livelli.piano, record.piano)
+    || !uguale(livelli.unita, record.unita)
+    || !uguale(livelli.prospetto, record.prospetto);
+  const mancanti = [!cantiere && 'il cantiere', ...livelli.mancanti].filter(Boolean);
+  return { cantiere, livelli, cambiato, mancanti };
+}
+
+function disegnaRimando(tutti) {
+  const riquadro = radice.querySelector('#riquadro-rimando');
+  if (!riquadro) return;
+  const record = tutti.find(r => r.id === rimandoAperto && r.stato === 'inviata');
+  if (!record) {
+    if (riquadro.dataset.id) {
+      riquadro.dataset.id = '';
+      riquadro.innerHTML = '';
+    }
+    return;
+  }
+  if (riquadro.dataset.id !== record.id) {
+    riquadro.dataset.id = record.id;
+    riquadro.innerHTML = `
+      <div class="riquadro-rimando">
+        <p class="titolo">Rimanda questa bolla</p>
+        <div class="campo">
+          <label for="r-cantiere">Cantiere</label>
+          <select id="r-cantiere">${CANTIERI.map(c =>
+            `<option value="${scappaHtml(c.codice)}"${c.codice === record.cantiere ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`).join('')}</select>
+        </div>
+        ${campiLivelli('r-')}
+        <p id="r-spiegazione" class="aiuto tenue"></p>
+        <div class="azioni-alternative">
+          <button id="r-manda" class="btn btn-secondario btn-minore" type="button">Rimanda</button>
+        </div>
+        <p id="r-esito" class="tenue"></p>
+      </div>`;
+    riquadro.querySelector('#r-cantiere').addEventListener('change', () => { ridisegna(); });
+    for (const id of ['#r-fase', '#r-piano', '#r-unita', '#r-prospetto']) {
+      riquadro.querySelector(id).addEventListener('change', () => { ridisegna(); });
+    }
+    riquadro.querySelector('#r-manda').addEventListener('click', () => { eseguiRimando(record.id); });
+  }
+
+  const letture = lettureRimando(riquadro, record);
+  const pulsante = riquadro.querySelector('#r-manda');
+  pulsante.disabled = letture.mancanti.length > 0;
+  pulsante.textContent = letture.cambiato ? 'Rimanda corretta' : 'Rimanda la stessa';
+  riquadro.querySelector('#r-spiegazione').textContent = letture.mancanti.length > 0
+    ? `Scegli ${letture.mancanti.join(' e ')} per rimandarla.`
+    : letture.cambiato
+      ? 'Invio nuovo, con un identificativo nuovo: quella già mandata resta in magazzino e va annullata dall’ufficio.'
+      : 'Stesso identificativo: se era già arrivata non si crea un doppione, e l’app te lo dice.';
+}
+
+async function eseguiRimando(id) {
+  const riquadro = radice.querySelector('#riquadro-rimando');
+  const record = (await coda.elenca()).find(r => r.id === id);
+  if (!riquadro || !record) return;
+  const letture = lettureRimando(riquadro, record);
+  if (letture.mancanti.length > 0) return;
+  riquadro.querySelector('#r-manda').disabled = true;
+  riquadro.querySelector('#r-esito').textContent = 'In coda…';
+  try {
+    if (letture.cambiato) {
+      await coda.rimandaCorretta(id, {
+        cantiere: letture.cantiere,
+        fase: letture.livelli.fase,
+        piano: letture.livelli.piano,
+        unita: letture.livelli.unita,
+        prospetto: letture.livelli.prospetto,
+        autore: impostazioniApp.autore || record.autore,
+      });
+      coda.incrementaScattate(1);
+    } else {
+      await coda.rimandaStessa(id);
+    }
+  } catch {
+    riquadro.querySelector('#r-esito').textContent = 'Non è stato possibile rimetterla in coda: riprova.';
+    riquadro.querySelector('#r-manda').disabled = false;
+    return;
+  }
+  rimandoAperto = '';
+  await ridisegna();
+  invio.avvia();
 }

@@ -38,6 +38,26 @@ module.exports = {
       return flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
     };
 
+    // Dalla 0.36.0 una foto di galleria senza ora dello scatto NON entra in
+    // coda da sola: compare un avviso, e si decide. Questo aiutante fa la
+    // strada lunga — avviso, «Aggiungi comunque», invio — perché è quella che
+    // l'operatore fa davvero.
+    const mandaComunque = async (tipo, file) => {
+      const prima = flow.stato.ricevuti.length;
+      await pagina.selectOption('#categoria', tipo);
+      await pagina.selectOption('#commessa', 'SNZ2.2');
+      await pagina.setInputFiles('#input-galleria', [materiale(file)]);
+      await pagina.waitForSelector('#senza-data-comunque', { timeout: 60000 });
+      await pagina.click('#senza-data-comunque');
+      await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+      await pagina.click('#invia');
+      const fine = Date.now() + 90000;
+      while (flow.stato.ricevuti.length === prima && Date.now() < fine) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+      return flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    };
+
     // Data di oggi come la vede il telefono del collaudo: serve a riconoscere
     // un ripiego, che per definizione porta l'ora di adesso.
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: FUSO });
@@ -73,18 +93,52 @@ module.exports = {
       'a gennaio in Italia è +01:00: applicare il fuso di oggi (+02:00) sposterebbe di un’ora');
     registro.controlla('dichiarata misurata', avanzamento.scattoStimato === 'NO', avanzamento.scattoStimato);
 
-    registro.titolo('Quando l’ora non si può sapere, lo si dichiara');
-    const senzaExif = await manda('ARCHIVIO', 'foto-cantiere.jpg');
-    registro.dice('foto senza EXIF → dataScatto', senzaExif.dataScatto);
-    registro.controlla('si ripiega sull’ora di accodamento',
-      String(senzaExif.dataScatto).startsWith(oggi), senzaExif.dataScatto);
-    registro.controlla('e si dichiara stimata', senzaExif.scattoStimato === 'SI',
-      'chi legge la raccolta deve poter distinguere una misura da un ripiego');
+    registro.titolo('Copia ridotta senza EXIF: si ferma e si chiede, non si stima in silenzio');
+    // Il caso vero del 17/09/2026. `copia-whatsapp.jpg` ha lato lungo 1600 px,
+    // nessun EXIF, e la data del FILE messa a un mese prima di proposito:
+    // serve a distinguere il ripiego giusto (data del file) da quello
+    // sbagliato (ora dell'invio), che con un file di oggi darebbero lo stesso
+    // risultato — e una prova così non proverebbe niente.
+    await pagina.selectOption('#categoria', 'ARCHIVIO');
+    await pagina.selectOption('#commessa', 'SNZ2.2');
+    await pagina.setInputFiles('#input-galleria', [materiale('copia-whatsapp.jpg')]);
+    await pagina.waitForSelector('#senza-data-comunque', { timeout: 60000 });
+    const avviso = await pagina.$eval('#avviso-senza-data', e => e.textContent.replace(/\s+/g, ' ').trim());
+    registro.dice('avviso a video', avviso);
+    registro.controlla('l’avviso dice che la data di scatto manca', /data di scatto/i.test(avviso));
+    registro.controlla('e indica dove sta l’originale', /Fotocamera/.test(avviso),
+      'la via d’uscita giusta è l’album Fotocamera, e va detta prima dell’altra');
+    registro.controlla('la foto NON è ancora in coda',
+      (await pagina.$$('.foto-anteprima')).length === 0,
+      'accodarla in silenzio, stimando, è esattamente il difetto del 17/09');
+    registro.controlla('e Invia resta spento',
+      await pagina.$eval('#invia', e => e.disabled));
 
-    const assurda = await manda('ARCHIVIO', 'scatto-exif-assurda.jpg');
+    const primaCopia = flow.stato.ricevuti.length;
+    await pagina.click('#senza-data-comunque');
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    await pagina.selectOption('#fase', 'Bonifica');
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    await pagina.click('#invia');
+    const fineCopia = Date.now() + 90000;
+    while (flow.stato.ricevuti.length === primaCopia && Date.now() < fineCopia) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const copia = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    registro.dice('dataScatto ricevuta dal flow', copia.dataScatto);
+    registro.controlla('mandata comunque, porta la data del FILE',
+      String(copia.dataScatto).startsWith('2026-08-20'), copia.dataScatto);
+    registro.controlla('e NON l’ora dell’invio',
+      !String(copia.dataScatto).startsWith(oggi),
+      'è il punto: scatto ad agosto e invio a settembre finivano nella cartella di settembre');
+    registro.controlla('dichiarata stimata', copia.scattoStimato === 'SI',
+      'la data del file è un ripiego ragionevole, non una misura');
+
+    registro.titolo('EXIF presente ma assurdo: vale come assente');
+    const assurda = await mandaComunque('ARCHIVIO', 'scatto-exif-assurda.jpg');
     registro.dice('EXIF 1970:01:01 → dataScatto', assurda.dataScatto);
     registro.controlla('una data assurda non viene mandata',
-      String(assurda.dataScatto).startsWith(oggi), assurda.dataScatto);
+      !String(assurda.dataScatto).startsWith('1970'), assurda.dataScatto);
     registro.controlla('ed è dichiarata stimata', assurda.scattoStimato === 'SI',
       'l’orologio mai impostato del telefono non è un’ora di scatto');
 

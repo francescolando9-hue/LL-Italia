@@ -25,6 +25,14 @@
 //    risulta vera prima del tempo. `puliscine()` fa entrambe le cose, e
 //    ricarica la pagina perché la cancellazione del database, se una
 //    connessione è aperta, resta in sospeso e scatta dopo.
+// 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
+//    lo controlla come script CommonJS e lascia passare errori che in un
+//    modulo ES sono fatali. Il controllo giusto è
+//    `node --input-type=module --check < file`. Trappola pagata il 18/09/2026
+//    con un backtick dentro un commento HTML dentro un template literal: il
+//    backtick chiude il template, il file diventa sintatticamente assurdo,
+//    `node --check` dice ok, e il collaudo riporta soltanto «#fase non
+//    visibile» — un sintomo che non somiglia in niente alla causa.
 
 const http = require('http');
 const fs = require('fs');
@@ -65,7 +73,12 @@ function avviaStatico(porta = PORTA_APP) {
 // Riceve gli invii come farebbe Power Automate, e sa anche rifiutare: gli
 // errori vanno provati, non immaginati.
 function avviaFlow(porta = PORTA_FLOW) {
-  const stato = { ricevuti: [], stato: 200, corpo: '', risposte: null };
+  // `deduplica` fa comportare il flow finto come quello vero: la guardia sui
+  // duplicati riconosce un `idClient` già visto, risponde `200 gia_presente` e
+  // NON crea un secondo file. Serve a «Rimanda la stessa», che esiste proprio
+  // per farsi dire questo. Spenta per default: gli altri collaudi contano
+  // `ricevuti` come «richieste arrivate» e non devono cambiare comportamento.
+  const stato = { ricevuti: [], stato: 200, corpo: '', risposte: null, deduplica: false, giaPresenti: 0 };
   const gestore = (req, res) => {
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -78,7 +91,16 @@ function avviaFlow(porta = PORTA_FLOW) {
     req.on('end', () => {
       let dati = null;
       try { dati = JSON.parse(corpo); } catch { dati = { nonJson: corpo.length }; }
+      const chiave = dati && dati.idClient;
+      const giaVisto = stato.deduplica && chiave
+        && stato.ricevuti.some(r => r && r.idClient === chiave);
       stato.ricevuti.push(dati);
+      if (giaVisto) {
+        stato.giaPresenti += 1;
+        res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
+        res.end('{"esito":"gia_presente"}');
+        return;
+      }
       // `risposte` permette a un collaudo di decidere invio per invio.
       const scelta = typeof stato.risposte === 'function'
         ? stato.risposte(dati, stato.ricevuti.length) : stato.stato;
@@ -176,8 +198,14 @@ async function configura(pagina, indirizzoApp, impostazioni = {}) {
     // Come un telefono che la fase l'ha già scelta una volta, così negli altri
     // collaudi il campo viaggia pieno; il caso senza fase lo prova
     // 12-fase-e-barra.js.
-    bolle: impostazioni.bolle ? { ultimaFase: 'Murature', ...impostazioni.bolle } : undefined,
-    foto: impostazioni.foto ? { ultimaFase: 'Murature', ...impostazioni.foto } : undefined,
+    //
+    // **Una fase SENZA livelli**, dalla 0.36.0: `Murature` pretende il piano,
+    // e usarla qui bloccherebbe l'invio in tutti i collaudi che non hanno
+    // niente a che fare coi livelli — che li misurerebbero invece della cosa
+    // che provano. I livelli hanno il loro collaudo (15-livelli.js), dove la
+    // fase si sceglie a mano.
+    bolle: impostazioni.bolle ? { ultimaFase: 'Bonifica', ...impostazioni.bolle } : undefined,
+    foto: impostazioni.foto ? { ultimaFase: 'Bonifica', ...impostazioni.foto } : undefined,
   });
 }
 
