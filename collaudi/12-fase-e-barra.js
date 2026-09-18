@@ -18,9 +18,12 @@
 // regole nello stesso posto vuol dire non sapere quale ha fallito.
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
-// 27 date da Francesco, meno «CMC 128» che lui stesso ha tolto: era un codice
-// di commessa finito in un elenco di fasi.
-const QUANTE_FASI = 26;
+// Il conteggio, che ha una storia: 27 date da Francesco il 14/09, meno
+// «CMC 128» che lui stesso ha tolto lo stesso giorno (era un codice di
+// commessa finito in un elenco di fasi) = 26; più `SistemazioneEsterna`,
+// aggiunta il 18/09 = 27. Sta in una costante perché il numero ricompare in
+// più controlli, e un elenco che si accorcia per sbaglio si vede qui.
+const QUANTE_FASI = 27;
 
 module.exports = {
   nome: 'Fase di lavoro nei due moduli, e barra dei comandi delle bolle',

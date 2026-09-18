@@ -37,8 +37,13 @@
 // operatori (core/operatori.js). «Murature», «murature», «Muratura» e
 // «Murat.» in raccolta sono quattro fasi, e nessun conteggio per fase regge.
 //
-// Ordine alfabetico, non per frequenza: sono ventisei voci, e in un elenco
+// Ordine alfabetico, non per frequenza: sono ventisette voci, e in un elenco
 // lungo si cerca per lettera, non per abitudine.
+//
+// `Sistemazione esterna` aggiunta il 18/09/2026 su decisione di Francesco.
+// «Sistemazione esterna» è anche il nome di un'attività in contabilità: la
+// coincidenza è nota e accettata, e si governa a valle qualificando il dominio
+// in una colonna — non rinominando quello che l'operatore legge in cantiere.
 export const FASI = [
   { codice: 'Bonifica', etichetta: 'Bonifica' },
   { codice: 'Cantiere', etichetta: 'Cantiere' },
@@ -64,6 +69,7 @@ export const FASI = [
   { codice: 'Murature', etichetta: 'Murature' },
   { codice: 'Ponteggio', etichetta: 'Ponteggio' },
   { codice: 'Scavi', etichetta: 'Scavi' },
+  { codice: 'SistemazioneEsterna', etichetta: 'Sistemazione esterna' },
   { codice: 'Strutture', etichetta: 'Strutture' },
   { codice: 'Urbanizzazioni', etichetta: 'Urbanizzazioni' },
 ];

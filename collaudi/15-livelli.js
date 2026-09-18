@@ -85,6 +85,42 @@ module.exports = {
         `livelli rifatti per ${codice}`, 10000, codice);
     };
 
+    // L'elenco delle fasi vive in DUE posti dentro l'app: `core/fasi.js` dice
+    // quali sono (codice + etichetta), `core/anagrafica.js` dice cosa ognuna
+    // pretende. Non sono due copie — sono due fatti diversi sulla stessa lista
+    // — ma le chiavi devono combaciare, e finché non c'era questo controllo una
+    // divergenza non faceva rumore: una fase presente in `fasi.js` e assente in
+    // `anagrafica.js` risulta «senza livelli», quindi si può scegliere e la foto
+    // parte — e finisce nella cartella del mese invece che in quella del piano.
+    // Aggiunto il 18/09/2026, quando è entrata `SistemazioneEsterna`.
+    registro.titolo('I due posti dove vivono le fasi dicono la stessa cosa');
+    const coerenza = await pagina.evaluate(async () => {
+      const fasi = await import('./core/fasi.js');
+      const ana = await import('./core/anagrafica.js');
+      const codici = fasi.FASI.map(f => f.codice);
+      const chiavi = Object.keys(ana.ANAGRAFICA.livelliPerFase);
+      const lotti = chiavi.filter(k => /^Lotto\d+$/.test(k));
+      return {
+        fasi: codici,
+        senzaRegola: codici.filter(c => !chiavi.includes(c)),
+        regolaSenzaFase: chiavi.filter(k => !lotti.includes(k) && !codici.includes(k)),
+        lotti,
+        versioneAnagrafica: ana.VERSIONE_ANAGRAFICA,
+      };
+    });
+    registro.dice('fasi nell’elenco', String(coerenza.fasi.length));
+    registro.dice('versione dell’anagrafica', coerenza.versioneAnagrafica);
+    registro.controlla('ogni fase dell’elenco ha la sua riga nell’anagrafica',
+      coerenza.senzaRegola.length === 0, coerenza.senzaRegola.join(' · ') || 'tutte',
+      'una fase senza riga risulta «senza livelli»: si può scegliere, la foto parte, e finisce nella cartella sbagliata senza far rumore');
+    registro.controlla('e l’anagrafica non ha righe per fasi che non esistono',
+      coerenza.regolaSenzaFase.length === 0, coerenza.regolaSenzaFase.join(' · ') || 'nessuna');
+    registro.controlla('i codici di lotto sono i quattro attesi',
+      coerenza.lotti.join(',') === 'Lotto1,Lotto2,Lotto3,Lotto4', coerenza.lotti.join(' '));
+    registro.controlla('in ordine alfabetico',
+      coerenza.fasi.join(',') === [...coerenza.fasi].sort((a, b) => a.localeCompare(b, 'it')).join(','),
+      'in un elenco di ventisette voci si cerca per lettera, non per abitudine');
+
     registro.titolo('Urbanizzazioni: al posto delle fasi, i lotti');
     await scegliCommessa('#commessa', 'SNU');
     const lottiSNU = await voci('#fase');
@@ -113,10 +149,13 @@ module.exports = {
     registro.dice('MAR: quante fasi', String(fasiMAR.length));
     registro.controlla('MAR non mostra la fase Interrato', !fasiMAR.includes('Interrato'),
       'MAR non ha piani sotto quota: offrirla sarebbe offrire una cartella che non esisterà mai');
+    registro.controlla('e ne mostra esattamente una in meno delle 27',
+      fasiMAR.length === 26, String(fasiMAR.length),
+      'il conteggio dice che il filtro toglie UNA voce e non due: senza, «non c’è Interrato» starebbe anche con mezzo elenco mancante');
     await scegliCommessa('#commessa', 'MNG');
     const fasiMNG = await voci('#fase');
     registro.controlla('MNG la mostra, perché ha due interrati', fasiMNG.includes('Interrato'));
-    registro.controlla('e sono tutte e 26', fasiMNG.length === 26, String(fasiMNG.length));
+    registro.controlla('e sono tutte e 27', fasiMNG.length === 27, String(fasiMNG.length));
     await scegliFase('Interrato');
     const pianiInterrato = await voci('#piano');
     registro.dice('MNG, fase Interrato: piani offerti', pianiInterrato.join(' '));
@@ -203,6 +242,23 @@ module.exports = {
       (await voci('#prospetto')).join(',') === 'Nord,Sud,Est,Ovest');
 
     registro.titolo('Fase senza livelli, e commessa senza anagrafica');
+    // `SistemazioneEsterna`, entrata il 18/09/2026: fase senza livelli, quindi
+    // sul server va in `SistemazioneEsterna\[AAAAMM]\`. Provata a parte da
+    // `Bonifica` perché è quella nuova, ed è dove un'aggiunta fatta in un solo
+    // posto dei due si vedrebbe.
+    await scegliCommessa('#commessa', 'MAR');
+    await scegliFase('SistemazioneEsterna');
+    registro.controlla('la fase nuova non chiede nessun livello',
+      !(await visibile('#campo-piano')) && !(await visibile('#campo-unita'))
+      && !(await visibile('#campo-prospetto')));
+    const esterna = await mandaFoto('MAR', 'SistemazioneEsterna');
+    registro.dice('payload', `fase: ${JSON.stringify(esterna.fase)} · piano: ${JSON.stringify(esterna.piano)} · unita: ${JSON.stringify(esterna.unita)} · prospetto: ${JSON.stringify(esterna.prospetto)}`);
+    registro.controlla('il codice arriva senza spazi', esterna.fase === 'SistemazioneEsterna',
+      'a video si legge «Sistemazione esterna», in colonna deve arrivare il codice: è il nome della cartella');
+    registro.controlla('e i tre livelli sono null veri, non stringhe vuote',
+      esterna.piano === null && esterna.unita === null && esterna.prospetto === null,
+      [esterna.piano, esterna.unita, esterna.prospetto].map(v => JSON.stringify(v)).join(' '));
+
     const bonifica = await mandaFoto('MAR', 'Bonifica');
     registro.controlla('una fase senza livelli non chiede niente',
       bonifica.piano === null && bonifica.unita === null && bonifica.prospetto === null);
@@ -217,8 +273,8 @@ module.exports = {
     // scattando per un dato che manca in ufficio.
     await scegliCommessa('#commessa', 'MRS');
     const fasiMRS = await voci('#fase');
-    registro.controlla('una commessa senza anagrafica mostra tutte e 26 le fasi',
-      fasiMRS.length === 26 && fasiMRS.includes('Interrato'), String(fasiMRS.length));
+    registro.controlla('una commessa senza anagrafica mostra tutte e 27 le fasi',
+      fasiMRS.length === 27 && fasiMRS.includes('Interrato'), String(fasiMRS.length));
     const senzaAnagrafica = await mandaFoto('MRS', 'Strutture');
     registro.controlla('e non chiede il piano, perché non ne ha da offrire',
       senzaAnagrafica.piano === null,

@@ -37,7 +37,7 @@
 import { FASI, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202609181330',
+  versione: '202609182010',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -67,6 +67,7 @@ export const ANAGRAFICA = {
     Murature:                     { piano: 'O', unita: '-', prospetto: '-' },
     Ponteggio:                    { piano: '-', unita: '-', prospetto: '-' },
     Scavi:                        { piano: '-', unita: '-', prospetto: '-' },
+    SistemazioneEsterna:          { piano: '-', unita: '-', prospetto: '-' },
     Strutture:                    { piano: 'O', unita: '-', prospetto: '-' },
     Urbanizzazioni:               { piano: '-', unita: '-', prospetto: '-' },
     Lotto1:                       { piano: '-', unita: '-', prospetto: '-' },

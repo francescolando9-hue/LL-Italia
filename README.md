@@ -136,7 +136,7 @@ La categoria si sceglie prima perché **decide come l'immagine viene preparata**
 
 Accanto al cantiere c'è la **fase di lavoro** (dalla 0.31.0), dallo stesso elenco chiuso del modulo Bolle, con l'ultima scelta preselezionata; vale per tutte le foto di un invio. **È obbligatoria per le foto da archiviare** (dalla 0.33.0): quelle vanno sul server nella cartella della fase, e senza fase non saprebbero dove andare — se fra le foto in attesa ce n'è almeno una d'archivio, Invia resta spento e l'avviso dice perché. Per l'avanzamento lavori resta facoltativa. Lato raccolta serve la colonna `Fase`; finché non c'è il flow ignora il campo.
 
-**Sotto la fase, un livello** (dalla 0.36.0). L'archivio di commessa sul server ha una cartella in più sotto la fase, e **dove c'è sostituisce la cartella del mese**: `Strutture\P1\`, `FinituraAlloggi\P1\1.01\`, `FinituraFacciata\Nord\`, mentre una fase senza livelli resta `Bonifica\202609\`. L'app chiede quindi **piano**, **unità** o **prospetto**, ma solo dove la fase li pretende — 10 fasi vogliono il piano, 4 l'unità, 1 il prospetto, 11 niente — e **dove li chiede sono obbligatori**: non esistono livelli facoltativi, perché una cartella non si indovina. Con l'unità il **piano non si chiede**: lo ricava l'app dalla mappa dell'anagrafica e lo manda comunque, e sotto il menù si legge quale ha ricavato. La mappa **non si deduce dal codice**: le commesse numerano diversamente (`1.01` su MAR, `1A` su MNG) e `10A` su SNZ2.2 sta al `P10`, non al `P1`. Due filtri: per la fase `Interrato` solo i piani sotto quota, e una commessa senza interrati non vede nemmeno la fase (è il caso di MAR).
+**Sotto la fase, un livello** (dalla 0.36.0). L'archivio di commessa sul server ha una cartella in più sotto la fase, e **dove c'è sostituisce la cartella del mese**: `Strutture\P1\`, `FinituraAlloggi\P1\1.01\`, `FinituraFacciata\Nord\`, mentre una fase senza livelli resta `Bonifica\202609\`. L'app chiede quindi **piano**, **unità** o **prospetto**, ma solo dove la fase li pretende — 10 fasi vogliono il piano, 4 l'unità, 1 il prospetto, 12 niente — e **dove li chiede sono obbligatori**: non esistono livelli facoltativi, perché una cartella non si indovina. Con l'unità il **piano non si chiede**: lo ricava l'app dalla mappa dell'anagrafica e lo manda comunque, e sotto il menù si legge quale ha ricavato. La mappa **non si deduce dal codice**: le commesse numerano diversamente (`1.01` su MAR, `1A` su MNG) e `10A` su SNZ2.2 sta al `P10`, non al `P1`. Due filtri: per la fase `Interrato` solo i piani sotto quota, e una commessa senza interrati non vede nemmeno la fase (è il caso di MAR).
 
 **Per le urbanizzazioni il lotto prende il posto della fase.** Su `SNU` e `BRU` il campo si chiama **Lotto** e mostra i lotti di quella commessa; il valore viaggia nello stesso campo `fase` (`Lotto2`), perché a valle è sempre la cartella immediatamente sotto la commessa. Il selettore è condiviso col modulo Bolle, quindi anche una bolla di SNU prende il lotto.
 
@@ -191,7 +191,9 @@ core/                 shell: router hash, home/launcher, impostazioni app, desig
 core/vendor/          codice di terzi incluso nel repo (vedi sotto)
 core/cantieri.js      anagrafica cantieri, condivisa dai moduli
 core/operatori.js     chi può firmare un invio: elenco chiuso, condiviso
-core/fasi.js          le fasi di lavoro: elenco chiuso, codice + etichetta, condiviso
+core/fasi.js          le fasi di lavoro: 27 voci, elenco chiuso, codice + etichetta
+                      (chi ne aggiunge una tocca anche core/anagrafica.js: un
+                      collaudo verifica che i due elenchi combacino)
 core/anagrafica.js    piani, unità, prospetti, lotti e cosa ogni fase pretende:
                       copia di un master su L:, si sostituisce in blocco
 core/endpoint.js      api-version dei flow Power Automate, condivisa
