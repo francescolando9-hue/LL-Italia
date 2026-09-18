@@ -64,13 +64,16 @@ export function corpoInvio(record, impostazioni, contenutoBase64, idDispositivo,
     // Fase di lavoro a cui la bolla si attribuisce, dall'elenco chiuso della
     // shell (core/fasi.js). Testo; vuoto solo per le bolle accodate prima
     // della 0.31.0, che il campo non lo avevano.
+    // Fase, o LOTTO per le urbanizzazioni (`Lotto2`): stesso campo, perché a
+    // valle è sempre «la cartella sotto la commessa».
+    //
+    // I tre livelli dell'archivio — `piano`, `unita`, `prospetto` — NON sono
+    // qui, e non è una dimenticanza: la raccolta delle bolle non ha le colonne
+    // per riceverli (verificato sul tenant il 18/09/2026 alle 16:05), e un
+    // campo che arriva e viene scartato in silenzio è peggio di un campo che
+    // non parte. Il giorno che quelle colonne ci fossero, si riaccendono qui e
+    // nel modulo (`campiLivelli(prefisso, true)`).
     fase: record.fase || '',
-    // I tre livelli dell'archivio (dalla 0.36.0): il selettore della fase è
-    // quello del modulo Foto, quindi una bolla porta gli stessi livelli.
-    // `null` dove non si applicano, mai stringa vuota.
-    piano: record.piano || null,
-    unita: record.unita || null,
-    prospetto: record.prospetto || null,
     operatore: record.autore,
     idClient: record.id,
     idDispositivo,

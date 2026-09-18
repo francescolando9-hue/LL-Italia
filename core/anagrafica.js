@@ -438,7 +438,7 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci) {
   }
 }
 
-export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso = '', iniziali = {}) {
+export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso = '', iniziali = {}, conLivelli = true) {
   const menuFase = radice.querySelector(`#${prefisso}fase`);
   if (!menuFase) return { fase: '', piano: null, unita: null, prospetto: null, mancanti: [] };
 
@@ -448,6 +448,13 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   if (etichetta) etichetta.textContent = etichettaSelettoreFase(codiceCommessa);
 
   const fase = menuFase.value;
+  // Senza livelli il lavoro finisce qui: niente menù da accendere, e
+  // soprattutto **niente da pretendere** — `mancanti` vuoto, altrimenti
+  // l'invio si bloccherebbe chiedendo un campo che non è a video.
+  if (!conLivelli) {
+    menuFase.dataset.livelli = `${codiceCommessa}|${fase}`;
+    return { fase, piano: null, unita: null, prospetto: null, mancanti: [] };
+  }
   const richiesti = livelliRichiesti(codiceCommessa, fase);
 
   const campoPiano = radice.querySelector(`#campo-${prefisso}piano`);
@@ -520,7 +527,20 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
 //
 // I menù nascono VUOTI: a riempirli è `sincronizzaLivelli` al primo ridisegno,
 // che è anche l'unico a sapere quali voci vanno mostrate per quella commessa.
-export function campiLivelli(prefisso = '') {
+// `conLivelli = false` emette il SOLO menù della fase (o del lotto). Serve al
+// modulo Bolle: `BolleInArrivo` non ha le tre colonne dei livelli e non le
+// prende — verificato sul tenant il 18/09/2026 alle 16:05 — quindi chiedere un
+// piano su una bolla sarebbe attrito per un dato che viene scartato. Il giorno
+// che quelle colonne ci fossero, si rimette `true` qui e in
+// `sincronizzaLivelli`: la regola non va riscritta, sta già tutta qui.
+export function campiLivelli(prefisso = '', conLivelli = true) {
+  const soloFase = `
+      <div class="campo">
+        <label for="${prefisso}fase" id="etichetta-${prefisso}fase">Fase di lavoro</label>
+        <select id="${prefisso}fase" required></select>
+        <p id="aiuto-${prefisso}fase" class="aiuto tenue"></p>
+      </div>`;
+  if (!conLivelli) return soloFase;
   return `
       <div class="campo">
         <label for="${prefisso}fase" id="etichetta-${prefisso}fase">Fase di lavoro</label>

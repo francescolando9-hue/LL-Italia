@@ -224,7 +224,13 @@ module.exports = {
       senzaAnagrafica.piano === null,
       'non bloccare l’operatore per un dato che manca in ufficio è una scelta, non una dimenticanza');
 
-    registro.titolo('La stessa regola nel modulo Bolle: un selettore solo');
+    registro.titolo('Nel modulo Bolle il lotto sì, i livelli NO');
+    // Il selettore della fase è condiviso di proposito, e per un'urbanizzazione
+    // mostra il lotto anche su una bolla. I tre LIVELLI invece non ci sono:
+    // `BolleInArrivo` non ha le colonne per riceverli (verificato sul tenant il
+    // 18/09/2026 alle 16:05), e un campo che arriva e viene scartato in
+    // silenzio è peggio di un campo che non parte — peggio ancora se per
+    // sceglierlo l'operatore ha dovuto fermarsi.
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#cantiere');
     await scegliCommessa('#cantiere', 'SNU');
@@ -234,14 +240,14 @@ module.exports = {
       'il selettore è condiviso di proposito: due elenchi separati diventerebbero due verità');
     await scegliCommessa('#cantiere', 'MNG');
     await scegliFase('FinituraAlloggi');
-    registro.controlla('e pretende l’unità come nel modulo Foto',
-      await visibile('#campo-unita'));
+    registro.controlla('i menù dei livelli non esistono nemmeno',
+      (await pagina.$$('#campo-piano, #campo-unita, #campo-prospetto')).length === 0,
+      'non nascosti: assenti. Un menù nascosto resterebbe un candidato a ricomparire per sbaglio');
     await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
-    registro.controlla('senza unità la bolla non parte',
-      await pagina.$eval('#invia', e => e.disabled));
-    await pagina.selectOption('#unita', '1B');
-    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    registro.controlla('e la bolla parte senza chiedere niente in più',
+      !(await pagina.$eval('#invia', e => e.disabled)),
+      'una fase che pretende l’unità non deve fermare una bolla: quel dato in raccolta non ci arriva');
     const primaBolla = flow.stato.ricevuti.length;
     await pagina.click('#invia');
     const fineBolla = Date.now() + 60000;
@@ -249,15 +255,19 @@ module.exports = {
       await new Promise(r => setTimeout(r, 300));
     }
     const bolla = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
-    registro.dice('payload della bolla', `fase: ${JSON.stringify(bolla.fase)} · piano: ${JSON.stringify(bolla.piano)} · unita: ${JSON.stringify(bolla.unita)}`);
-    registro.controlla('la bolla porta unità e piano ricavato',
-      bolla.unita === '1B' && bolla.piano === 'P1');
+    registro.dice('payload della bolla', `fase: ${JSON.stringify(bolla.fase)} · campi livello presenti: ${
+      ['piano', 'unita', 'prospetto'].filter(c => c in bolla).join(', ') || 'nessuno'}`);
+    registro.controlla('la fase (qui FinituraAlloggi) arriva', bolla.fase === 'FinituraAlloggi');
+    registro.controlla('e i tre campi dei livelli NON sono nel payload',
+      !('piano' in bolla) && !('unita' in bolla) && !('prospetto' in bolla),
+      'mandarli sapendo che vengono scartati è il difetto che questa modifica evita');
 
-    registro.titolo('Nessuna stringa vuota, in nessun invio');
-    const tutti = flow.stato.ricevuti;
+    registro.titolo('Nessuna stringa vuota, in nessun invio di foto');
+    // Solo i payload del modulo Foto: `tipo` c'è lì e non nelle bolle.
+    const tutti = flow.stato.ricevuti.filter(r => 'tipo' in r);
     const vuoti = tutti.flatMap(r => ['piano', 'unita', 'prospetto']
       .filter(c => r[c] === '').map(c => `${c} di ${r.idClient}`));
-    registro.dice('invii esaminati', String(tutti.length));
+    registro.dice('invii di foto esaminati', String(tutti.length));
     registro.controlla('i tre campi sono un codice oppure null, mai ""',
       vuoti.length === 0, vuoti.join(' · ') || 'nessuno');
     registro.controlla('e viaggiano sempre, anche quando valgono null',

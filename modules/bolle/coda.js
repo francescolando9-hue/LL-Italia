@@ -99,12 +99,6 @@ export function aggiungiBozza(fotoBlob, nomeOriginale, miniatura = null, impront
     // Fase di lavoro (o lotto, per le urbanizzazioni): si sceglie con Invia,
     // come il cantiere.
     fase: '',
-    // I tre livelli dell'archivio (dalla 0.36.0): il selettore è lo stesso del
-    // modulo Foto, quindi anche una bolla li porta. `null` dove non si
-    // applicano, mai stringa vuota.
-    piano: null,
-    unita: null,
-    prospetto: null,
     timestampDispositivo: timestampDispositivo(),
     creatoIl: Date.now(),
     tentativi: 0,
@@ -172,7 +166,7 @@ export function progressivoRaggiunto() {
 // Resta comunque un invio per pagina — il contratto è un file per richiesta —
 // e ogni pagina consuma il suo progressivo, così il controllo di continuità
 // non cambia: una pagina mai arrivata è un buco come qualsiasi altro.
-export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase = '', livelli = {}) {
+export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase = '') {
   const bozze = (await elenca()).filter(r => r.stato === 'bozza');
   if (bozze.length === 0) return 0;
   const primo = await riservaProgressivi(bozze.length);
@@ -183,9 +177,6 @@ export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase
     record.stato = 'in_coda';
     record.cantiere = cantiere;
     record.fase = fase;
-    record.piano = livelli.piano || null;
-    record.unita = livelli.unita || null;
-    record.prospetto = livelli.prospetto || null;
     record.autore = autore;
     record.progressivo = numero;
     // Anche una bolla di una pagina sola ha il suo idBolla: a valle la regola
@@ -214,9 +205,6 @@ export async function confermaSingola(id, cantiere, autore, bolla = null) {
   // La fase resta quella dell'invio originale: si corregge il cantiere, non
   // l'attribuzione.
   record.fase = (bolla && bolla.fase) || '';
-  record.piano = (bolla && bolla.piano) || null;
-  record.unita = (bolla && bolla.unita) || null;
-  record.prospetto = (bolla && bolla.prospetto) || null;
   record.autore = autore;
   record.progressivo = await riservaProgressivi(1);
   record.idBolla = (bolla && bolla.idBolla) || crypto.randomUUID();
@@ -304,9 +292,6 @@ export async function registraInvio(record) {
     idClient: record.id,
     commessa: record.cantiere,
     fase: record.fase || '',
-    piano: record.piano || null,
-    unita: record.unita || null,
-    prospetto: record.prospetto || null,
     operatore: record.autore,
     dataInvio: record.timestampDispositivo,
     inviatoIl: record.inviatoIl || Date.now(),
@@ -427,9 +412,6 @@ export async function rimandaCorretta(id, dati) {
   nuovo.stato = 'in_coda';
   nuovo.cantiere = dati.cantiere;
   nuovo.fase = dati.fase || '';
-  nuovo.piano = dati.piano || null;
-  nuovo.unita = dati.unita || null;
-  nuovo.prospetto = dati.prospetto || null;
   nuovo.autore = dati.autore || originale.autore;
   nuovo.progressivo = await riservaProgressivi(1);
   // La pagina corretta resta la stessa pagina della stessa bolla: altrimenti

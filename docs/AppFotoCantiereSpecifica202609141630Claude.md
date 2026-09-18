@@ -6,7 +6,9 @@
 >
 > ⚠️ **Due punti aperti:** l'apertura della sessione di caricamento a blocchi, che il tenant oggi rifiuta (§4-bis); e l'ora di ripresa dei **video**, che non sta nell'EXIF e per ora resta stimata (§4.1).
 >
-> 🔴 **La 0.36.0 non si pubblica prima del lato ricevente.** Le tre colonne di §5 e lo smistamento di §6 vanno fatti prima, o insieme: se l'app parte per prima, `piano`, `unita` e `prospetto` arrivano al flow e vengono **scartati in silenzio** — le foto atterrano, i livelli no, e non lo segnala nessuno. L'ordine fra le due metà non conta, purché si sappia quale delle due è già fatta. La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
+> ✅ **Il lato ricevente è pronto per le foto, dal 18/09/2026 ore 16:05.** Le tre colonne esistono in `FotoCantiere` (testo 255, non obbligatorie, nome interno identico al visualizzato) e il flow le mappa su `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. Verificato con un invio vero: le colonne di sempre si compilano, le tre nuove arrivano `null` — cioè il ramo regge, **ma l'aggancio quando i campi ci sono resta da dimostrare**, e lo dimostra il primo invio dalla 0.36.0. Per questo il rilascio si fa **presidiato**, guardando la prima foto di ognuna delle quattro famiglie: piano, unità, prospetto, nessun livello.
+>
+> 🔴 **`BolleInArrivo` non ha quelle colonne e non le prende.** Conseguenza: **il modulo Bolle non chiede i livelli e non li manda** — vedi la specifica Bolle, rev. 6. Il lotto invece sì, perché viaggia nel campo `fase`. Resta aperto lo smistamento del venerdì (§6): finché non è riscritto, i livelli arrivano in raccolta e nessuno li usa — le foto però sono a posto, e si smistano appena il runbook c'è. La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
 
 ## 1. A cosa serve
 
@@ -336,9 +338,9 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 | `DurataSecondi` | Numero, 0 decimali | `durataSecondi` — vedi §4.2 |
 | `DataScarico` | — | scritta dal runbook del venerdì, non dall'app |
 | `ScattoStimato` | Riga di testo singola | `scattoStimato` — **DA AGGIUNGERE**, vedi sotto |
-| `Piano` | Riga di testo singola | `piano` — **DA AGGIUNGERE con la 0.36.0**, vedi §4.5. Codice senza spazi (`P1`, `P-2`, `P10`), che è anche il nome della cartella. Vuota dove la fase non prevede il piano |
-| `Unita` | Riga di testo singola | `unita` — **DA AGGIUNGERE con la 0.36.0**, vedi §4.5. Codice così com'è in anagrafica (`1.01` su MAR, `1A` su MNG): **niente normalizzazioni**, il punto fa parte del codice |
-| `Prospetto` | Riga di testo singola | `prospetto` — **DA AGGIUNGERE con la 0.36.0**, vedi §4.5. `Nord`, `Sud`, `Est` o `Ovest`; valorizzata solo su `FinituraFacciata` |
+| `Piano` | Riga di testo singola (255) | `piano` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Codice senza spazi (`P1`, `P-2`, `P10`), che è anche il nome della cartella. Vuota dove la fase non prevede il piano |
+| `Unita` | Riga di testo singola (255) | `unita` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Nome interno senza accento. Codice così com'è in anagrafica (`1.01` su MAR, `1A` su MNG): **niente normalizzazioni**, il punto fa parte del codice |
+| `Prospetto` | Riga di testo singola (255) | `prospetto` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. `Nord`, `Sud`, `Est` o `Ovest`; valorizzata solo su `FinituraFacciata` |
 
 **Colonna da aggiungere, con la 0.29.0: `ScattoStimato`** (riga di testo singola), mappata sul campo omonimo del payload. Finché non c'è, il flow **ignora** il campo — che è il motivo per cui l'app può essere rilasciata subito e senza coordinamento: le foto continuano ad atterrare, con l'ora giusta, e si perde solo l'indicazione se quell'ora sia misurata o stimata. Valori attesi: `SI` e `NO`, nient'altro. Una vista con filtro `ScattoStimato = SI` dice al volo quali foto hanno un'ora approssimativa.
 
@@ -390,12 +392,14 @@ Provato in locale con i collaudi automatici del repo (`node collaudi/esegui.js`,
 
 ### Rilascio 0.36.0 — i livelli dell'archivio
 
-🔴 **Da fare a valle PRIMA che l'app sia pubblicata, o insieme.** Se l'app parte per prima, i tre campi arrivano al flow e vengono scartati in silenzio: le foto atterrano, i livelli no.
+**Stato al 18/09/2026 ore 16:05.**
 
-1. **Tre colonne nuove in `FotoCantiere`** — `Piano`, `Unita`, `Prospetto`, tutte **Riga di testo singola** (§5). Nomi senza accento e senza spazi, come le altre.
-2. **Tre mappature in `Update file properties`** — `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. Sono testo e accettano il nullo: dove il livello non si applica la colonna resta vuota, ed è il suo significato.
-3. **Le stesse tre colonne in `BolleInArrivo`**: il selettore della fase è condiviso, quindi anche una bolla porta i livelli (specifica Bolle, §4).
-4. **Lo smistamento del runbook del venerdì** va riscritto secondo la tabella di §6: dove il livello c'è, **sostituisce la cartella del mese**.
+1. ✅ **Tre colonne in `FotoCantiere`** — `Piano`, `Unita`, `Prospetto`, testo 255, non obbligatorie, nome interno identico al visualizzato. **Fatte.**
+2. ✅ **Tre mappature in `Update file properties`** — `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. **Fatte**, e verificate con un invio vero: le tre colonne arrivano `null`, che è il comportamento giusto per una 0.35.0 che non manda quei campi. **Che la mappatura agganci quando i campi ci sono lo dimostra il primo invio dalla 0.36.0**, non questo: un `null` che arriva da un campo assente e un `null` che arriva da una mappatura rotta si leggono uguali.
+3. ❌ **In `BolleInArrivo` NON si aggiungono.** Deciso il 18/09: quelle colonne non ci sono e non ci saranno, quindi il modulo Bolle **non chiede i livelli e non li manda** (specifica Bolle, rev. 6). Un campo che arriva e viene scartato in silenzio è peggio di un campo che non parte — peggio ancora se per sceglierlo l'operatore si è fermato.
+4. ⏳ **Lo smistamento del runbook del venerdì** va riscritto secondo la tabella di §6: dove il livello c'è, **sostituisce la cartella del mese**. **Aperto.** Non blocca il rilascio: finché non c'è, i livelli restano in raccolta senza essere usati.
+
+🔴 **Il rilascio si fa presidiato.** La prova dell'aggancio è la prima foto di **ognuna delle quattro famiglie** — una con il piano, una con l'unità, una con il prospetto, una senza livelli — guardata in raccolta subito dopo l'invio. Tre famiglie su quattro non bastano: una mappatura può agganciare su un campo e non sull'altro, e la famiglia «senza livelli» è quella che dimostra che il `null` non rompe la scrittura delle altre colonne.
 
 ⚠️ **Niente conversioni sui codici.** `1.01` resta `1.01` col punto, `P-2` resta `P-2` col segno. Quello che arriva in colonna **è** il nome della cartella: è la scelta che evita una tabella di corrispondenza fra due posti, che il giorno che si aggiunge un piano si disallinea in silenzio.
 

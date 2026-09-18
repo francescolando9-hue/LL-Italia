@@ -104,10 +104,10 @@ function revocaUrl() {
 // scelta è sempre scritta a video: mai da indovinare al momento di Invia.
 let unaSolaBolla = false;
 
-// I livelli scelti (o derivati) all'ultimo ridisegno, e la bolla inviata che
-// si sta rimandando. Come nel modulo Foto: il riquadro sta fuori dalla lista
-// della coda, che si ridisegna a ogni cambio di stato di un invio.
-let livelliCorrenti = { fase: '', piano: null, unita: null, prospetto: null, mancanti: [] };
+// La fase (o il lotto) all'ultimo ridisegno, e la bolla inviata che si sta
+// rimandando. Il riquadro di «Rimanda» sta fuori dalla lista della coda, che
+// si ridisegna a ogni cambio di stato di un invio.
+let faseCorrente = '';
 let rimandoAperto = '';
 
 async function vista(el) {
@@ -139,11 +139,14 @@ async function vista(el) {
         <label for="cantiere">Cantiere</label>
         <select id="cantiere" required>${opzioniCantiere}</select>
       </div>
-      <!-- Fase (o lotto, per le urbanizzazioni), piano, unità, prospetto: lo
-           stesso blocco del modulo Foto, dalla shell. Il selettore è condiviso
-           di proposito — deciso il 18/09/2026 — quindi anche una bolla di SNU
-           prende il lotto. -->
-      ${campiLivelli()}
+      <!-- Fase, o LOTTO per le urbanizzazioni: il selettore è quello del modulo
+           Foto, dalla shell, condiviso di proposito (deciso il 18/09/2026) —
+           quindi anche una bolla di SNU prende il lotto.
+           I tre livelli (piano, unità, prospetto) qui NON ci sono: sono le
+           cartelle dell'archivio di commessa, e la raccolta delle bolle non ha
+           le colonne per riceverli. Chiederli bloccherebbe l'invio per un dato
+           che viene scartato all'arrivo. -->
+      ${campiLivelli('', false)}
       <p class="didascalia-alternative">Altri modi per aggiungere una foto</p>
       <div class="azioni-alternative">
         ${fotocameraDisponibile()
@@ -181,9 +184,6 @@ async function vista(el) {
 
   el.querySelector('#cantiere').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
-  for (const id of ['#piano', '#unita', '#prospetto']) {
-    el.querySelector(id).addEventListener('change', () => { ridisegna(); });
-  }
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
   if (pulsanteScatto) pulsanteScatto.addEventListener('click', apriScatto);
   el.querySelector('#input-camera').addEventListener('change', gestisciFile);
@@ -308,16 +308,9 @@ async function invia() {
   const selezioneFase = radice.querySelector('#fase');
   const fase = selezioneFase ? selezioneFase.value : '';
   if (!cantiere) return;
-  // Dove la fase pretende un livello, senza la scelta non si parte: la guardia
-  // è anche qui e non solo sul pulsante, che si può premere fra due ridisegni.
-  if (livelliCorrenti.mancanti.length > 0) return;
   // Con una sola foto in attesa il raggruppamento non fa differenza:
   // pagina 1 di 1 in ogni caso.
-  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase, {
-    piano: livelliCorrenti.piano,
-    unita: livelliCorrenti.unita,
-    prospetto: livelliCorrenti.prospetto,
-  });
+  const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
   if (quante > 0) {
     coda.incrementaScattate(quante);
     // Cantiere e fase si ripropongono al prossimo invio: il giro felice resta
@@ -401,13 +394,13 @@ async function ridisegna() {
 
   const selezione = radice.querySelector('#cantiere');
   const cantiereScelto = selezione ? selezione.value : '';
-  // Fase (o lotto) e livelli: li accende e li spegne la shell, con le stesse
-  // regole del modulo Foto.
-  livelliCorrenti = sincronizzaLivelli(radice, cantiereScelto, scappaHtml, '',
-    { fase: impostazioniBolle().ultimaFase });
+  // Fase, o lotto dove la commessa è un'urbanizzazione: il menù lo costruisce
+  // la shell, con le stesse regole del modulo Foto. Senza livelli: l'ultimo
+  // argomento è `false`.
+  faseCorrente = sincronizzaLivelli(radice, cantiereScelto, scappaHtml, '',
+    { fase: impostazioniBolle().ultimaFase }, false).fase;
   const pulsanteInvia = radice.querySelector('#invia');
-  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto
-    || livelliCorrenti.mancanti.length > 0;
+  pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
   pulsanteInvia.textContent = bozze.length === 0
     ? 'Invia'
     : numeraPagine
@@ -416,9 +409,8 @@ async function ridisegna() {
         ? 'Invia 1 bolla'
         : `Invia ${bozze.length} bolle separate`;
   const avvisoCantiere = radice.querySelector('#avviso-cantiere');
-  const mancanti = [!cantiereScelto && 'il cantiere', ...livelliCorrenti.mancanti].filter(Boolean);
-  avvisoCantiere.innerHTML = bozze.length > 0 && mancanti.length > 0
-    ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.</p>` : '';
+  avvisoCantiere.innerHTML = bozze.length > 0 && !cantiereScelto
+    ? '<p class="avviso avviso-attenzione">Scegli il cantiere per inviare.</p>' : '';
 
   const azioni = radice.querySelector('#coda-azioni');
   azioni.innerHTML = inErrore.length > 0
@@ -459,7 +451,7 @@ async function ridisegna() {
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="bolle-progressivo">n. ${r.progressivo}</span>` : ''}
               ${Number(r.pagine) > 1 ? `<span class="bolle-pagina-riga">pag. ${r.pagina}/${r.pagine}</span>` : ''}
-              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''}${scappaHtml(scritturaLivelli(r))} &middot; ${ora}
+              ${scappaHtml(etichettaCantiere(r.cantiere))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${giaPresente}
@@ -487,33 +479,17 @@ async function ridisegna() {
   disegnaRimando(record);
 }
 
-// I livelli sulla riga della coda: sono il percorso della cartella a valle, e
-// leggerli è il solo modo di accorgersi di un piano sbagliato prima che
-// l'archivio se lo porti dietro.
-function scritturaLivelli(record) {
-  const pezzi = [record.piano, record.unita, record.prospetto].filter(Boolean);
-  return pezzi.length > 0 ? ` \u00b7 ${pezzi.join(' \u00b7 ')}` : '';
-}
-
 // Quello che c'è scritto nel riquadro adesso, e se differisce dall'invio
 // originale: lo leggono sia il ridisegno, per l'etichetta del pulsante, sia
 // l'azione — una sola lettura, così il pulsante non può dire una cosa e farne
 // un'altra.
 function lettureRimando(riquadro, record) {
   const cantiere = riquadro.querySelector('#r-cantiere').value;
-  const livelli = sincronizzaLivelli(riquadro, cantiere, scappaHtml, 'r-', {
-    fase: record.fase || '',
-    piano: record.piano || '',
-    unita: record.unita || '',
-    prospetto: record.prospetto || '',
-  });
+  const livelli = sincronizzaLivelli(riquadro, cantiere, scappaHtml, 'r-',
+    { fase: record.fase || '' }, false);
   const uguale = (a, b) => (a || '') === (b || '');
-  const cambiato = !uguale(cantiere, record.cantiere)
-    || !uguale(livelli.fase, record.fase)
-    || !uguale(livelli.piano, record.piano)
-    || !uguale(livelli.unita, record.unita)
-    || !uguale(livelli.prospetto, record.prospetto);
-  const mancanti = [!cantiere && 'il cantiere', ...livelli.mancanti].filter(Boolean);
+  const cambiato = !uguale(cantiere, record.cantiere) || !uguale(livelli.fase, record.fase);
+  const mancanti = [!cantiere && 'il cantiere'].filter(Boolean);
   return { cantiere, livelli, cambiato, mancanti };
 }
 
@@ -538,7 +514,7 @@ function disegnaRimando(tutti) {
           <select id="r-cantiere">${CANTIERI.map(c =>
             `<option value="${scappaHtml(c.codice)}"${c.codice === record.cantiere ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`).join('')}</select>
         </div>
-        ${campiLivelli('r-')}
+        ${campiLivelli('r-', false)}
         <p id="r-spiegazione" class="aiuto tenue"></p>
         <div class="azioni-alternative">
           <button id="r-manda" class="btn btn-secondario btn-minore" type="button">Rimanda</button>
@@ -546,9 +522,7 @@ function disegnaRimando(tutti) {
         <p id="r-esito" class="tenue"></p>
       </div>`;
     riquadro.querySelector('#r-cantiere').addEventListener('change', () => { ridisegna(); });
-    for (const id of ['#r-fase', '#r-piano', '#r-unita', '#r-prospetto']) {
-      riquadro.querySelector(id).addEventListener('change', () => { ridisegna(); });
-    }
+    riquadro.querySelector('#r-fase').addEventListener('change', () => { ridisegna(); });
     riquadro.querySelector('#r-manda').addEventListener('click', () => { eseguiRimando(record.id); });
   }
 
@@ -576,9 +550,6 @@ async function eseguiRimando(id) {
       await coda.rimandaCorretta(id, {
         cantiere: letture.cantiere,
         fase: letture.livelli.fase,
-        piano: letture.livelli.piano,
-        unita: letture.livelli.unita,
-        prospetto: letture.livelli.prospetto,
         autore: impostazioniApp.autore || record.autore,
       });
       coda.incrementaScattate(1);

@@ -68,7 +68,7 @@ I dati viaggiano dentro l'hash dell'indirizzo, che il browser **non** invia al s
 Dalla 0.36.0, sotto **ogni** elemento inviato — foto e bolle — c'è **Rimanda**, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Si apre un riquadro coi campi già compilati, e il pulsante dice **quale delle due cose** sta per fare, perché in raccolta sono due cose diverse:
 
 - **Rimanda la stessa** (niente modificato) — riusa lo **stesso identificativo**. Il flow riconosce il duplicato, non crea un doppione e l'app scrive *«Era già in raccolta»*. Non conta fra le inviate di oggi: in raccolta non è arrivato niente di nuovo, e quel numero serve a essere confrontato coi file atterrati.
-- **Rimanda corretta** (cantiere, fase, livelli o nota cambiati) — è un **invio nuovo**, con identificativo e numero progressivo nuovi. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può sapere se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta. Per una pagina di una bolla di più fogli l'`idBolla` resta quello dell'originale, così la correzione non spezza la bolla in due.
+- **Rimanda corretta** (cantiere, fase, livelli o nota cambiati; su una bolla solo cantiere e fase, che sono i campi che una bolla ha) — è un **invio nuovo**, con identificativo e numero progressivo nuovi. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può sapere se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta. Per una pagina di una bolla di più fogli l'`idBolla` resta quello dell'originale, così la correzione non spezza la bolla in due.
 
 Serve che la foto sia ancora sul telefono: rimandare una miniatura al posto dell'originale consegnerebbe all'ufficio una foto peggiore.
 
@@ -139,6 +139,8 @@ Accanto al cantiere c'è la **fase di lavoro** (dalla 0.31.0), dallo stesso elen
 **Sotto la fase, un livello** (dalla 0.36.0). L'archivio di commessa sul server ha una cartella in più sotto la fase, e **dove c'è sostituisce la cartella del mese**: `Strutture\P1\`, `FinituraAlloggi\P1\1.01\`, `FinituraFacciata\Nord\`, mentre una fase senza livelli resta `Bonifica\202609\`. L'app chiede quindi **piano**, **unità** o **prospetto**, ma solo dove la fase li pretende — 10 fasi vogliono il piano, 4 l'unità, 1 il prospetto, 11 niente — e **dove li chiede sono obbligatori**: non esistono livelli facoltativi, perché una cartella non si indovina. Con l'unità il **piano non si chiede**: lo ricava l'app dalla mappa dell'anagrafica e lo manda comunque, e sotto il menù si legge quale ha ricavato. La mappa **non si deduce dal codice**: le commesse numerano diversamente (`1.01` su MAR, `1A` su MNG) e `10A` su SNZ2.2 sta al `P10`, non al `P1`. Due filtri: per la fase `Interrato` solo i piani sotto quota, e una commessa senza interrati non vede nemmeno la fase (è il caso di MAR).
 
 **Per le urbanizzazioni il lotto prende il posto della fase.** Su `SNU` e `BRU` il campo si chiama **Lotto** e mostra i lotti di quella commessa; il valore viaggia nello stesso campo `fase` (`Lotto2`), perché a valle è sempre la cartella immediatamente sotto la commessa. Il selettore è condiviso col modulo Bolle, quindi anche una bolla di SNU prende il lotto.
+
+**I tre livelli sono solo nel modulo Foto.** Nelle bolle non ci sono, e non è una dimenticanza: sono le cartelle dell'archivio di commessa, dove le bolle non vanno, e la raccolta delle bolle non ha le colonne per riceverli. Chiederli su una bolla vorrebbe dire fermare l'operatore per un dato che viene scartato all'arrivo. Il **lotto** invece c'è anche là, perché viaggia nel campo `fase`.
 
 Piani, unità, prospetti e lotti stanno in `core/anagrafica.js`: è **dato, non logica**, è la copia di un master che vive su `L:` e si sostituisce in blocco. La sua versione si legge nella pagina Informazioni. Le commesse concluse (`SNZ2.1`, `MRS`) non hanno anagrafica: le loro fasi restano tutte e i tre campi non viaggiano — a valle la foto va nella cartella del mese con un'anomalia, che è meglio di un operatore bloccato in cantiere per un dato che manca in ufficio.
 
@@ -272,10 +274,10 @@ Content-Type: application/json
 { "token": "collaudo",
   "commessa": "MAR",                       // solo il codice, vedi Cantieri
   "fase": "FinituraAlloggi",               // codice della fase senza spazi;
-                                           //   per SNU e BRU è il lotto: "Lotto2"
-  "piano": "P1",                           // livelli dell'archivio: codici senza spazi,
-  "unita": "1A",                           //   null dove il livello non si applica,
-  "prospetto": null,                       //   mai stringa vuota
+                                           //   per SNU e BRU è il lotto: "Lotto2".
+                                           //   I livelli dell'archivio (piano, unità,
+                                           //   prospetto) NON sono qui: sono solo
+                                           //   nel modulo Foto
   "operatore": "Paolo Sanzarello",
   "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
@@ -359,7 +361,7 @@ Quattro richieste di Francesco, emerse dall'uso in cantiere della 0.29.x. Si aff
 Sei punti dati da Francesco. Tutti fatti; le prime tre cambiano il contratto e **richiedono il lato ricevente prima della pubblicazione**.
 
 1. **Il lotto al posto della fase** per le urbanizzazioni (`SNU`, `BRU`): viaggia nel campo `fase` col suo codice, selettore condiviso coi due moduli.
-2. **`piano`, `unita`, `prospetto`** nel payload, comparsa guidata dall'anagrafica fase per fase: obbligatorio, derivato, o assente. `null` dove non si applica, mai stringa vuota.
+2. **`piano`, `unita`, `prospetto`** nel payload **del modulo Foto**, comparsa guidata dall'anagrafica fase per fase: obbligatorio, derivato, o assente. `null` dove non si applica, mai stringa vuota. **Nelle bolle no** (deciso il 18/09 alle 16:05, quando si è visto che `BolleInArrivo` non ha quelle colonne): un campo che arriva e viene scartato in silenzio è peggio di un campo che non parte.
 3. **I due filtri su `Interrato`**: solo i piani sotto quota, e una commessa senza interrati non vede la fase.
 4. **«Rimanda» su ogni elemento inviato**, nei suoi due casi distinti (sezione sopra).
 5. **Le copie ridotte senza data di scatto si fermano** prima dell'invio, con la via d'uscita scritta.
@@ -367,4 +369,6 @@ Sei punti dati da Francesco. Tutti fatti; le prime tre cambiano il contratto e *
 
 ## Fuori perimetro (in capo a Francesco)
 
-Sul flow e sulla raccolta: colonne `Progressivo`, `IdDispositivo`, `IdBolla`, `Pagina` e `Pagine` con le loro mappature, la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`), e — **dalla 0.36.0, prima della pubblicazione** — `Piano`, `Unita` e `Prospetto` in entrambe le raccolte più lo smistamento del venerdì riscritto (specifica Foto, §6). Deciso e chiuso: token riservato al posto di `collaudo`, autori da elenco chiuso (dal 14/09/2026, prima a campo libero), deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
+Sul flow e sulla raccolta: colonne `Progressivo`, `IdDispositivo`, `IdBolla`, `Pagina` e `Pagine` con le loro mappature, e la colonna della data (`DataScatto`) di tipo testo (dettaglio in `docs/AppBolleFlowRicezione….md`).
+
+Per la 0.36.0: `Piano`, `Unita` e `Prospetto` **esistono in `FotoCantiere`** dal 18/09/2026 ore 16:05, mappate nel flow e verificate con un invio vero. Resta aperto lo **smistamento del venerdì** (specifica Foto, §6): finché non è riscritto, i livelli arrivano in raccolta e nessuno li usa. Il rilascio si fa **presidiato**, guardando in raccolta la prima foto di ognuna delle quattro famiglie — piano, unità, prospetto, nessun livello — perché l'invio di prova fatto con la 0.35.0 ha dimostrato che il ramo regge, non che la mappatura agganci quando i campi ci sono. Deciso e chiuso: token riservato al posto di `collaudo`, autori da elenco chiuso (dal 14/09/2026, prima a campo libero), deduplica lato flow lasciata come controllo inerte. Rinviato: hosting di produzione, compressione adattiva su rete lenta, OCR, login M365, notifiche push, moduli futuri.
