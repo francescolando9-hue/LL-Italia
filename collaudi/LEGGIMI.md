@@ -17,6 +17,7 @@ cd ..
 node collaudi/materiale.js    # genera le foto di prova (una volta sola)
 node collaudi/esegui.js       # tutti i collaudi
 node collaudi/esegui.js 05    # solo quelli col nome che contiene «05»
+node collaudi/pubblicato.js   # DOPO un rilascio: il sito in linea dice la versione giusta?
 ```
 
 L'uscita è `0` se tutto torna, `1` se anche un solo controllo fallisce: si può
@@ -35,7 +36,7 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `04-memoria-piena.js` | Con la **quota ristretta a 1 MB**: il messaggio è in italiano e dice cosa fare, e la foto non entra in coda (non si finge che sia salvata). |
 | `05-continuita-bolle.js` | Progressivo per dispositivo senza buchi, identità **ereditata** dai telefoni già in uso, sequenze separate fra due telefoni. |
 | `06-bolle-pagine.js` | Una bolla su più fogli resta una bolla: `idBolla` unico, pagine numerate, e la via d'uscita se il raggruppamento era sbagliato. |
-| `07-foto-invio.js` | Le due categorie preparano l'immagine in modo diverso, il contratto di invio ha tutti i campi e i tipi giusti, un file oltre il limite non entra in coda. |
+| `07-foto-invio.js` | Il menù della categoria **non esiste più** (assente, non nascosto), ogni foto parte a **risoluzione originale** — byte identici al file sul telefono — e il campo **`tipo` vale `ARCHIVIO` su ogni invio**: è quello da cui il flow compone il nome del file e su cui filtra lo script archiviatore, quindi un campo vuoto lascerebbe la foto in raccolta per sempre senza nessun errore. Più: il contratto ha tutti i campi e i tipi giusti, e un file oltre il limite non entra in coda. |
 | `08-errori-flow.js` | Il flow rifiuta: la bolla resta sul telefono, il messaggio dice dove guardare, e al ritorno riparte da sola senza consumare un numero. |
 | `09-operatore.js` | Il nome dell'operatore si **sceglie** da un elenco chiuso e non si scrive: niente segnaposto firmabile, e un nome salvato da una versione col campo libero viene riportato alla grafia ufficiale o richiesto di nuovo — mai indovinato. |
 | `10-ora-scatto.js` | `dataScatto` è l'ora dello **scatto**, letta dall'EXIF del file originale **prima** della ricodifica, col fuso del giorno dello scatto. Una **copia ridotta senza EXIF** (Google Foto, WhatsApp) **non entra in coda**: l'app avvisa e chiede, e mandata comunque parte con la **data del file** — provato su un file con la data messa ad agosto, che se l'app ripiegasse sull'ora dell'invio finirebbe in settembre: è l'unico modo di distinguere il ripiego giusto da quello sbagliato. Una foto **scattata** dall'app è sempre `scattoStimato` `NO`. |
@@ -44,7 +45,7 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `13-gerarchia.js` | L'azione principale è **la cosa più grande a video**, in entrambi i moduli: barra appoggiata al fondo, 64 px, nessun pulsante pieno di colore o alto uguale fuori dalla barra, alternative su una riga sola e **col nome per esteso** — accorciare l'etichetta per far stare il pulsante è una scorciatoia sulla chiarezza. Più: il perché Invia è spento si legge **dentro la barra**, e l'avviso di aggiornamento non copre i comandi. |
 | `15-livelli.js` | I **livelli dell'archivio**. Prima di tutto la **coerenza fra i due posti in cui vivono le fasi**: `core/fasi.js` dice quali sono, `core/anagrafica.js` cosa ognuna pretende, e una fase presente in uno e assente nell'altro risulterebbe «senza livelli» — si può scegliere, la foto parte, e finisce nella cartella del mese invece che in quella del piano, senza nessun segnale. Poi: Per `SNU` e `BRU` il menù mostra i **lotti** al posto delle fasi e il campo si chiama «Lotto»; `MAR` non vede `Interrato` perché non ha interrati, e su `MNG` la fase `Interrato` offre solo `P-2` e `P-1`. Dove la fase pretende un livello, **senza la scelta Invia resta spento** e l'app dice cosa manca. Col piano **derivato** dall'unità la prova è su **`10A` di SNZ2.2**, che deve arrivare a `P10` e non a `P1`: è il caso su cui una deduzione dal codice e la lettura dalla mappa danno risultati diversi — con `1A` passerebbero entrambe. E i tre campi sono un codice **oppure `null`, mai `""`**, in tutti gli invii di foto — mentre nel payload di una **bolla non ci sono affatto**, perché la raccolta delle bolle non ha quelle colonne: mandarli sapendo che vengono scartati è il difetto che la modifica evita. |
 | `16-rimanda.js` | **«Rimanda»** nei suoi due casi, foto e bolle. Senza modifiche: **stesso `idClient` e stesso progressivo**, il flow risponde `gia_presente`, l'app lo dice e il contatore delle inviate **non si gonfia** — 6 richieste, 4 file distinti, 2 `gia_presente`. Con modifiche: `idClient` e progressivo nuovi, i livelli corretti, **il piano ricalcolato** dalla nuova unità, l'ora dello scatto invariata, e per le bolle l'`idBolla` dell'originale conservato. |
-| `12-fase-e-barra.js` | La **fase di lavoro** si sceglie da un elenco chiuso in entrambi i moduli. È **obbligatoria solo sulle foto da archiviare**: lì Invia resta spento e l'app dice perché, e basta una foto d'archivio in un invio misto perché serva; per bolle e avanzamento si invia col campo vuoto. Scelta una volta si ripropone («nessuna» compresa), e arriva al flow con la grafia esatta. E nel modulo Bolle **Fotografa** e **Invia** stanno in una barra fissa in basso, visibili anche in fondo a una coda lunga. |
+| `12-fase-e-barra.js` | La **fase di lavoro** si sceglie da un elenco chiuso in entrambi i moduli. Nel modulo Foto è **obbligatoria su ogni invio** (dalla 0.37.0): Invia resta spento, l'app dice perché, e rimettere il menù a «nessuna fase» non fa passare niente — la via d'uscita che c'era per l'avanzamento non esiste più. Nelle bolle si invia col campo vuoto. Scelta una volta si ripropone («nessuna» compresa), e arriva al flow con la grafia esatta. E nel modulo Bolle **Fotografa** e **Invia** stanno in una barra fissa in basso, visibili anche in fondo a una coda lunga. |
 
 ## Le trappole, già pagate
 
@@ -103,6 +104,20 @@ Vanno detti, altrimenti passano per garanzie che non sono:
   cercando la stringa `gia_presente` nel corpo, perché **il nome del campo non
   è documentato** — da stringere quando il ricevente lo conferma. Non
   riconoscerlo non fa danni: la foto è arrivata comunque.
+- **Che l'EXIF si legga PRIMA della preparazione** — non più. Fino alla 0.36.1 era
+  una prova vera: si mandava una foto come «Avanzamento», la compressione la
+  faceva passare per un canvas, i byte arrivavano **senza** EXIF e l'ora
+  arrivava comunque giusta. Funzionamento e guasto davano risultati diversi.
+  Dalla 0.37.0 non c'è più compressione: un JPEG parte com'è, e quella prova
+  è rimasta **senza oggetto**. L'unica ricodifica superstite è HEIC/PNG →
+  JPEG, che questo Chromium non sa produrre. Non è un controllo tolto, è un
+  controllo che non ha più un caso su cui girare — e va saputo, perché quel
+  pezzo di codice resta e non è più coperto.
+- **Che il numero di versione sia arrivato SUL SITO.** I collaudi girano su un
+  server locale che serve il repo: `02-versione.js` prova che `sw.js` e
+  `core/versione.js` dicono lo stesso numero, non che quel numero sia in
+  linea. Lo prova `node collaudi/pubblicato.js`, che va lanciato **dopo** il
+  merge e ha bisogno di rete.
 - **L'EXIF dei telefoni veri.** Le foto con l'ora dello scatto dentro sono
   **costruite** (`exif-finto.js`), non uscite da un telefono: provano che il
   lettore capisce il formato — e lo provano davvero, perché chi scrive i byte e

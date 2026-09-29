@@ -1,7 +1,14 @@
-// Il modulo Foto cantiere: le due categorie decidono come l'immagine viene
-// preparata, e il contratto di invio è quello che il flow si aspetta. Un campo
-// che cambia nome o tipo senza che nessuno se ne accorga è il modo più facile
-// di far atterrare le foto in raccolta senza dati.
+// Il modulo Foto cantiere: ogni foto va in archivio, e il contratto di invio è
+// quello che il flow si aspetta. Un campo che cambia nome o tipo senza che
+// nessuno se ne accorga è il modo più facile di far atterrare le foto in
+// raccolta senza dati.
+//
+// Dal 29/09/2026 la scelta Avanzamento / Archivio non c'è più. Quello che
+// resta da provare — ed è il punto delicato della modifica — è che il CAMPO
+// `tipo` continui a viaggiare sempre valorizzato: a valle ci stanno appese due
+// cose, il flow compone il nome del file da lì e lo script archiviatore prende
+// solo gli elementi con `Tipo = ARCHIVIO`. Un `tipo` vuoto non darebbe nessun
+// errore: la foto atterrerebbe in raccolta e ci resterebbe per sempre.
 const fs = require('fs');
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
@@ -16,7 +23,7 @@ const CAMPI_ATTESI = [
 ];
 
 module.exports = {
-  nome: 'Foto cantiere: categorie e contratto di invio',
+  nome: 'Foto cantiere: tutto in archivio, e contratto di invio',
 
   async esegui({ browser, app, flow, registro, aiuto }) {
     const { contesto, pagina, errori } = await nuovoTelefono(browser);
@@ -24,28 +31,25 @@ module.exports = {
       foto: { endpoint: flow.endpoint('foto'), token: 'LLI-FOTO', conservaUltime: 10, limiteMB: 20 },
     });
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
+    await pagina.waitForSelector('#commessa');
 
-    registro.titolo('La categoria si sceglie prima di scattare');
-    const categorie = await pagina.$$eval('#categoria option', o => o.map(e => e.textContent.trim()));
-    registro.dice('categorie a video', categorie);
-    registro.controlla('sono le due concordate',
-      categorie.includes('Avanzamento lavori') && categorie.includes('Da archiviare sul server'));
-    await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
-    const avviso = await aiuto.attendi(pagina, () => {
-      const e = document.querySelector('#avviso-foto');
-      return e && e.textContent.trim() ? e.textContent.replace(/\s+/g, ' ').trim() : false;
-    }, 'avviso categoria mancante', 30000);
-    registro.dice('senza categoria', avviso);
-    registro.controlla('senza categoria non accoda nulla',
-      (await pagina.$$eval('.foto-anteprima', e => e.length)) === 0,
-      'la categoria decide come la foto viene preparata: sceglierla dopo sarebbe una bugia');
+    registro.titolo('Niente più da scegliere sul tipo di foto');
+    registro.controlla('il menù della categoria non esiste più',
+      (await pagina.$$('#categoria')).length === 0,
+      'non nascosto: assente. Dal 29/09/2026 tutto quello che parte dall’app va in archivio');
+    registro.controlla('e non ne resta traccia negli aiuti a video',
+      (await pagina.$$('#aiuto-categoria, #avviso-categoria')).length === 0);
 
     const originale = fs.statSync(materiale('foto-cantiere.jpg')).size;
-    const manda = async (tipo, nota) => {
+    const manda = async nota => {
       const prima = flow.stato.ricevuti.length;
-      await pagina.selectOption('#categoria', tipo);
       await pagina.selectOption('#commessa', 'MAR');
+      // `Cantiere` non pretende livelli: è il percorso veloce per una foto
+      // generica, e qui serve a provare l'invio senza trascinarsi dentro la
+      // regola dei livelli, che ha il suo collaudo.
+      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MAR|'),
+        'menù della fase pronto', 10000);
+      await pagina.selectOption('#fase', 'Cantiere');
       await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
       if (nota) await pagina.fill('#nota', nota);
@@ -60,23 +64,24 @@ module.exports = {
       return flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
     };
 
-    registro.titolo('Avanzamento: compressa per partire anche con poca rete');
-    const avanzamento = await manda('AVANZAMENTO', 'Getto solaio piano 3 completato');
-    const byteAvanzamento = Buffer.from(avanzamento.contenutoBase64, 'base64').length;
+    registro.titolo('Ogni foto parte a risoluzione originale');
+    const conNota = await manda('Getto solaio piano 3 completato');
+    const byteConNota = Buffer.from(conNota.contenutoBase64, 'base64').length;
     registro.dice('sul telefono', `${(originale / 1048576).toFixed(2)} MB`);
-    registro.dice('inviato', `${(byteAvanzamento / 1048576).toFixed(2)} MB`);
-    registro.controlla('l\'avanzamento viaggia compresso', byteAvanzamento < originale / 2);
-    registro.controlla('la nota arriva', avanzamento.nota === 'Getto solaio piano 3 completato');
-    registro.controlla('il tipo arriva', avanzamento.tipo === 'AVANZAMENTO');
+    registro.dice('inviato', `${(byteConNota / 1048576).toFixed(2)} MB`);
+    registro.controlla('partono i byte originali, senza ricodifica', byteConNota === originale,
+      'la compressione a 2500 px serviva all’avanzamento, che non esiste più');
+    registro.controlla('la nota arriva', conNota.nota === 'Getto solaio piano 3 completato');
     registro.controlla('la nota si svuota dopo l\'invio',
       (await pagina.$eval('#nota', e => e.value)) === '');
 
-    registro.titolo('Archivio: byte originali, senza ricodifica');
-    const archivio = await manda('ARCHIVIO', '');
-    const byteArchivio = Buffer.from(archivio.contenutoBase64, 'base64').length;
-    registro.dice('inviato', `${(byteArchivio / 1048576).toFixed(2)} MB`);
-    registro.controlla('per l\'archivio partono i byte originali', byteArchivio === originale,
-      'ricomprimere «a qualità massima» degraderebbe l\'immagine senza alcun vantaggio');
+    registro.titolo('Il campo `tipo` resta, e non è mai vuoto');
+    const archivio = await manda('');
+    registro.dice('tipo ricevuto', JSON.stringify(archivio.tipo));
+    registro.controlla('vale ARCHIVIO', archivio.tipo === 'ARCHIVIO');
+    registro.controlla('e non è vuoto su nessuno degli invii',
+      flow.stato.ricevuti.every(r => r.tipo === 'ARCHIVIO'),
+      'il flow compone il nome del file da qui e lo script archiviatore prende solo Tipo = ARCHIVIO: un campo vuoto lascerebbe la foto in raccolta per sempre, senza nessun errore');
     registro.controlla('la nota vuota resta vuota, non diventa altro', archivio.nota === '');
 
     registro.titolo('Il contratto di invio');

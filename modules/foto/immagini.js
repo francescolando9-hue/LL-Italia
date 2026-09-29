@@ -1,21 +1,20 @@
-// Preparazione delle immagini del modulo Foto.
-// Due trattamenti, secondo la categoria scelta:
-//  - Avanzamento: compressa come le bolle (2500 px, 0,85), leggera e veloce;
-//  - Archivio: risoluzione originale, perché la foto va sul server come
-//    l'ha scattata il telefono.
+// Preparazione delle immagini del modulo Foto: un trattamento solo, dal
+// 29/09/2026.
 //
-// Nota sull'Archivio: se il file è già JPEG si spediscono i byte originali,
-// senza ricodificarli — ricomprimere "a qualità massima" degraderebbe
-// l'immagine senza alcun vantaggio. Se invece il telefono produce HEIC o PNG
-// si converte in JPEG a piena risoluzione: il nome del file in raccolta è
-// .jpg, e byte HEIC dentro un .jpg sarebbero un file che non si apre.
+// **Risoluzione originale, sempre.** La compressione a 2500 px serviva alla
+// categoria «Avanzamento», che non esiste più: tutto quello che parte da qui
+// va in archivio, e una foto d'archivio va sul server come l'ha scattata il
+// telefono.
+//
+// Se il file è già JPEG si spediscono **i byte originali, senza
+// ricodificarli**: ricomprimere «a qualità massima» degraderebbe l'immagine
+// senza alcun vantaggio. Se invece il telefono produce HEIC o PNG si converte
+// in JPEG a piena risoluzione — il nome del file in raccolta è `.jpg`, e byte
+// HEIC dentro un `.jpg` sarebbero un file che non si apre.
 
-const LATO_AVANZAMENTO = 2500;
-const QUALITA_AVANZAMENTO = 0.85;
 const QUALITA_CONVERSIONE = 0.95;
 
-export async function preparaImmagine(file, originale) {
-  if (!originale) return ridimensiona(file, LATO_AVANZAMENTO, QUALITA_AVANZAMENTO);
+export async function preparaImmagine(file) {
   if (file.type === 'image/jpeg') return file;
   return ridimensiona(file, Infinity, QUALITA_CONVERSIONE);
 }

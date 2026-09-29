@@ -1,7 +1,12 @@
-// Modulo Foto: foto di cantiere verso l'ufficio, in due categorie.
+// Modulo Foto: foto di cantiere verso l'archivio di commessa.
 // Capture-only come Bolle: raccoglie e invia, non legge nulla del contenuto.
-// La categoria si sceglie PRIMA di scattare, perché decide come l'immagine
-// viene preparata: compressa per l'avanzamento, originale per l'archivio.
+//
+// Dal 29/09/2026 non c'è più niente da scegliere sul TIPO di foto: la
+// distinzione Avanzamento / Archivio è stata tolta da Francesco — tutto
+// quello che parte da qui va in archivio, e per le urgenze si usa WhatsApp.
+// Ogni immagine parte quindi a risoluzione originale, e il campo `tipo` del
+// payload vale sempre `ARCHIVIO` (vedi `categorie.js`: si è tolta la scelta,
+// non il campo).
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
@@ -12,7 +17,7 @@ import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
   sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA,
 } from '../../core/anagrafica.js';
-import { CATEGORIE, categoria, etichettaCategoria } from './categorie.js';
+import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
 import { impostazioniFoto, salvaImpostazioniFoto } from './impostazioni.js';
@@ -35,14 +40,6 @@ const ETICHETTE_STATO = {
 
 let radice = null;
 let urlAperti = [];
-
-// La fase è obbligatoria SOLO per le foto da archiviare (deciso da Francesco
-// il 15/09/2026), perché sul server finiscono nella cartella della fase e una
-// foto senza fase non saprebbe dove andare. Per l'avanzamento resta
-// facoltativa: quelle restano in raccolta e non si smistano. Lo stabilisce il
-// ridisegno, che è l'unico a sapere cosa c'è in attesa, e se lo ricorda qui
-// per `invia()`.
-let faseObbligatoria = false;
 
 // I livelli scelti (o derivati) all'ultimo ridisegno: `invia()` li prende da
 // qui invece di rileggere i menù, così il valore che parte è esattamente
@@ -124,20 +121,9 @@ async function vista(el) {
     `<option value="${scappaHtml(c.codice)}"${c.codice === impostazioni.ultimaCommessa ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`
   ).join('');
 
-  const notaCategoria = CATEGORIE.some(c => c.codice === impostazioni.ultimaCategoria);
-  const segnapostoCategoria = notaCategoria ? '' : '<option value="" selected>— scegli il tipo di foto —</option>';
-  const opzioniCategoria = segnapostoCategoria + CATEGORIE.map(c =>
-    `<option value="${scappaHtml(c.codice)}"${c.codice === impostazioni.ultimaCategoria ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`
-  ).join('');
-
   el.innerHTML = `
     <div id="foto-contatori" class="foto-contatori"></div>
     <section class="scheda">
-      <div class="campo">
-        <label for="categoria">Tipo di foto</label>
-        <select id="categoria" required>${opzioniCategoria}</select>
-        <p id="aiuto-categoria" class="aiuto tenue"></p>
-      </div>
       <div class="campo">
         <label for="commessa">Cantiere</label>
         <select id="commessa" required>${opzioniCommessa}</select>
@@ -147,7 +133,6 @@ async function vista(el) {
            contratto con la funzione che li accende e li spegne secondo
            l'anagrafica. -->
       ${campiLivelli()}
-      <div id="avviso-categoria"></div>
       <p class="didascalia-alternative">Altri modi per aggiungere foto o video</p>
       <div class="azioni-alternative">
         ${fotocameraDisponibile()
@@ -185,7 +170,6 @@ async function vista(el) {
     </div>
   `;
 
-  el.querySelector('#categoria').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#commessa').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
   for (const id of ['#piano', '#unita', '#prospetto']) {
@@ -218,20 +202,12 @@ async function gestisciFile(evento) {
 // Qui non c'è raggruppamento — ogni foto è una foto — ma il gesto è lo stesso
 // del modulo Bolle, così chi usa l'app impara una sola cosa.
 async function apriScatto() {
-  const scelta = categoria(radice.querySelector('#categoria').value);
   const avviso = radice.querySelector('#avviso-foto');
-  if (!scelta) {
-    avviso.innerHTML = '<p class="avviso avviso-attenzione">Scegli prima il tipo di foto: cambia come viene inviata.</p>';
-    portaInVista(avviso);
-    return;
-  }
   let esito;
   try {
     esito = await apriFotocamera({
-      titolo: `Foto — ${scelta.breve}`,
-      suggerimento: scelta.originale
-        ? 'Risoluzione originale: scatta pure più foto, poi tocca Fine.'
-        : 'Scatta pure più foto di fila, poi tocca Fine.',
+      titolo: 'Foto di cantiere',
+      suggerimento: 'Risoluzione originale: scatta pure più foto, poi tocca Fine.',
     });
   } catch (errore) {
     avviso.innerHTML = `<p class="avviso avviso-attenzione">${scappaHtml(errore.message)}.</p>`;
@@ -307,15 +283,7 @@ async function oraDiScatto(file, provenienza) {
 
 async function aggiungiFile(file, provenienza = 'galleria') {
   if (file.length === 0) return;
-  const tipo = radice.querySelector('#categoria').value;
-  const scelta = categoria(tipo);
   const avviso = radice.querySelector('#avviso-foto');
-  // La categoria decide la preparazione dell'immagine, quindi va scelta prima:
-  // senza, non si saprebbe se comprimere o tenere l'originale.
-  if (!scelta) {
-    avviso.innerHTML = '<p class="avviso avviso-attenzione">Scegli prima il tipo di foto: cambia come viene inviata.</p>';
-    return;
-  }
   avviso.innerHTML = `<p class="avviso avviso-info">Preparazione di ${file.length} file&hellip;</p>`;
   const errori = [];
   const troppoGrandi = [];
@@ -338,7 +306,7 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         // contenitore (`mvhd`), non nell'EXIF, e fra MP4 e MOV non è scritta
         // con le stesse convenzioni di fuso. Finché non è letta davvero, il
         // video parte con l'ora di accodamento e `scattoStimato` = 'SI'.
-        await coda.aggiungiBozza(singolo, anteprima, singolo.name, tipo, {
+        await coda.aggiungiBozza(singolo, anteprima, singolo.name, TIPO_ARCHIVIO, {
           genere: 'video', estensione: estensioneDi(singolo), durata,
         });
         continue;
@@ -352,13 +320,13 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         senzaData.push(singolo);
         continue;
       }
-      const preparata = await preparaImmagine(singolo, scelta.originale);
+      const preparata = await preparaImmagine(singolo);
       if (preparata.size > limiteByte) {
         troppoGrandi.push(pesoLeggibile(preparata.size));
         continue;
       }
       const anteprima = await creaAnteprima(singolo);
-      await coda.aggiungiBozza(preparata, anteprima, singolo.name, tipo, {
+      await coda.aggiungiBozza(preparata, anteprima, singolo.name, TIPO_ARCHIVIO, {
         genere: 'foto', estensione: 'jpg',
         dataScatto: quando.dataScatto, scattoStimato: quando.scattoStimato,
       });
@@ -385,8 +353,8 @@ async function aggiungiFile(file, provenienza = 'galleria') {
 
 // «Invia comunque»: le foto messe da parte entrano in coda con la data di
 // ripiego e `scattoStimato` = 'SI'. Ripassano da `aggiungiFile` invece di
-// avere una strada propria, così il limite di peso, la preparazione secondo
-// la categoria e la gestione della memoria piena restano scritti una volta.
+// avere una strada propria, così il limite di peso, la preparazione
+// dell'immagine e la gestione della memoria piena restano scritti una volta.
 async function accodaSenzaData() {
   const attesa = senzaData;
   senzaData = [];
@@ -398,7 +366,7 @@ async function invia() {
   // Facoltativa per l'avanzamento — vuota è legittima, e si ricorda anche
   // quella — obbligatoria se in attesa c'è almeno una foto da archiviare.
   const fase = radice.querySelector('#fase').value;
-  if (!commessa || (faseObbligatoria && !fase)) return;
+  if (!commessa || !fase) return;
   // Un livello che la fase pretende e che non c'è ferma l'invio: la guardia sta
   // anche qui e non solo sul pulsante, perché il pulsante lo si può premere
   // nell'istante fra due ridisegni.
@@ -411,8 +379,7 @@ async function invia() {
   });
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    const tipo = radice.querySelector('#categoria').value;
-    salvaImpostazioniFoto({ ultimaCommessa: commessa, ultimaCategoria: tipo, ultimaFase: fase });
+    salvaImpostazioniFoto({ ultimaCommessa: commessa, ultimaFase: fase });
     radice.querySelector('#nota').value = '';
   }
   await ridisegna();
@@ -449,39 +416,23 @@ async function ridisegna() {
     <div class="foto-chip errore"><span class="valore">${inErrore.length}</span><span class="etichetta">Errore</span></div>
   `;
 
-  const tipoScelto = radice.querySelector('#categoria').value;
-  const scelta = categoria(tipoScelto);
-  radice.querySelector('#aiuto-categoria').textContent = scelta
-    ? scelta.originale
-      ? 'Inviata a risoluzione originale: pesa di più e con poca rete parte più lentamente.'
-      : 'Compressa per partire veloce anche con poca rete.'
-    : '';
-
   // Il cantiere si legge qui perché da lui dipendono TUTTI i menù sotto: per
   // un'urbanizzazione al posto delle fasi ci sono i lotti, e per un edificio
   // compaiono i livelli che la fase pretende.
   const commessaScelta = radice.querySelector('#commessa').value;
   const conLotti = eUrbanizzazione(commessaScelta);
-  radice.querySelector('#aiuto-fase').textContent =
-    tipoScelto === 'ARCHIVIO' || bozze.some(r => r.tipo === 'ARCHIVIO')
-      ? conLotti
-        ? 'Obbligatorio per le foto da archiviare: sul server finiscono nella cartella del lotto.'
-        : 'Obbligatoria per le foto da archiviare: sul server finiscono nella cartella della fase.'
-      : '';
+  // La fase è obbligatoria SEMPRE, dalla 0.37.0: ogni foto va in archivio, e
+  // una foto d'archivio senza fase non saprebbe in quale cartella andare.
+  // Prima dipendeva dalla categoria, che non esiste più.
+  radice.querySelector('#aiuto-fase').textContent = conLotti
+    ? 'Sul server la foto finisce nella cartella del lotto.'
+    : 'Sul server la foto finisce nella cartella della fase.';
 
   // Fase (o lotto), piano, unità, prospetto: li accende, li spegne e li
   // ricostruisce la shell, con le regole dell'anagrafica. Torna quello che
   // partirà — piano derivato compreso — e cosa manca ancora all'appello.
   livelliCorrenti = sincronizzaLivelli(radice, commessaScelta, scappaHtml, '',
     { fase: impostazioniFoto().ultimaFase });
-
-  // Cambiare categoria con foto già pronte cambierebbe il significato di
-  // quelle foto, non come sono state preparate: si avvisa invece di tacere.
-  const tipiInAttesa = [...new Set(bozze.map(r => r.tipo))];
-  radice.querySelector('#avviso-categoria').innerHTML =
-    tipoScelto && tipiInAttesa.length > 0 && tipiInAttesa.some(t => t !== tipoScelto)
-      ? `<p class="avviso avviso-attenzione">In attesa ci sono foto di tipo <strong>${scappaHtml(etichettaCategoria(tipiInAttesa[0]))}</strong>: partono con quel tipo, non con quello scelto adesso.</p>`
-      : '';
 
   // Foto senza ora dello scatto: fermate prima dell'invio, con le due vie
   // d'uscita scritte. La prima è quella giusta e va detta per prima — l'album
@@ -525,8 +476,7 @@ async function ridisegna() {
       ${immagine}
       ${video ? '<span class="foto-play" aria-hidden="true">&#9654;</span>' : ''}
       <button class="foto-rimuovi" data-id="${r.id}" aria-label="Rimuovi">&#10005;</button>
-      <span class="foto-marchio">${video ? 'Video' : scappaHtml(etichettaCategoria(r.tipo))}${
-        video && r.durata ? ` ${durataLeggibile(r.durata)}` : ''} · ${pesoLeggibile(r.byte)}</span>
+      <span class="foto-marchio">${video ? `Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''} · ` : ''}${pesoLeggibile(r.byte)}</span>
     </div>
   `;
   }).join('');
@@ -535,17 +485,13 @@ async function ridisegna() {
   }
 
   const faseScelta = livelliCorrenti.fase;
-  // A decidere è ciò che sta per PARTIRE, non la categoria selezionata adesso:
-  // un invio può contenere foto accodate con categorie diverse, e la fase vale
-  // per tutte quelle dell'invio.
-  faseObbligatoria = bozze.some(r => r.tipo === 'ARCHIVIO');
   const pulsanteInvia = radice.querySelector('#invia');
   // I livelli non sono mai facoltativi: dove la fase li pretende, senza la
   // scelta non si parte. Il ripiego non esiste di proposito — una foto
   // d'archivio senza piano non saprebbe in quale cartella andare, e una foto
   // che parte con un livello a caso è peggio di una foto ferma.
   pulsanteInvia.disabled = bozze.length === 0 || !commessaScelta
-    || (faseObbligatoria && !faseScelta) || livelliCorrenti.mancanti.length > 0;
+    || !faseScelta || livelliCorrenti.mancanti.length > 0;
   const quantiVideo = bozze.filter(r => r.genere === 'video').length;
   const quanteFoto = bozze.length - quantiVideo;
   const parti = [];
@@ -554,12 +500,12 @@ async function ridisegna() {
   pulsanteInvia.textContent = bozze.length > 0 ? `Invia ${parti.join(' e ')}` : 'Invia';
   const mancanti = [
     !commessaScelta && 'il cantiere',
-    faseObbligatoria && !faseScelta && (conLotti ? 'il lotto' : 'la fase'),
+    !faseScelta && (conLotti ? 'il lotto' : 'la fase'),
     ...livelliCorrenti.mancanti,
   ].filter(Boolean);
   radice.querySelector('#avviso-invio').innerHTML = bozze.length > 0 && mancanti.length > 0
     ? `<p class="avviso avviso-attenzione">Scegli ${mancanti.join(' e ')} per inviare.${
-      faseObbligatoria && !faseScelta ? ' Le foto da archiviare si ordinano per fase sul server.' : ''}</p>`
+      !faseScelta ? ' Sul server le foto si ordinano per fase.' : ''}</p>`
     : '';
 
   const azioni = radice.querySelector('#coda-azioni');
@@ -614,7 +560,8 @@ async function ridisegna() {
           <div class="foto-dettagli">
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
-              <span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>
+              ${etichettaCategoria(r.tipo)
+                ? `<span class="foto-tag">${scappaHtml(etichettaCategoria(r.tipo))}</span>` : ''}
               ${r.genere === 'video' ? `<span class="foto-tag">Video${r.durata ? ` ${durataLeggibile(r.durata)}` : ''}</span>` : ''}
               ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''}${scappaHtml(scritturaLivelli(r))} &middot; ${ora}
             </div>

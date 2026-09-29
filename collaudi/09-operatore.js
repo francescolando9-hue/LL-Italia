@@ -83,7 +83,7 @@ module.exports = {
     registro.titolo('Un nome non riconosciuto riporta al benvenuto');
     await pagina.evaluate(() => localStorage.setItem('llitalia.app', JSON.stringify({ autore: 'P. Sanzarello' })));
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#autore, #categoria', { timeout: 20000 });
+    await pagina.waitForSelector('#autore, #commessa', { timeout: 20000 });
     const dove = await pagina.evaluate(() => location.hash);
     registro.controlla('l\'app chiede di scegliere invece di mandare un nome sbagliato',
       dove.includes('benvenuto'), dove);

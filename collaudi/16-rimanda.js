@@ -57,8 +57,7 @@ module.exports = {
 
     registro.titolo('Foto: una da archiviare, inviata');
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
+    await pagina.waitForSelector('#commessa');
     await scegliCommessa('#commessa', 'MNG');
     await scegliFase('FinituraAlloggi');
     await pagina.selectOption('#unita', '1A');

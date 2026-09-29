@@ -12,7 +12,6 @@ const PREDEFINITE = {
   token: 'collaudo',
   conservaUltime: 10,
   ultimaCommessa: '',
-  ultimaCategoria: '',
   ultimaFase: '',
   // Tetto di peso per un singolo invio, in MB. Serve ai video, che non si
   // possono comprimere nel browser: il contenuto viaggia in base64 dentro

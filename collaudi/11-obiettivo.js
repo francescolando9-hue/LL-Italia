@@ -48,7 +48,7 @@ module.exports = {
       foto: { endpoint: flow.endpoint('foto'), token: 'LLI-FOTO', conservaUltime: 10, limiteMB: 20 },
     });
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
+    await pagina.waitForSelector('#commessa');
 
     registro.titolo('La scelta della lente, sui nomi che i telefoni dichiarano');
     const scegli = etichette => pagina.evaluate(async nomi => {
@@ -69,7 +69,6 @@ module.exports = {
       (await scegli(['camera2 1, facing front', 'camera2 0, facing back'])).scelto === 'camera2 0, facing back');
 
     registro.titolo('Con una fotocamera sola l’app apre come prima, e dice cosa ha visto');
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
     await pagina.selectOption('#commessa', 'MAR');
     await pagina.click('#apri-fotocamera');
     await pagina.waitForSelector('.fotocamera-scatta:not([disabled])', { timeout: 30000 });

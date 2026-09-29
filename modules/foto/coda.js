@@ -19,6 +19,7 @@
 // shell, perché è l'identità del telefono e non di un modulo.
 
 import { timestampDispositivo } from '../../core/orario.js';
+import { TIPO_ARCHIVIO } from './categorie.js';
 
 const NOME_DB = 'llitalia-foto';
 // v2: aggiunto lo store del contatore. Le foto già in coda non si toccano.
@@ -290,8 +291,12 @@ export async function rimandaStessa(id) {
 export async function rimandaCorretta(id, dati) {
   const originale = (await elenca()).find(r => r.id === id);
   if (!originale || !originale.foto) return null;
+  // Il tipo del nuovo invio è `ARCHIVIO`, non quello dell'originale: dalla
+  // 0.37.0 tutto quello che parte dall'app va in archivio, e una copia
+  // corretta di una vecchia foto `AVANZAMENTO` che ripartisse come
+  // `AVANZAMENTO` atterrerebbe in raccolta e non verrebbe mai archiviata.
   const nuovo = await aggiungiBozza(
-    originale.foto, originale.anteprima, originale.nome, originale.tipo, {
+    originale.foto, originale.anteprima, originale.nome, TIPO_ARCHIVIO, {
       genere: originale.genere,
       estensione: originale.estensione,
       durata: originale.durata,

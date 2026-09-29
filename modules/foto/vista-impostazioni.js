@@ -1,17 +1,16 @@
 // Impostazioni del modulo Foto: endpoint del proprio flow, token, foto
-// conservate sul dispositivo. L'elenco cantieri e le due categorie non si
-// toccano da qui: stanno in codice, perché un valore errato arriverebbe a
-// destinazione come commessa o categoria inesistente.
+// conservate sul dispositivo. L'elenco dei cantieri non si tocca da qui: sta
+// in codice, perché un valore errato arriverebbe a destinazione come commessa
+// inesistente.
 import { scappaHtml } from '../../core/impostazioni.js';
 import {
   impostazioniFoto, salvaImpostazioniFoto, normalizzaEndpoint,
   endpointDaCorreggere, API_VERSION,
 } from './impostazioni.js';
-import { CATEGORIE } from './categorie.js';
+import { TIPO_ARCHIVIO } from './categorie.js';
 
 export function vistaImpostazioniFoto(el) {
   const impostazioni = impostazioniFoto();
-  const elencoCategorie = CATEGORIE.map(c => `<li>${scappaHtml(c.etichetta)} — <code>${scappaHtml(c.codice)}</code>${c.originale ? ', inviata a risoluzione originale' : ', compressa'}</li>`).join('');
   el.innerHTML = `
     <section class="scheda">
       <h2>Impostazioni Foto cantiere</h2>
@@ -69,8 +68,8 @@ export function vistaImpostazioniFoto(el) {
       <p class="tenue">Sotto il primo limite il file viaggia in una sola richiesta. Sopra, se il caricamento a blocchi è acceso, il telefono lo manda in più pezzi e <strong>riprende da dove si era interrotto</strong> invece di ricominciare: è la differenza fra un video che arriva e uno che non arriva mai.</p>
     </section>
     <section class="scheda">
-      <h2>Le due categorie</h2>
-      <ul class="tenue">${elencoCategorie}</ul>
+      <h2>Che fine fanno le foto</h2>
+      <p class="tenue">Dal 29/09/2026 non c'è più niente da scegliere: <strong>tutto quello che parte da qui va in archivio</strong>, a risoluzione originale, e sul server finisce nella cartella della fase. Per le cose urgenti, da guardare e basta, si usa WhatsApp. Nel campo inviato al sistema resta il valore <code>${scappaHtml(TIPO_ARCHIVIO)}</code>, che è quello su cui si regge l'archiviazione a valle.</p>
     </section>
     <section class="scheda">
       <h2>Altri telefoni</h2>
