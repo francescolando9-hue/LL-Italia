@@ -18,6 +18,22 @@
 // regole nello stesso posto vuol dire non sapere quale ha fallito.
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
 
+// Il menù della fase NASCE VUOTO (dalla 0.36.0) e lo riempie la shell al primo
+// ridisegno, che è asincrono. `waitForSelector('#fase')` dice solo che
+// l'elemento esiste, non che abbia le sue voci: leggerlo subito dopo dà a
+// volte un elenco vuoto, e il collaudo fallisce una volta su sei senza che
+// nulla sia rotto. Si aspetta il marcatore `data-livelli`, che la shell scrive
+// per ultimo, quando i menù sono a posto.
+const attendiMenuFase = (pagina, aiuto) => aiuto.attendi(
+  pagina,
+  () => {
+    const menu = document.querySelector('#fase');
+    return Boolean(menu && menu.dataset.livelli && menu.querySelectorAll('option').length > 1);
+  },
+  'menù della fase riempito',
+  10000,
+);
+
 // Il conteggio, che ha una storia: 27 date da Francesco il 14/09, meno
 // «CMC 128» che lui stesso ha tolto lo stesso giorno (era un codice di
 // commessa finito in un elenco di fasi) = 26; più `SistemazioneEsterna`,
@@ -52,6 +68,7 @@ module.exports = {
     registro.titolo('Bolle: la fase si sceglie da un elenco, e non è obbligatoria');
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#fase');
+    await attendiMenuFase(pagina, aiuto);
     const voci = await pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim(), d: e.disabled })));
     const scelte = voci.filter(o => o.v);
     const nomi = scelte.map(o => o.t);
@@ -100,6 +117,7 @@ module.exports = {
       flow.stato.ricevuti[1].commessa === 'MAR' && flow.stato.ricevuti[1].operatore === 'Paolo Sanzarello');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
+    await attendiMenuFase(pagina, aiuto);
     registro.controlla('dopo la ricarica la fase è già selezionata',
       (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoAscensore');
     await mandaBolla('bolla.jpg');
@@ -112,6 +130,7 @@ module.exports = {
     registro.controlla('tornati a «nessuna», il campo parte di nuovo vuoto', flow.stato.ricevuti[3].fase === '');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
+    await attendiMenuFase(pagina, aiuto);
     registro.controlla('e «nessuna» si ricorda come le altre', (await pagina.$eval('#fase', e => e.value)) === '');
     const inCoda = await pagina.$$eval('#lista-coda .bolle-voce .riga', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
     registro.dice('righe della coda', inCoda);
@@ -157,6 +176,7 @@ module.exports = {
     registro.titolo('Foto cantiere: stesso elenco, ma per l’archivio la fase è obbligatoria');
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#fase');
+    await attendiMenuFase(pagina, aiuto);
     const nomiFoto = await pagina.$$eval('#fase option', o => o.filter(e => e.value).map(e => e.textContent.trim()));
     registro.controlla('l’elenco è identico a quello delle bolle', nomiFoto.join('|') === nomi.join('|'),
       'due elenchi separati sarebbero due verità destinate a divergere');
@@ -211,6 +231,7 @@ module.exports = {
       'è la garanzia su cui si regge lo smistamento per cartella sul server');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
+    await attendiMenuFase(pagina, aiuto);
     registro.controlla('e si ripropone alla prossima apertura', (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoFotovoltaico');
 
     registro.titolo('Rimessa a «nessuna fase», l’invio si blocca di nuovo');

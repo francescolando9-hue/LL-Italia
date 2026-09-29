@@ -25,6 +25,11 @@
 // Microsoft Graph vuole blocchi multipli di 320 KiB: un blocco di taglia
 // diversa viene rifiutato a metà caricamento, e sarebbe un difetto scoperto
 // solo sui file grandi.
+// Ogni passo del caricamento a blocchi ha lo stesso tetto di tempo degli
+// altri invii: un blocco è al massimo una decina di MB, quindi il tetto non
+// lo sfiora mai — serve solo a non lasciare appeso un passo che non
+// risponde più, che bloccherebbe il motore come qualunque altra richiesta.
+import { fetchConScadenza } from '../../core/coda-invio.js';
 const UNITA_BLOCCO = 327680;
 
 export function bloccoValido(byteRichiesti) {
@@ -34,7 +39,7 @@ export function bloccoValido(byteRichiesti) {
 
 // Fase 1. Restituisce { modo, urlCaricamento, dimensioneBlocco }.
 export async function preparaCaricamento(endpoint, corpo) {
-  const risposta = await fetch(endpoint, {
+  const risposta = await fetchConScadenza(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...corpo, azione: 'preparaCaricamento' }),
@@ -61,7 +66,7 @@ export async function preparaCaricamento(endpoint, corpo) {
 // invece di rispedire tutto. Microsoft Graph risponde con nextExpectedRanges.
 export async function byteGiaCaricati(urlCaricamento) {
   try {
-    const risposta = await fetch(urlCaricamento, { method: 'GET' });
+    const risposta = await fetchConScadenza(urlCaricamento, { method: 'GET' });
     if (!risposta.ok) return null;
     const dati = await risposta.json();
     const intervalli = dati && dati.nextExpectedRanges;
@@ -81,7 +86,7 @@ export async function inviaBlocchi(urlCaricamento, file, dimensioneBlocco, daByt
   while (inizio < file.size) {
     const fine = Math.min(inizio + dimensioneBlocco, file.size);
     const blocco = file.slice(inizio, fine);
-    const risposta = await fetch(urlCaricamento, {
+    const risposta = await fetchConScadenza(urlCaricamento, {
       method: 'PUT',
       headers: {
         'Content-Range': `bytes ${inizio}-${fine - 1}/${file.size}`,
@@ -101,7 +106,7 @@ export async function inviaBlocchi(urlCaricamento, file, dimensioneBlocco, daByt
 
 // Fase 3. Il flow scrive le colonne sul file arrivato.
 export async function completaCaricamento(endpoint, corpo) {
-  const risposta = await fetch(endpoint, {
+  const risposta = await fetchConScadenza(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...corpo, azione: 'completaCaricamento' }),

@@ -444,6 +444,8 @@ async function ridisegna() {
           rimandoAperto === r.id ? 'Chiudi' : 'Rimanda'}</button>` : '';
       const giaPresente = r.giaPresente
         ? '<div class="tenue">Era già in raccolta: nessun doppione creato.</div>' : '';
+      const ripreso = r.ripreso
+        ? '<div class="tenue">Invio interrotto da una chiusura dell’app: ripreso.</div>' : '';
       return `
         <li class="bolle-voce">
           <img class="bolle-miniatura" src="${urlFoto(r.foto)}" alt="">
@@ -455,6 +457,7 @@ async function ridisegna() {
             </div>
             <div class="tenue">${scappaHtml(r.autore)}</div>
             ${giaPresente}
+            ${ripreso}
             ${messaggioErrore}
           </div>
           <div class="bolle-azioni">

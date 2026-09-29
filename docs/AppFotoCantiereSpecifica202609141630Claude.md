@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 12 del 29/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 13 del 29/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 13 — quattro punti CHIUSI e un difetto corretto (0.37.1).** I quattro «resta aperto» che questo documento si trascinava dietro sono chiusi con riscontri sul campo, e stanno in §0: vanno letti prima di riaprirli. Il difetto: un invio interrotto restava su «Invio in corso» per sempre — sette giorni sul telefono di Francesco, mai arrivato, segnalato ogni giorno come buco di continuità. Corretto in §4-ter. **Rettifica del 18/09:** il «rilascio che non arriva ai telefoni» non è mai stato osservato — la lettura che lo faceva credere era una copia servita dalla cache, non il contenuto del commit. Nel repo le due costanti di versione erano allineate e il collaudo che le confronta esisteva già. Da allora un riscontro del pubblicato si fa scavalcando la cache (`collaudi/pubblicato.js` lo fa con `no-store`), e una differenza si attribuisce a un commit solo leggendo il commit.
 >
 > **Rev. 12 — via la categoria: TUTTO va in archivio**, deciso da Francesco il 29/09/2026, dalla **0.37.0**. La distinzione Avanzamento / Archivio non ha più senso: quello che si manda dall'app è documentazione, e per le urgenze si usa WhatsApp. Conseguenze: (1) **nel modulo non c'è più niente da scegliere sul tipo di foto** (§2); (2) **sparisce la compressione a 2500 px** — ogni immagine parte a risoluzione originale (§3); (3) la **fase diventa obbligatoria su ogni invio** del modulo Foto, e non più solo sull'archivio (§4.4); (4) **il campo `tipo` RESTA nel contratto**, sempre valorizzato `ARCHIVIO` (§4). Il punto (4) è quello da non sbagliare: il flow compone il nome del file da `tipo` e lo script archiviatore prende solo gli elementi con `Tipo = ARCHIVIO` — un invio con `tipo` vuoto atterrerebbe in raccolta e ci resterebbe per sempre, senza nessun errore. Si è tolta la scelta, non il campo, e l'invio ha anche un ripiego su quel valore. **Il contratto non cambia in nient'altro:** nessun campo rinominato, nessun campo tolto, e un telefono non ancora aggiornato continua a mandare `AVANZAMENTO` senza errori.
 >
@@ -13,6 +15,21 @@
 > ✅ **Il lato ricevente è pronto per le foto, dal 18/09/2026 ore 16:05.** Le tre colonne esistono in `FotoCantiere` (testo 255, non obbligatorie, nome interno identico al visualizzato) e il flow le mappa su `triggerBody()?['piano']`, `['unita']`, `['prospetto']`. Verificato con un invio vero: le colonne di sempre si compilano, le tre nuove arrivano `null` — cioè il ramo regge, **ma l'aggancio quando i campi ci sono resta da dimostrare**, e lo dimostra il primo invio dalla 0.36.0. Per questo il rilascio si fa **presidiato**, guardando la prima foto di ognuna delle quattro famiglie: piano, unità, prospetto, nessun livello.
 >
 > 🔴 **`BolleInArrivo` non ha quelle colonne e non le prende.** Conseguenza: **il modulo Bolle non chiede i livelli e non li manda** — vedi la specifica Bolle, rev. 6. Il lotto invece sì, perché viaggia nel campo `fase`. Resta aperto lo smistamento del venerdì (§6): finché non è riscritto, i livelli arrivano in raccolta e nessuno li usa — le foto però sono a posto, e si smistano appena il runbook c'è. La destinazione del runbook del venerdì **non è** fra i punti aperti: i percorsi esistono, sono verificati e registrati fuori da questo repo (§6).
+
+## 0. Punti chiusi — non riaprirli senza leggere qui
+
+Quattro cose che questo documento ha elencato per settimane fra quelle aperte. **Sono chiuse**, con riscontri fatti sul campo, e la data del riscontro è il motivo per cui non vanno rimesse in coda.
+
+| Punto | Stato | Riscontro |
+|---|---|---|
+| Verifica dei **livelli** sul campo | **chiuso** | Foto vere: `P1`+`1A` e `Nord` il 18/09, `P-1` il 22/09, `P0` il 23/09, `P4` il 28/09, `Lotto1` senza livelli il 24/09. Tutte lette nelle colonne `Piano`/`Unita`/`Prospetto` e riportate nel registro; tutte depositate nella cartella giusta. |
+| **Runbook del venerdì** per la struttura a livelli | **chiuso** | Recepita dalla rev. 15 del runbook, 18/09. |
+| Colonna **`Fase`** in raccolta | **chiuso** | Esiste in `FotoCantiere` **e** in `BolleInArrivo`, verificata via REST il 18/09, compilata su tutti gli elementi recenti. |
+| Risposta del flow ai **doppioni** | **chiuso** | Il corpo è `{"esito": "gia_presente", "idClient": "<idClient>"}`. Provato sul campo il 29/09: il n. 55, rimandato, ha mostrato «Era già in raccolta: nessun doppione creato» e sul server non è nato nessun file nuovo. |
+
+Sull'ultimo punto, una conseguenza che vale oltre il suo caso: **rimandare un elemento è sicuro**, perché il flow riconosce un `idClient` già visto. È il presupposto su cui si regge la ripartenza automatica degli invii interrotti (§4-ter) — senza quella garanzia, la scelta sarebbe stata un'altra.
+
+Sul riconoscimento lato app: l'`esito` si legge cercando la stringa `gia_presente` nel corpo, non il nome del campo. Ora che la forma è nota il controllo si potrebbe stringere; resta com'è perché una lettura più larga non sbaglia mai in modo pericoloso — al massimo non riconosce un caso, e allora la foto risulta semplicemente inviata.
 
 ## 1. A cosa serve
 
@@ -276,6 +293,23 @@ Lotto2\202609\<file>                    urbanizzazioni: il lotto fa da fase
 
 **Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, e la tabella `livelliPerFase`. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (`202609181330`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
 
+### 4-ter. Invii interrotti: «in corso» vale solo per la sessione che l'ha avviato
+
+**Il difetto, misurato il 29/09/2026.** Sul telefono di Francesco l'elemento n. 56 (SNZ2.2, `Impermeabilizzazioni`, `P-1`, scattato il 22/09 alle 11:37) era fermo su «Invio in corso» **da sette giorni**, attraverso chiusure dell'app e aggiornamenti. Al ricevente non era mai arrivato, e lo script lo segnalava ogni giorno come buco di continuità.
+
+Perché restava lì. Il motore mette il record su `invio` prima della richiesta e lo sposta a `inviata` o a `errore` quando la richiesta finisce. Se la pagina muore nel mezzo — app chiusa, telefono in tasca, scheda scaricata dal sistema — il record resta su `invio` **nel database**, e da lì non si muove più: il giro degli invii prende `in_coda` e `errore`, e a video «Riprova» e «Rimanda» si accendono su `errore` e su `inviata`. Nessuna strada, in nessuna direzione. L'elemento era invisibile all'app e mancante a destinazione.
+
+**Il principio, dalla 0.37.1:** «in corso» è vero **solo finché vive la pagina che ha avviato la richiesta**. Uno stato «in corso» ereditato da una sessione precedente è per definizione interrotto.
+
+**Due correzioni, per due casi diversi.**
+
+1. **Fra sessioni.** Alla prima elaborazione della coda in una sessione, ogni record su `invio` torna `in_coda` e **riparte da solo**. Fra un pulsante da premere e una ripartenza automatica si è scelta la seconda: la promessa della coda è che lo scatto non si perda, e aspettare che qualcuno si accorga di un elemento fermo è esattamente il modo in cui si è perso. È sicuro perché il flow risponde `gia_presente` a un `idClient` già visto (§0): nel peggiore dei casi si spende una richiesta e non nasce nessun doppione. A video l'elemento lo dichiara — *«Invio interrotto da una chiusura dell'app: ripreso»* — perché uno che riparte in silenzio sembra partito due volte. Il **caricamento a blocchi non si azzera**: `urlCaricamento` e `byteInviati` restano, e la ripresa chiede al server quanti byte ha davvero (§4-bis); ricominciare da zero un video quasi finito sarebbe il contrario di quello che serve.
+2. **Dentro la stessa sessione.** Ogni richiesta ha un **tetto di tempo**: passato quello viene abortita e il record va in `errore`, con «Riprova» a video. Non è un obiettivo di prestazione — è la differenza fra «ci mette tanto» e «non finirà mai». Finché una richiesta resta appesa il motore, che lavora un elemento per volta, **non va avanti**: si ferma tutta la coda, non solo quell'elemento.
+
+**Il tetto è otto minuti**, largo di proposito. Un video di 27 MB su una linea da 2 Mbit/s vuole un minuto e mezzo di solo caricamento, e in cantiere la linea è peggio; d'altra parte il flow ha una finestra di 120 secondi, quindi una richiesta che passa gli otto minuti non aveva comunque nessuna possibilità di riuscire. Si può accorciare da `localStorage` (`llitalia.scadenzaInvioMs`, millisecondi): serve al supporto su un telefono che si comporta male, e serve ai collaudi — un tetto di otto minuti non si prova aspettando otto minuti.
+
+⚠️ **Il contratto col flow non cambia in niente.** Un invio ripreso è una richiesta identica a quella di prima, con lo stesso `idClient`.
+
 ## 4-bis. Caricamento a blocchi — scritto nell'app, FERMO in attesa del presupposto
 
 > **Stato all'11/09/2026: spento, e va lasciato spento.** Il codice nell'app c'è ed è collaudato in locale; quello che manca è il presupposto lato tenant. Non si riparte dal client: si riparte dalla prova descritta in fondo a questa sezione.
@@ -330,7 +364,7 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 |---|---|---|
 | `Tipo` | Riga di testo singola, **indicizzata** | `tipo` |
 | `Commessa` | Riga di testo singola | `commessa` |
-| `Fase` | Riga di testo singola | `fase` — **DA AGGIUNGERE**, vedi §4.4. Contiene il **codice** senza spazi (`FinituraAlloggi`), che è anche il nome della cartella sul server. Sempre valorizzata sulle `ARCHIVIO` dalla 0.33.0 |
+| `Fase` | Riga di testo singola | `fase` — **esiste**, verificata via REST il 18/09/2026 (§0); vedi §4.4. Contiene il **codice** senza spazi (`FinituraAlloggi`), che è anche il nome della cartella sul server. Sempre valorizzata sulle `ARCHIVIO` dalla 0.33.0 |
 | `Operatore` | Riga di testo singola | `operatore` |
 | `Nota` | Più righe di testo | `nota` |
 | `DataScatto` | **Riga di testo singola** | `dataScatto`, **compattato a 12 cifre dal flow** — vedi §4.1 |
@@ -341,7 +375,7 @@ Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una mod
 | `Genere` | Riga di testo singola, **indicizzata** | `genere` |
 | `DurataSecondi` | Numero, 0 decimali | `durataSecondi` — vedi §4.2 |
 | `DataScarico` | — | scritta dal runbook del venerdì, non dall'app |
-| `ScattoStimato` | Riga di testo singola | `scattoStimato` — **DA AGGIUNGERE**, vedi sotto |
+| `ScattoStimato` | Riga di testo singola | `scattoStimato`, vedi sotto |
 | `Piano` | Riga di testo singola (255) | `piano` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Codice senza spazi (`P1`, `P-2`, `P10`), che è anche il nome della cartella. Vuota dove la fase non prevede il piano |
 | `Unita` | Riga di testo singola (255) | `unita` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. Nome interno senza accento. Codice così com'è in anagrafica (`1.01` su MAR, `1A` su MNG): **niente normalizzazioni**, il punto fa parte del codice |
 | `Prospetto` | Riga di testo singola (255) | `prospetto` — **esiste dal 18/09/2026 ore 16:05**, vedi §4.5. `Nord`, `Sud`, `Est` o `Ovest`; valorizzata solo su `FinituraFacciata` |
@@ -425,6 +459,22 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.1 — invii interrotti
+
+**Niente da fare a valle**: il contratto non cambia, un invio ripreso è una richiesta identica con lo stesso `idClient`. Quello che cambia è che elementi rimasti fermi su «Invio in corso» su qualche telefono **ripartiranno da soli** al primo avvio dopo l'aggiornamento: se erano già arrivati il flow risponderà `gia_presente` e non nascerà nessun doppione; se non erano arrivati — il caso del n. 56 — atterreranno adesso, e i buchi di continuità che lo script segnalava si chiuderanno.
+
+Previsione scritta prima di provare, e confermata (collaudo `17-invio-interrotto.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Record su `invio` ereditato da una sessione chiusa | torna `in_coda` al primo avvio e riparte da solo | ✓ |
+| Contenuto del record ripreso | fase, livelli e tipo intatti | ✓ `Impermeabilizzazioni` / `P-1` / `ARCHIVIO` |
+| Richiesta che non risponde più | va in **errore**, non resta appesa | ✓ in 3,1 s con tetto a 3 s |
+| Messaggio d'errore | dice che è scaduta, non che manca la rete | ✓ |
+| Dopo il retry | nessun elemento resta su `invio` | ✓ |
+
+**Cosa questo NON dimostra:** il caso vero. Il n. 56 sta sul telefono di Francesco, e la prova è che dopo l'aggiornamento e un ricarico diventi inviabile e arrivi sul server come `Snz22Foto20260922113715-07.jpg` in `Impermeabilizzazioni\P-1\`. Quella verifica è del ricevente.
 
 ### Rilascio 0.37.0 — via la categoria
 
