@@ -7,7 +7,7 @@ import { TIPO_ARCHIVIO } from './categorie.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
-import { creaMotore, eGiaPresente } from '../../core/coda-invio.js';
+import { creaMotore, eGiaPresente, fetchConScadenza, messaggioScaduto } from '../../core/coda-invio.js';
 import { preparaCaricamento, byteGiaCaricati, inviaBlocchi, completaCaricamento, bloccoValido } from './caricamento.js';
 
 // Il motore della coda vive nella shell. Qui il modulo Foto non ha niente da
@@ -124,12 +124,15 @@ async function inviaSingola(record) {
   const versione = await versioneApp();
   let risposta;
   try {
-    risposta = await fetch(endpoint, {
+    risposta = await fetchConScadenza(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo, versione)),
     });
-  } catch {
+  } catch (errore) {
+    // Scaduta e «non parte» sono due cose diverse per chi guarda: la prima
+    // vuol dire che la richiesta era partita e si è persa per strada.
+    if (errore && errore.name === 'AbortError') throw new Error(messaggioScaduto());
     throw new Error(navigator.onLine
       ? 'Invio bloccato: nessuna risposta dall’endpoint (rete assente o CORS)'
       : 'Rete non disponibile');

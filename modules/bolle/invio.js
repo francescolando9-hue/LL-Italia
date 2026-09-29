@@ -7,7 +7,7 @@ import { impostazioniBolle, normalizzaEndpoint } from './impostazioni.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
-import { creaMotore, eGiaPresente } from '../../core/coda-invio.js';
+import { creaMotore, eGiaPresente, fetchConScadenza, messaggioScaduto } from '../../core/coda-invio.js';
 
 const CHIAVE_MOCK = 'llitalia.bolle.mock';
 
@@ -103,12 +103,15 @@ async function inviaSingola(record) {
   const versione = await versioneApp();
   let risposta;
   try {
-    risposta = await fetch(normalizzaEndpoint(impostazioni.endpoint), {
+    risposta = await fetchConScadenza(normalizzaEndpoint(impostazioni.endpoint), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpoInvio(record, impostazioni, contenutoBase64, dispositivo, versione)),
     });
-  } catch {
+  } catch (errore) {
+    // Scaduta e «non parte» sono due cose diverse per chi guarda: la prima
+    // vuol dire che la richiesta era partita e si è persa per strada.
+    if (errore && errore.name === 'AbortError') throw new Error(messaggioScaduto());
     // fetch fallisce senza status sia con rete assente sia quando il browser
     // blocca la richiesta (CORS): distinguere i due casi aiuta la diagnosi.
     throw new Error(navigator.onLine

@@ -63,6 +63,14 @@ I dati viaggiano dentro l'hash dell'indirizzo, che il browser **non** invia al s
 
 ⚠️ Quel codice **vale come una password**: si mostra solo a chi deve usare l'app, non si appende in bacheca e si manda per messaggio diretto, non in un gruppo.
 
+## Un invio interrotto riparte da solo
+
+Dalla 0.37.1. «Invio in corso» è vero **solo finché vive la pagina che ha avviato la richiesta**: se l'app viene chiusa nel mezzo, quello stato resta scritto nel database e l'elemento non è più né riprovabile né rimandabile — «Riprova» e «Rimanda» si accendono su *errore* e su *inviata*. È successo davvero: un elemento fermo sette giorni, mai arrivato, segnalato ogni giorno dal ricevente come buco di continuità.
+
+Ora, al primo avvio di ogni sessione, un elemento rimasto su «in corso» torna in coda e **riparte da solo**, dicendolo a video. È sicuro perché il flow riconosce un `idClient` già visto e risponde `gia_presente` senza creare un doppione: nel peggiore dei casi si spende una richiesta. Si è scelta la ripartenza automatica e non un pulsante perché aspettare che qualcuno noti un elemento fermo è il modo in cui quell'elemento si perde.
+
+Separatamente, **ogni richiesta ha un tetto di otto minuti**: passato quello va in errore invece di restare appesa. Finché una richiesta resta appesa il motore, che lavora un elemento per volta, non va avanti — si ferma tutta la coda. Il tetto è largo di proposito (un video lungo su una linea di cantiere vuole minuti) e si può accorciare da `localStorage` con `llitalia.scadenzaInvioMs`, che serve al supporto e ai collaudi.
+
 ## Rimanda una foto o una bolla già inviata
 
 Dalla 0.36.0, sotto **ogni** elemento inviato — foto e bolle — c'è **Rimanda**, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Si apre un riquadro coi campi già compilati, e il pulsante dice **quale delle due cose** sta per fare, perché in raccolta sono due cose diverse:
@@ -179,7 +187,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Sedici collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, sette commesse, livelli dell'archivio e Rimanda.
+Diciassette collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, sette commesse, livelli dell'archivio, Rimanda e **invii interrotti**.
 
 A parte, e **dopo** un rilascio: `node collaudi/pubblicato.js` legge `sw.js` e `core/versione.js` **dal sito pubblicato** e li confronta fra loro e col repo. Gli altri collaudi girano su un server locale che serve il repo: provano che il codice è coerente, non che sia arrivato in linea — fra «unito su main» e «lo prendono i telefoni» ci sono una build di Pages e qualche minuto. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
 

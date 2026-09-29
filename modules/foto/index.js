@@ -549,6 +549,10 @@ async function ridisegna() {
           rimandoAperto === r.id ? 'Chiudi' : 'Rimanda'}</button>` : '';
       const giaPresente = r.giaPresente
         ? '<div class="tenue">Era già in raccolta: nessun doppione creato.</div>' : '';
+      // Un invio interrotto da una chiusura dell'app riparte da solo: dirlo
+      // evita che sembri partito due volte, e spiega perché è tornato in coda.
+      const ripreso = r.ripreso
+        ? '<div class="tenue">Invio interrotto da una chiusura dell’app: ripreso.</div>' : '';
       const nota = r.nota ? `<div class="tenue">${scappaHtml(r.nota)}</div>` : '';
       return `
         <li class="foto-voce">
@@ -568,6 +572,7 @@ async function ridisegna() {
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
             ${nota}
             ${giaPresente}
+            ${ripreso}
             ${avanzamento}
             ${messaggioErrore}
           </div>

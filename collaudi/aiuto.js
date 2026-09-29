@@ -25,6 +25,13 @@
 //    risulta vera prima del tempo. `puliscine()` fa entrambe le cose, e
 //    ricarica la pagina perché la cancellazione del database, se una
 //    connessione è aperta, resta in sospeso e scatta dopo.
+// 4ter. Un elemento che ESISTE non è un elemento PRONTO. I menù della fase e
+//    dei livelli nascono vuoti nel markup e li riempie la shell al primo
+//    ridisegno, che è asincrono: `waitForSelector('#fase')` passa subito e la
+//    lettura delle voci può dare un elenco vuoto. Costa un fallimento ogni
+//    cinque o sei giri, cioè il tipo di rosso che si archivia come «flake» e
+//    non si guarda più. Si aspetta il marcatore `data-livelli`, che
+//    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto.
 // 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
 //    lo controlla come script CommonJS e lascia passare errori che in un
 //    modulo ES sono fatali. Il controllo giusto è
@@ -78,7 +85,12 @@ function avviaFlow(porta = PORTA_FLOW) {
   // NON crea un secondo file. Serve a «Rimanda la stessa», che esiste proprio
   // per farsi dire questo. Spenta per default: gli altri collaudi contano
   // `ricevuti` come «richieste arrivate» e non devono cambiare comportamento.
-  const stato = { ricevuti: [], stato: 200, corpo: '', risposte: null, deduplica: false, giaPresenti: 0 };
+  // `nonRispondere` simula la richiesta che resta appesa: il flow riceve e non
+  // risponde mai. È il caso che il 29/09/2026 ha lasciato un elemento su
+  // «Invio in corso» per sette giorni, e senza un server che sappia tacere
+  // non si può provare.
+  const stato = { ricevuti: [], stato: 200, corpo: '', risposte: null, deduplica: false, giaPresenti: 0, nonRispondere: false };
+  const appese = [];
   const gestore = (req, res) => {
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -91,6 +103,11 @@ function avviaFlow(porta = PORTA_FLOW) {
     req.on('end', () => {
       let dati = null;
       try { dati = JSON.parse(corpo); } catch { dati = { nonJson: corpo.length }; }
+      if (stato.nonRispondere) {
+        stato.ricevuti.push(dati);
+        appese.push(res);
+        return;
+      }
       const chiave = dati && dati.idClient;
       const giaVisto = stato.deduplica && chiave
         && stato.ricevuti.some(r => r && r.idClient === chiave);
@@ -118,9 +135,16 @@ function avviaFlow(porta = PORTA_FLOW) {
     // Senza campo non è irraggiungibile solo l'app: è irraggiungibile anche il
     // magazzino. Spegnere solo il server dell'app farebbe partire gli invii e
     // il collaudo offline direbbe una cosa per un'altra.
-    sospendi: () => new Promise(r => server.close(r)),
+    // Le risposte lasciate appese vanno chiuse, o il server non si spegne.
+    sospendi: () => {
+      for (const res of appese.splice(0)) { try { res.destroy(); } catch { /* già chiusa */ } }
+      return new Promise(r => server.close(r));
+    },
     riprendi: () => { server = http.createServer(gestore); return accendi(); },
-    chiudi: () => new Promise(r => server.close(r)),
+    chiudi: () => {
+      for (const res of appese.splice(0)) { try { res.destroy(); } catch { /* già chiusa */ } }
+      return new Promise(r => server.close(r));
+    },
   }));
 }
 
