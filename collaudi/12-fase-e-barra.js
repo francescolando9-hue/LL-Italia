@@ -173,65 +173,55 @@ module.exports = {
       await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
     };
 
-    registro.titolo('Avanzamento: la fase resta facoltativa');
-    await pagina.selectOption('#categoria', 'AVANZAMENTO');
+    registro.titolo('Nel modulo Foto la fase è obbligatoria SEMPRE');
+    // Fino alla 0.36.1 dipendeva dalla categoria: obbligatoria per l'archivio,
+    // facoltativa per l'avanzamento. Dalla 0.37.0 la categoria non esiste più
+    // e tutto va in archivio, quindi la regola è una: senza fase non si parte.
+    // Questo è il posto dove si vedrebbe se quella semplificazione avesse
+    // lasciato in giro un ramo che lascia passare un invio senza fase.
     await pagina.selectOption('#commessa', 'SNZ2.2');
-    await mandaFoto();
-    await attendiRicevuti(5);
-    registro.controlla('senza fase la foto d’avanzamento parte, col campo vuoto',
-      flow.stato.ricevuti[4].fase === '');
-    registro.controlla('e nessun avviso chiede la fase',
-      !/fase/i.test(await pagina.$eval('#avviso-invio', e => e.textContent)));
-
-    registro.titolo('Archivio: senza fase non si invia, e l’app dice perché');
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
+    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
+      'menù della fase pronto', 10000);
     registro.dice('aiuto sotto il campo', await pagina.$eval('#aiuto-fase', e => e.textContent.trim()));
-    registro.controlla('scegliendo ARCHIVIO l’app avvisa subito, prima di scattare',
-      /obbligatoria/i.test(await pagina.$eval('#aiuto-fase', e => e.textContent)),
+    registro.controlla('l’app dice dove finirà la foto, prima di scattare',
+      /cartella della fase/i.test(await pagina.$eval('#aiuto-fase', e => e.textContent)),
       'dirlo dopo il primo scatto sarebbe dirlo in ritardo');
     await accodaFoto();
     await aiuto.attendi(pagina, () => document.querySelector('#invia').disabled, 'Invia spento', 10000);
-    registro.controlla('con una foto da archiviare in attesa, Invia è spento',
+    registro.controlla('con una foto in attesa e nessuna fase, Invia è spento',
       await pagina.$eval('#invia', e => e.disabled));
     const avvisoArchivio = await pagina.$eval('#avviso-invio', e => e.textContent.replace(/\s+/g, ' ').trim());
     registro.dice('avviso nella barra', avvisoArchivio);
     registro.controlla('e il perché si legge accanto al pulsante',
       /la fase/.test(avvisoArchivio) && /server/.test(avvisoArchivio));
 
-    registro.titolo('Scelta la fase, l’archivio parte');
+    registro.titolo('Scelta la fase, la foto parte');
     await pagina.selectOption('#fase', 'ImpiantoFotovoltaico');
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.click('#invia');
-    await attendiRicevuti(6);
-    const foto = flow.stato.ricevuti[5];
-    registro.dice('payload foto → fase', foto.fase);
+    await attendiRicevuti(5);
+    const foto = flow.stato.ricevuti[4];
+    registro.dice('payload foto', `fase: ${foto.fase} · tipo: ${JSON.stringify(foto.tipo)}`);
     registro.controlla('al flow arriva il CODICE, non l’etichetta', foto.fase === 'ImpiantoFotovoltaico',
       'è quello che diventa il nome della cartella sul server');
     registro.controlla('insieme al resto del contratto',
       foto.commessa === 'SNZ2.2' && foto.tipo === 'ARCHIVIO' && foto.scattoStimato);
-    registro.controlla('nessuna foto ARCHIVIO è mai partita senza fase',
-      flow.stato.ricevuti.filter(r => r.tipo === 'ARCHIVIO').every(r => r.fase),
+    registro.controlla('nessuna foto è mai partita senza fase',
+      flow.stato.ricevuti.filter(r => 'tipo' in r).every(r => r.fase),
       'è la garanzia su cui si regge lo smistamento per cartella sul server');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     registro.controlla('e si ripropone alla prossima apertura', (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoFotovoltaico');
 
-    registro.titolo('Un invio misto: basta una foto da archiviare perché la fase serva');
-    await pagina.selectOption('#fase', '');
-    await pagina.selectOption('#categoria', 'AVANZAMENTO');
+    registro.titolo('Rimessa a «nessuna fase», l’invio si blocca di nuovo');
+    // La via d'uscita che c'era per l'avanzamento non esiste più: riportare il
+    // menù a «nessuna fase» non fa passare niente.
     await accodaFoto();
-    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
-    registro.controlla('con la sola foto d’avanzamento in attesa, Invia è acceso',
-      !(await pagina.$eval('#invia', e => e.disabled)));
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
-    // Una foto CON l'ora dello scatto: una copia senza EXIF verrebbe fermata
-    // dall'avviso della 0.36.0, che qui non è la cosa in prova.
-    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
-    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 2, 'seconda anteprima', 90000);
+    await pagina.selectOption('#fase', '');
     await aiuto.attendi(pagina, () => document.querySelector('#invia').disabled, 'Invia spento', 10000);
-    registro.controlla('aggiunta una foto da archiviare, Invia si spegne',
+    registro.controlla('tornati a «nessuna fase», Invia si spegne',
       await pagina.$eval('#invia', e => e.disabled),
-      'la fase vale per tutte le foto dell’invio, quindi basta che una la richieda');
+      'non c’è più una categoria che permetta di mandare una foto senza fase');
 
     registro.controllaConsole(errori);
     await contesto.close();

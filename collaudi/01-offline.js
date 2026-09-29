@@ -37,7 +37,7 @@ module.exports = {
 
     const rotte = [
       ['#/bolle', '#bolle-contatori', 'modulo Bolle'],
-      ['#/foto', '#categoria', 'modulo Foto cantiere'],
+      ['#/foto', '#commessa', 'modulo Foto cantiere'],
       ['#/bolle/storico', '.bolle-calendario', 'storico delle bolle'],
       ['#/impostazioni', '#autore', 'impostazioni dell\'app'],
       ['#/bolle/impostazioni', '#endpoint', 'impostazioni Bolle'],

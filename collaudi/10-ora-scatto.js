@@ -22,12 +22,21 @@ module.exports = {
       foto: { endpoint: flow.endpoint('foto'), token: 'LLI-FOTO', conservaUltime: 10, limiteMB: 20 },
     });
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
+    await pagina.waitForSelector('#commessa');
 
-    const manda = async (tipo, file) => {
-      const prima = flow.stato.ricevuti.length;
-      await pagina.selectOption('#categoria', tipo);
+    // Dalla 0.37.0 la categoria non si sceglie più (tutto va in archivio) e la
+    // fase è obbligatoria su ogni invio: `Cantiere` non pretende livelli, ed è
+    // il percorso più corto per provare l'ORA, che è la cosa in prova qui.
+    const scegli = async () => {
       await pagina.selectOption('#commessa', 'SNZ2.2');
+      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
+        'menù della fase pronto', 10000);
+      await pagina.selectOption('#fase', 'Cantiere');
+    };
+
+    const manda = async file => {
+      const prima = flow.stato.ricevuti.length;
+      await scegli();
       await pagina.setInputFiles('#input-galleria', [materiale(file)]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
       await pagina.click('#invia');
@@ -42,10 +51,9 @@ module.exports = {
     // coda da sola: compare un avviso, e si decide. Questo aiutante fa la
     // strada lunga — avviso, «Aggiungi comunque», invio — perché è quella che
     // l'operatore fa davvero.
-    const mandaComunque = async (tipo, file) => {
+    const mandaComunque = async file => {
       const prima = flow.stato.ricevuti.length;
-      await pagina.selectOption('#categoria', tipo);
-      await pagina.selectOption('#commessa', 'SNZ2.2');
+      await scegli();
       await pagina.setInputFiles('#input-galleria', [materiale(file)]);
       await pagina.waitForSelector('#senza-data-comunque', { timeout: 60000 });
       await pagina.click('#senza-data-comunque');
@@ -63,7 +71,7 @@ module.exports = {
     const oggi = new Date().toLocaleDateString('sv-SE', { timeZone: FUSO });
 
     registro.titolo('Archivio: l’ora viene dall’EXIF, col fuso scritto nella foto');
-    const archivio = await manda('ARCHIVIO', 'scatto-exif.jpg');
+    const archivio = await manda('scatto-exif.jpg');
     registro.dice('dataScatto ricevuta dal flow', archivio.dataScatto);
     registro.dice('ora dell’invio (oggi)', oggi);
     registro.controlla('è l’ora dello scatto, al secondo',
@@ -74,18 +82,27 @@ module.exports = {
       `l’invio è appena avvenuto, lo scatto no: sono ${Math.round(Math.abs(new Date(archivio.dataScatto).getTime() - Date.now()) / 60000)} minuti di distanza`);
     registro.controlla('dichiarata misurata, non stimata', archivio.scattoStimato === 'NO', archivio.scattoStimato);
 
-    registro.titolo('Avanzamento: l’EXIF si legge PRIMA di ricomprimere');
-    // È il caso che conta davvero: la compressione dell'avanzamento passa per
-    // un canvas, e dal canvas l'EXIF non esce. Se l'ora si leggesse dopo, non
-    // si leggerebbe affatto — e il difetto tornerebbe solo su una categoria.
-    const avanzamento = await manda('AVANZAMENTO', 'scatto-exif-mm.jpg');
+    registro.titolo('Ordine dei byte MM, e nessun tag del fuso');
+    // Fino alla 0.36.1 questo blocco provava anche che l'EXIF si legge PRIMA
+    // della preparazione: si mandava la stessa foto come «Avanzamento», la
+    // compressione passava per un canvas, i byte arrivavano SENZA EXIF e l'ora
+    // arrivava lo stesso — funzionamento e guasto davano risultati diversi, ed
+    // era una prova vera.
+    //
+    // **Dalla 0.37.0 quella prova non esiste più**, perché non esiste più la
+    // ricompressione: un JPEG parte com'è. Non è un controllo che si è deciso
+    // di togliere, è un controllo rimasto senza oggetto — e va detto, invece
+    // di sostituirlo con uno che passa comunque. L'unica ricodifica rimasta è
+    // HEIC/PNG → JPEG, che questo Chromium non sa produrre: registrato fra le
+    // cose che i collaudi NON dimostrano.
+    const avanzamento = await manda('scatto-exif-mm.jpg');
     const byte = Buffer.from(avanzamento.contenutoBase64, 'base64');
-    const portaExif = byte.includes(Buffer.from('Exif', 'ascii'));
     registro.dice('dataScatto ricevuta dal flow', avanzamento.dataScatto);
-    registro.dice('i byte inviati contengono EXIF?', portaExif ? 'sì' : 'no');
-    registro.controlla('i byte ricompressi hanno perso l’EXIF', !portaExif,
-      'è la prova che la lettura non può avvenire dopo la preparazione');
-    registro.controlla('ma l’ora dello scatto è arrivata lo stesso',
+    registro.dice('byte inviati', `${byte.length} — sul telefono ${require('fs').statSync(materiale('scatto-exif-mm.jpg')).size}`);
+    registro.controlla('i byte partono identici all’originale',
+      byte.length === require('fs').statSync(materiale('scatto-exif-mm.jpg')).size,
+      'nessuna ricodifica: la foto va sul server come l’ha scattata il telefono');
+    registro.controlla('l’ora dello scatto è quella dell’EXIF',
       avanzamento.dataScatto === '2026-01-15T09:00:00+01:00',
       'ordine dei byte MM (iPhone) e nessun tag del fuso: si legge come ora locale');
     registro.controlla('il fuso è quello del giorno dello scatto, non di oggi',
@@ -99,8 +116,7 @@ module.exports = {
     // serve a distinguere il ripiego giusto (data del file) da quello
     // sbagliato (ora dell'invio), che con un file di oggi darebbero lo stesso
     // risultato — e una prova così non proverebbe niente.
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
-    await pagina.selectOption('#commessa', 'SNZ2.2');
+    await scegli();
     await pagina.setInputFiles('#input-galleria', [materiale('copia-whatsapp.jpg')]);
     await pagina.waitForSelector('#senza-data-comunque', { timeout: 60000 });
     const avviso = await pagina.$eval('#avviso-senza-data', e => e.textContent.replace(/\s+/g, ' ').trim());
@@ -117,7 +133,6 @@ module.exports = {
     const primaCopia = flow.stato.ricevuti.length;
     await pagina.click('#senza-data-comunque');
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
-    await pagina.selectOption('#fase', 'Bonifica');
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.click('#invia');
     const fineCopia = Date.now() + 90000;
@@ -135,7 +150,7 @@ module.exports = {
       'la data del file è un ripiego ragionevole, non una misura');
 
     registro.titolo('EXIF presente ma assurdo: vale come assente');
-    const assurda = await mandaComunque('ARCHIVIO', 'scatto-exif-assurda.jpg');
+    const assurda = await mandaComunque('scatto-exif-assurda.jpg');
     registro.dice('EXIF 1970:01:01 → dataScatto', assurda.dataScatto);
     registro.controlla('una data assurda non viene mandata',
       !String(assurda.dataScatto).startsWith('1970'), assurda.dataScatto);
@@ -144,8 +159,7 @@ module.exports = {
 
     registro.titolo('Scatto fatto dentro l’app: l’ora è quella del momento');
     const prima = flow.stato.ricevuti.length;
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
-    await pagina.selectOption('#commessa', 'SNZ2.2');
+    await scegli();
     await pagina.click('#apri-fotocamera');
     await pagina.waitForSelector('.fotocamera-scatta:not([disabled])', { timeout: 30000 });
     const istante = Date.now();

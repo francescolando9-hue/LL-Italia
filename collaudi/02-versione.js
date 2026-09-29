@@ -50,8 +50,7 @@ module.exports = {
 
     registro.titolo('Il payload porta la versione in esecuzione');
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
-    await pagina.selectOption('#categoria', 'AVANZAMENTO');
+    await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'MAR');
     // Una foto CON l'ora dello scatto: dalla 0.36.0 una copia senza EXIF
     // viene fermata con un avviso, e qui si sta provando la versione nel

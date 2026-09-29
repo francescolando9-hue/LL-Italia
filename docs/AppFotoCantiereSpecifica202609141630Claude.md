@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 11 del 18/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 12 del 29/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 12 — via la categoria: TUTTO va in archivio**, deciso da Francesco il 29/09/2026, dalla **0.37.0**. La distinzione Avanzamento / Archivio non ha più senso: quello che si manda dall'app è documentazione, e per le urgenze si usa WhatsApp. Conseguenze: (1) **nel modulo non c'è più niente da scegliere sul tipo di foto** (§2); (2) **sparisce la compressione a 2500 px** — ogni immagine parte a risoluzione originale (§3); (3) la **fase diventa obbligatoria su ogni invio** del modulo Foto, e non più solo sull'archivio (§4.4); (4) **il campo `tipo` RESTA nel contratto**, sempre valorizzato `ARCHIVIO` (§4). Il punto (4) è quello da non sbagliare: il flow compone il nome del file da `tipo` e lo script archiviatore prende solo gli elementi con `Tipo = ARCHIVIO` — un invio con `tipo` vuoto atterrerebbe in raccolta e ci resterebbe per sempre, senza nessun errore. Si è tolta la scelta, non il campo, e l'invio ha anche un ripiego su quel valore. **Il contratto non cambia in nient'altro:** nessun campo rinominato, nessun campo tolto, e un telefono non ancora aggiornato continua a mandare `AVANZAMENTO` senza errori.
 >
 > **Rev. 11 — fase nuova: `SistemazioneEsterna`** («Sistemazione esterna»), decisa da Francesco il 18/09/2026, dalla **0.36.1**. Senza livelli, quindi sul server va in `SistemazioneEsterna\[AAAAMM]\`. Le fasi diventano **27**, e i conteggi di §4.5 passano a 10 piano / 4 unità / 1 prospetto / **12 niente**. Master dell'anagrafica alla rev. 4, `versione` `202609182010`. Nota sul nome: «Sistemazione esterna» è **anche** un'attività della contabilità di gruppo — la coincidenza è nota e accettata, e si governa a valle qualificando il dominio in una colonna, non rinominando quello che l'operatore legge.
 >
@@ -14,50 +16,42 @@
 
 ## 1. A cosa serve
 
-Chi è in cantiere fotografa e manda in ufficio. Due usi diversi, che finora viaggiavano insieme su WhatsApp e si distinguevano solo dal contesto della conversazione:
+Chi è in cantiere fotografa e manda in ufficio, e quello che manda è **documentazione**: finisce nella cartella di commessa sul server.
 
-| Categoria | Codice | A cosa serve |
-|---|---|---|
-| Avanzamento lavori | `AVANZAMENTO` | Dire a che punto è una lavorazione. Si guarda, si commenta, non si archivia. |
-| Da archiviare sul server | `ARCHIVIO` | Documentazione che deve finire nella cartella di commessa su `L:`. |
+**Dal 29/09/2026 non c'è più una categoria da scegliere.** Fino alla 0.36.1 le foto erano di due tipi — `AVANZAMENTO`, da guardare e commentare, e `ARCHIVIO`, da conservare — con due trattamenti diversi dell'immagine. La distinzione è stata tolta da Francesco: **tutto quello che parte da questa app va in archivio**, e per dire «guarda a che punto siamo» si usa WhatsApp, che è dove quelle foto venivano già guardate.
 
-**La categoria si sceglie prima di scattare**, come il cantiere: non è un'etichetta messa dopo, perché decide **come l'immagine viene preparata** (§3).
+Cosa cambia in pratica: un campo in meno da scegliere prima di scattare, e ogni immagine a risoluzione originale (§3). Cosa NON cambia: il campo `tipo` nel contratto, che resta e vale sempre `ARCHIVIO` (§4) — è quello su cui si regge l'archiviazione a valle.
 
 ## 2. Le schermate
 
 Una sola schermata di lavoro, con la stessa impostazione di Bolle:
 
-1. **Tipo di foto** (obbligatorio) — le due categorie sopra. Sotto, una riga che dice cosa comporta la scelta: *«Compressa per partire veloce anche con poca rete»* oppure *«Inviata a risoluzione originale: pesa di più e con poca rete parte più lentamente»*.
-2. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice.
-   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js` più «nessuna fase», lo stesso delle bolle, ultima scelta preselezionata. **Obbligatoria se fra le foto in attesa ce n'è almeno una `ARCHIVIO`**, facoltativa altrimenti (§4.4). Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
+1. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice.
+   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js` più «nessuna fase», lo stesso delle bolle, ultima scelta preselezionata. **Obbligatoria su ogni invio dalla 0.37.0** (§4.4): tutto va in archivio, e una foto d'archivio senza fase non saprebbe in quale cartella andare. Per una foto generica il percorso veloce è la fase `Cantiere`, che non pretende livelli. Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
    **Piano**, **Unità**, **Prospetto** — compaiono **solo dove la fase li pretende**, e dove compaiono sono obbligatori: non esistono livelli facoltativi (§4.5). Con l'unità il piano non si chiede — lo ricava l'app — ma si legge sotto il menù, perché l'operatore non l'ha scelto e vederlo è il solo modo che ha di accorgersi se non torna. **Nessuno dei tre è preselezionato:** un livello è il nome di una cartella sul server, e una scelta preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato senza fare rumore. Costa un tocco per invio, non per foto.
-3. **Scatta foto** — apre la **fotocamera dentro l'app** (`core/fotocamera.js`, la stessa del modulo Bolle): si scatta più volte di fila senza uscire, con rullino e contatore, poi *Fine*. Accanto restano **Usa la fotocamera del telefono** e **Scegli dalla galleria** (multi-foto). Anteprime rimovibili, ognuna con categoria e peso reale del file che partirà.
+2. **Scatta foto** — apre la **fotocamera dentro l'app** (`core/fotocamera.js`, la stessa del modulo Bolle): si scatta più volte di fila senza uscire, con rullino e contatore, poi *Fine*. Accanto restano **Usa la fotocamera del telefono** e **Scegli dalla galleria** (multi-foto). Anteprime rimovibili, ognuna col peso reale del file che partirà.
    Qui gli scatti di una sessione **non** vengono raggruppati: ogni foto è una foto. Il gesto però è identico a quello delle bolle, così chi usa l'app impara una sola cosa.
-4. **Nota** (facoltativa, max 255 caratteri) — vale per tutte le foto di quell'invio. Si svuota dopo l'invio, perché la nota successiva è un'altra cosa.
-5. **Invia** — resta disabilitato finché non c'è almeno una foto e un cantiere, e finché manca la fase se fra le foto in attesa ce n'è una da archiviare. L'avviso accanto al pulsante dice cosa manca e perché.
-6. **Rimanda** — sotto ogni elemento **già inviato**, foto e bolle, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Prima esisteva solo per le bolle, solo dallo storico, e solo per correggere il cantiere. Si apre un riquadro con i campi dell'invio già compilati, e il pulsante **dice quale delle due cose sta per fare**, perché in raccolta sono due cose diverse:
+3. **Nota** (facoltativa, max 255 caratteri) — vale per tutte le foto di quell'invio. Si svuota dopo l'invio, perché la nota successiva è un'altra cosa.
+4. **Invia** — resta disabilitato finché non ci sono almeno una foto, un cantiere e **la fase** (obbligatoria su ogni invio dalla 0.37.0), più i livelli che quella fase pretende. L'avviso accanto al pulsante dice cosa manca e perché.
+5. **Rimanda** — sotto ogni elemento **già inviato**, foto e bolle, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Prima esisteva solo per le bolle, solo dallo storico, e solo per correggere il cantiere. Si apre un riquadro con i campi dell'invio già compilati, e il pulsante **dice quale delle due cose sta per fare**, perché in raccolta sono due cose diverse:
    - **«Rimanda la stessa»** (niente modificato) → **stesso `idClient` e stesso progressivo**. Il flow riconosce il duplicato, risponde `gia_presente` e non crea un secondo file; l'app scrive *«Era già in raccolta: nessun doppione creato»*. Non conta fra le «inviate oggi», perché in raccolta non è arrivato niente di nuovo — e quel contatore serve a essere confrontato coi file atterrati.
    - **«Rimanda corretta»** (cantiere, fase, livelli o nota cambiati) → **`idClient` nuovo e progressivo nuovo**: è un invio nuovo a tutti gli effetti. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può saperlo se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta.
-7. **Coda invii** con gli stati e i contatori del giorno, come in Bolle. Ogni riga porta il **numero progressivo** (`n. 47`), che si legge a voce quando l'ufficio segnala un buco nella sequenza. Gli stati usano le classi del design system della shell: quelle sbagliate — e per un giorno lo sono state — fanno uscire «Inviata» senza colore, cioè senza conferma visiva che la foto sia arrivata.
+6. **Coda invii** con gli stati e i contatori del giorno, come in Bolle. **Dalla 0.37.0 la riga non porta più il marchio «Archivio»**: uguale su ogni riga non distingueva niente. Il marchio compare **solo** su un elemento con un tipo diverso da `ARCHIVIO` — cioè accodato prima della 0.37.0 e non ancora partito: quello lo script a valle non lo archivierebbe, e va riconosciuto a colpo d'occhio. Ogni riga porta il **numero progressivo** (`n. 47`), che si legge a voce quando l'ufficio segnala un buco nella sequenza. Gli stati usano le classi del design system della shell: quelle sbagliate — e per un giorno lo sono state — fanno uscire «Inviata» senza colore, cioè senza conferma visiva che la foto sia arrivata.
 
 Nelle impostazioni del modulo c'è **Configura un altro telefono**: genera un QR che porta indirizzo e codice su un altro dispositivo senza digitare nulla. Il link è **solo di questo modulo** — le bolle hanno una destinazione propria e un link proprio. Serve prima di distribuire l'app agli operai: l'URL del trigger è lungo e firmato, e sulle bolle una copia manuale è già costata un'ora di diagnosi per una lettera cambiata nel nome di un parametro e un carattere perso dalla firma.
 
-Se si cambia categoria quando ci sono già foto in attesa, l'app **avvisa** che quelle partono col tipo con cui sono state preparate, non con quello scelto adesso. Cambiare l'etichetta a posteriori sarebbe una bugia: il file è già stato compresso, o non lo è stato.
-
 ## 3. Preparazione delle immagini
 
-| Categoria | Trattamento |
-|---|---|
-| `AVANZAMENTO` | JPEG, lato lungo 2500 px, qualità 0,85 — come le bolle. Leggera, parte anche con poca rete. |
-| `ARCHIVIO` | **Risoluzione originale** (deciso il 10/09/2026). Se il file è già JPEG si spediscono **i byte originali, senza ricodificarli**: ricomprimere «a qualità massima» degraderebbe l'immagine senza alcun vantaggio. Se il telefono produce HEIC o PNG si converte in JPEG a piena risoluzione (qualità 0,95), perché il nome del file in raccolta è `.jpg` e byte HEIC dentro un `.jpg` sarebbero un file che non si apre. |
+**Un trattamento solo, dalla 0.37.0: risoluzione originale.** La compressione a 2500 px serviva all'`AVANZAMENTO`, che non esiste più.
 
-**Ricodificare butta via l'EXIF.** Il passaggio per il canvas — che avviene sempre per l'`AVANZAMENTO`, e per l'`ARCHIVIO` solo quando il file non è già JPEG — produce un JPEG pulito, **senza i metadati dell'originale**. È la ragione per cui l'ora dello scatto si legge **prima** della preparazione (§4.1), ed è anche la ragione per cui una foto d'archivio già JPEG arriva in raccolta con il suo EXIF intatto mentre una d'avanzamento no: sono due trattamenti diversi, non un'incoerenza.
+Se il file è già JPEG si spediscono **i byte originali, senza ricodificarli**: ricomprimere «a qualità massima» degraderebbe l'immagine senza alcun vantaggio. Se il telefono produce HEIC o PNG si converte in JPEG a piena risoluzione (qualità 0,95), perché il nome del file in raccolta è `.jpg` e byte HEIC dentro un `.jpg` sarebbero un file che non si apre.
+
+**Ricodificare butta via l'EXIF**, e ora è l'unico caso rimasto in cui succede: la conversione HEIC/PNG passa per un canvas, e dal canvas i metadati non escono. Resta la ragione per cui l'ora dello scatto si legge **prima** della preparazione (§4.1). Conseguenza della semplificazione, da registrare: fino alla 0.36.1 quel comportamento era **collaudabile** — si mandava una foto come `AVANZAMENTO`, i byte arrivavano senza EXIF e l'ora arrivava comunque giusta, e funzionamento e guasto davano risultati diversi. Adesso un JPEG parte com'è, quindi quella prova non ha più oggetto, e l'unica ricodifica rimasta è su formati che il Chromium dei collaudi non sa produrre. Non è un controllo tolto: è un controllo rimasto senza caso, ed è annotato fra le cose che i collaudi non dimostrano.
 
 **Misure sul flow vero** (collaudo del ricevente, 10/09/2026 sera, telefono reale) — sostituiscono le stime di laboratorio:
 
 | Caso | Peso del file | Corpo della richiesta |
 |---|---|---|
-| `AVANZAMENTO` (2500 px, q. 0,85) | 1,49 MB | ~2,0 MB |
 | `ARCHIVIO` da fotocamera in-app | 3,76 MB | ~5,0 MB |
 | `ARCHIVIO` da fotocamera nativa, byte originali | **4,39 MB** | **~5,9 MB** |
 | `ARCHIVIO`, il più grande arrivato finora (14/09) | **6,17 MB** | **~8,2 MB**, accettato in una sola richiesta |
@@ -73,7 +67,7 @@ Il caricamento a blocchi serve ai **video**, che non si comprimono e arrivano al
 Si può inviare anche un video, non solo foto.
 
 - **Si registra con la fotocamera di sistema**, non dentro l'app: il pulsante è *Registra un video*. Registrare in-app significherebbe `MediaRecorder`, che produce formati diversi fra Android e iPhone e non usa l'encoder hardware del telefono. Il video di sistema è migliore, consuma meno batteria e si apre su qualunque PC dell'ufficio. Per le foto la fotocamera interna serve a non uscire fra uno scatto e l'altro; un video si registra uno per volta, quindi quel problema non c'è.
-- **Il video non viene compresso.** Transcodificare in un browser non è realistico: parte come l'ha prodotto il telefono, **in qualunque categoria** — la distinzione compressa/originale vale solo per le foto.
+- **Il video non viene compresso.** Transcodificare in un browser non è realistico: parte come l'ha prodotto il telefono. Anche il video è `ARCHIVIO` dalla 0.37.0, e anche per lui la fase è obbligatoria.
 - **Il peso è l'unico vero vincolo.** Nelle impostazioni del modulo c'è un **tetto in MB** (predefinito 20). Un file che lo supera **non entra in coda** e l'app lo dice subito — *«Un file da 373,4 MB supera il limite di 20 MB e non è stato aggiunto: registra un video più corto»* — invece di accodarlo e farlo ritentare a vuoto per sempre. Il valore giusto lo dice il collaudo sul flow vero.
 - **Anteprima e durata** si ricavano da un fotogramma del filmato, mezzo secondo dentro. Se il browser non decodifica il formato, l'anteprima è un'icona e la durata resta 0: l'invio non dipende dalla riuscita di una miniatura.
 - Foto e video **possono stare nello stesso invio**: il pulsante dice *Invia 1 foto e 1 video*.
@@ -84,7 +78,8 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
 
 ```
 { "token": "…",
-  "tipo": "AVANZAMENTO",              // oppure ARCHIVIO
+  "tipo": "ARCHIVIO",                 // sempre, dalla 0.37.0: la scelta non c'è più,
+                                      //   ma IL CAMPO RESTA e non è mai vuoto
   "commessa": "MAR",                  // solo il codice; sette commesse dal 16/09/2026
   "fase": "FinituraAlloggi",          // CODICE della fase senza spazi (§4.4);
                                       //   per SNU e BRU qui c'è il LOTTO: "Lotto2" (§4.5)
@@ -106,6 +101,8 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
   "nomeFile": "…",                    // IGNORATO dal backend: lo compone il flow
   "contenutoBase64": "…" }
 ```
+
+⚠️ **`tipo` non può essere vuoto, ed è il motivo per cui il campo è sopravvissuto alla categoria.** A valle ci stanno appese due cose: il flow **compone il nome del file** da `tipo`, e lo **script archiviatore prende solo gli elementi con `Tipo = ARCHIVIO`**. Un invio con `tipo` vuoto atterrerebbe in raccolta e ci resterebbe per sempre — nessun errore, nessun avviso, e nessuno che se ne accorga finché non si va a cercare una foto che si credeva archiviata. L'app lo valorizza sempre, e l'invio ha anche un ripiego per i record accodati da versioni precedenti.
 
 **Attenzione, il campo si chiama `dataScatto`** — non `dataInvio` come nelle bolle. Nelle bolle il nome del campo e quello della colonna divergono per un incidente storico; qui nascono uguali. **Non dare per scontata la simmetria fra i due contratti.**
 
@@ -144,7 +141,7 @@ Se si manda comunque: **`dataScatto` = data del file** (`lastModified`) quando �
 
 Una data EXIF **assurda** (l'orologio mai impostato: `1970`, `2001`, `2008`) vale come assente e segue la stessa strada. Il tag c'è, il valore no.
 
-**La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la preparazione dell'`AVANZAMENTO` (2500 px, qualità 0,85) passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo mai — e il difetto sarebbe tornato su una categoria sola, che è il modo più efficace di non accorgersene.
+**La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la conversione HEIC/PNG → JPEG passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo su quei formati — cioè proprio sugli iPhone, che è il modo più efficace di non accorgersene. Fino alla 0.36.1 il canvas serviva anche alla compressione dell'`AVANZAMENTO`, e la cosa era più facile da provare (§3).
 
 **Niente libreria EXIF**: lo stack è vincolato e qui non serve. Si leggono i primi 128 KB del file e si scandiscono i marcatori JPEG fino all'APP1 (`core/exif.js`, ~150 righe). Il contenuto della foto non viene toccato.
 
@@ -207,11 +204,13 @@ Senza una sequenza per dispositivo **non esiste un controllo di continuità**: n
 
 Campo **nuovo dalla 0.31.0**, testo, **sempre presente**.
 
-**Obbligatoria per la categoria `ARCHIVIO`, dalla 0.33.0** (deciso da Francesco il 15/09/2026): quelle foto vanno sul server nella **cartella della fase** (§6), e una foto senza fase non saprebbe dove andare. Facoltativa per l'`AVANZAMENTO`, che resta in raccolta e non si smista, e nel modulo Bolle.
+**Obbligatoria su OGNI invio del modulo Foto, dalla 0.37.0.** Era stata ristretta all'`ARCHIVIO` il 15/09/2026, quando l'`AVANZAMENTO` esisteva ancora e restava in raccolta senza smistarsi; tolta la categoria, tolta anche l'eccezione — tutto va in archivio, quindi tutto ha bisogno di una cartella. Invia resta spento e l'avviso nella barra dice *«Scegli la fase per inviare. Sul server le foto si ordinano per fase»*; l'app lo dice già sotto il campo, prima di scattare.
 
-Regola esatta, perché un invio può contenere foto accodate con categorie diverse: **se fra le foto in attesa ce n'è almeno una `ARCHIVIO`, la fase serve** — vale per tutte le foto di quell'invio. Invia resta spento e l'avviso nella barra dice *«Scegli la fase per inviare. Le foto da archiviare si ordinano per fase sul server»*; scegliendo `ARCHIVIO` l'app lo dice già sotto il campo, prima di scattare.
+**Nel modulo Bolle resta facoltativa:** le bolle in archivio non ci vanno, e meglio una bolla senza fase che una bolla ferma perché l'operatore non sa quale.
 
-Il campo arriva **vuoto** quando la fase non è stata indicata (avanzamento, o bolle) e per le foto accodate prima della 0.31.0. **Dalla 0.33.0 nessuna foto `ARCHIVIO` può più partire senza fase:** è la garanzia su cui si regge lo smistamento per cartella del runbook. È la **fase di lavoro** a cui la foto si attribuisce: il gruppo divide il lavoro in fasi → attività → lavorazioni, e si sceglie il livello delle fasi perché è quello che chi è in cantiere sa dire sul momento, senza guardare il cronoprogramma.
+Per una foto generica, che non appartiene a una lavorazione precisa, il percorso veloce è la fase **`Cantiere`**: è nell'elenco, non pretende livelli, e costa un tocco.
+
+Il campo arriva **vuoto** solo per le bolle e per le foto accodate prima della 0.31.0. **Dalla 0.33.0 nessuna foto `ARCHIVIO` può più partire senza fase:** è la garanzia su cui si regge lo smistamento per cartella del runbook. È la **fase di lavoro** a cui la foto si attribuisce: il gruppo divide il lavoro in fasi → attività → lavorazioni, e si sceglie il livello delle fasi perché è quello che chi è in cantiere sa dire sul momento, senza guardare il cronoprogramma.
 
 **Elenco chiuso**, lo stesso per Bolle e Foto, nella shell (`core/fasi.js`), dato da Francesco il 14/09/2026, in ordine alfabetico. **Non si scrive a mano**: «Murature», «murature» e «Muratura» in colonna sarebbero tre fasi.
 
@@ -241,7 +240,7 @@ Il campo arriva **vuoto** quando la fase non è stata indicata (avanzamento, o b
 
 **Nell'app** è un menù a tendina accanto al cantiere, **facoltativo**: la prima voce è «— nessuna fase —», sempre selezionabile, e con quella si invia lo stesso. L'ultima scelta si ripropone al prossimo invio, «nessuna» compresa, come il cantiere: non aggiunge tocchi al giro. Vale per tutte le foto di uno stesso invio, come commessa e nota.
 
-**Lato raccolta serve la colonna `Fase`** (riga di testo singola), mappata sul campo omonimo. Finché non c'è, il flow ignora il campo e le foto atterrano lo stesso: il rilascio è indipendente. Vuota = fase non indicata (solo `AVANZAMENTO`, dalla 0.33.0), oppure foto di una versione precedente alla 0.31.0.
+**Lato raccolta serve la colonna `Fase`** (riga di testo singola), mappata sul campo omonimo. Finché non c'è, il flow ignora il campo e le foto atterrano lo stesso: il rilascio è indipendente. Dalla 0.37.0 una foto in arrivo dall'app **non ha mai la fase vuota**: se la colonna risulta vuota, o è una foto di una versione precedente, o la colonna non è mappata.
 
 ### 4.5 I livelli dell'archivio: `piano`, `unita`, `prospetto`
 
@@ -325,7 +324,7 @@ Se il `PUT` cross-origin non fosse accettato, la strada resta la stessa e cambia
 
 Flow e raccolta sono **nuovi e dedicati**, non quelli delle bolle: così una modifica al flow delle foto non può rompere la catena delle bolle, già in esercizio.
 
-**Raccolta `FotoCantiere`** sul sito Cantieri LL, 12 colonne, versioni limitate a 3, tre viste ad ambito ricorsivo (`Ultime foto`, `Archivio da scaricare`, `Avanzamento`):
+**Raccolta `FotoCantiere`** sul sito Cantieri LL, 12 colonne, versioni limitate a 3, tre viste ad ambito ricorsivo (`Ultime foto`, `Archivio da scaricare`, `Avanzamento`). ⚠️ Dalla 0.37.0 la vista **`Avanzamento` non riceverà più niente di nuovo**: l'app non manda più quel tipo. Tenerla o toglierla è una decisione del ricevente — quello che conta è che nessuno la legga come «niente da archiviare oggi».
 
 | Colonna | Tipo | Origine nel payload |
 |---|---|---|
@@ -386,8 +385,8 @@ Provato in locale con i collaudi automatici del repo (`node collaudi/esegui.js`,
 
 | Caso | Atteso | Esito |
 |---|---|---|
-| EXIF `2026:09:14 08:31:39` con `OffsetTimeOriginal +02:00`, categoria `ARCHIVIO` | `dataScatto` = `2026-09-14T08:31:39+02:00`, `scattoStimato` `NO` | ✓ |
-| EXIF `2026:01:15 09:00:00` senza fuso, ordine byte `MM`, categoria `AVANZAMENTO` | `2026-01-15T09:00:00+01:00` (fuso del **giorno dello scatto**), `NO` | ✓ |
+| EXIF `2026:09:14 08:31:39` con `OffsetTimeOriginal +02:00` | `dataScatto` = `2026-09-14T08:31:39+02:00`, `scattoStimato` `NO` | ✓ |
+| EXIF `2026:01:15 09:00:00` senza fuso, ordine byte `MM` | `2026-01-15T09:00:00+01:00` (fuso del **giorno dello scatto**), `NO` | ✓ |
 | La stessa foto, byte effettivamente inviati | **senza EXIF** (ricompressa) e ora **comunque corretta**: la lettura avviene prima | ✓ |
 | Foto senza EXIF | ora di accodamento, `scattoStimato` `SI` | ✓ |
 | EXIF `1970:01:01 00:00:00` | ora di accodamento, `SI` | ✓ |
@@ -426,6 +425,29 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.0 — via la categoria
+
+**Niente da fare a valle.** Il contratto non cambia: nessun campo rinominato, nessuno tolto, nessuna colonna nuova. Cambia soltanto il VALORE di `tipo`, che da oggi è sempre `ARCHIVIO`.
+
+Tre cose che il ricevente deve sapere, e nessuna è un intervento:
+
+1. **La vista `Avanzamento` non riceverà più niente di nuovo.** Non è un guasto. Tenerla o toglierla è una scelta del ricevente; l'importante è che nessuno la legga come «oggi non è arrivato niente».
+2. **Il filtro `Tipo = ARCHIVIO` dello script archiviatore va lasciato dov'è.** Sembra ridondante ora che arriva solo quello, e toglierlo farebbe sparire la protezione contro gli elementi vecchi — oltre a togliere il motivo per cui l'app continua a mandare quel campo.
+3. **Un telefono non ancora aggiornato continua a mandare `AVANZAMENTO`,** e deve poterlo fare senza errori: la 0.36.1 resterà in giro finché tutti non riaprono l'app.
+
+Provato in locale coi collaudi automatici (16 verdi):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Menù della categoria | non esiste più nel DOM | ✓ |
+| `tipo` nel payload | `ARCHIVIO` su ogni invio | ✓ |
+| Byte inviati | identici al file originale, nessuna ricompressione | ✓ |
+| Fase | obbligatoria su ogni invio; rimettendo «nessuna fase» l'invio si blocca | ✓ |
+| Foto con fase `Cantiere` | parte senza chiedere livelli | ✓ |
+| `sw.js` e `core/versione.js` | stesso numero, `0.37.0` | ✓ |
+
+**Cosa questo NON dimostra:** che il numero sia arrivato **sul sito pubblicato**. I collaudi girano su un server locale che serve il repo, e fra «unito su main» e «in linea» ci sono una build di Pages e qualche minuto. Da qui si chiude con `node collaudi/pubblicato.js`, che legge `sw.js` e `core/versione.js` **dal sito** e li confronta fra loro e col repo.
 
 **Quando si aggiungerà il caricamento a blocchi** (§4-bis), lo stesso flow si articola su tre rami, uno `Switch` sul campo `azione` subito dopo il controllo del token:
 
@@ -468,7 +490,7 @@ Quello che vale la pena dire qui, perché riguarda il contratto e non il server:
   **Dove il livello c'è, SOSTITUISCE la cartella del mese**: non si annida sotto. I codici sono quelli in colonna, **senza spazi e identici**: niente conversioni, né sui codici di fase (§4.4) né su quelli dei livelli (§4.5) — `1.01` resta `1.01`, punto compreso. Una foto `ARCHIVIO` di una commessa **senza anagrafica** (§4.5) arriva coi tre livelli vuoti: finisce nella cartella del mese, e **va segnalata come anomalia** invece di essere indovinata. Le decisioni ancora aperte — quante sottocartelle creare e quando, il nome esatto delle cartelle, dove finiscono le foto già scaricate e i video — sono in capo a Francesco e vanno chiuse **prima** di creare qualunque cartella;
 - le sottocartelle si calcolano su **`DataScatto`, non sulla data di scarico**. Una foto di fine settembre scaricata a ottobre appartiene a settembre: altrimenti le cartelle sul server smettono di corrispondere a quelle in SharePoint, e la quadratura del mese non funziona più. **Dalla 0.29.0 quel criterio è finalmente affidabile:** fino alla 0.28.0 `DataScatto` era l'ora dell'invio (§4.1), quindi una foto fatta il 30 e mandata il 1º finiva nel mese sbagliato — sia nelle cartelle del flow sia in quelle del runbook. Le foto entrate in raccolta **prima** della 0.29.0 restano archiviate con la data dell'invio: non si correggono a posteriori, ma vale la pena saperlo quando una foto sembra nel mese sbagliato;
 - i **video** vanno in una sottocartella a parte, per non appesantire la cartella delle foto e i backup;
-- si scarica **solo `ARCHIVIO`**. L'avanzamento serve a capirsi sul momento, non ha valore documentale e resta in raccolta.
+- si scarica **solo `ARCHIVIO`** — che dalla 0.37.0 è tutto quello che arriva dall'app. Il filtro **resta**: continua a proteggere dagli elementi vecchi, e la sua esistenza è il motivo per cui il campo `tipo` non è stato tolto dal contratto (§4).
 
 ### Il marcatore dello scarico: `DataScarico`, e nient'altro
 
@@ -485,7 +507,7 @@ Tre motivi:
 ### Cosa resta aperto
 
 - **Quando si potano le foto dalla raccolta.** Oggi non si cancella niente: la raccolta è la copia di riferimento. Quando lo spazio diventerà un problema servirà una regola esplicita (per esempio: si cancellano le foto con `DataScarico` più vecchia di N mesi, mai quelle senza). Non è urgente, ma non è improvvisabile.
-- **Le foto di `AVANZAMENTO`** restano in raccolta per sempre e nessuno le pota: vale lo stesso ragionamento.
+- **Le foto di `AVANZAMENTO`** già in raccolta restano lì per sempre e nessuno le pota: vale lo stesso ragionamento. Dalla 0.37.0 non ne arrivano di nuove, quindi quell'insieme è chiuso e non cresce più.
 
 ## 7. Scelte di costruzione, e perché
 

@@ -87,7 +87,6 @@ module.exports = {
     registro.titolo('Nel payload arriva il codice, non l’etichetta');
     // La prova sul caso che può fallire: una commessa NUOVA, e col punto nel
     // codice, che è la forma più facile da rompere lungo la strada.
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
     await pagina.selectOption('#commessa', 'BRU');
     // BRU è un'urbanizzazione: dalla 0.36.0 al posto delle fasi mostra i
     // LOTTI, e il lotto viaggia nello stesso campo `fase`.

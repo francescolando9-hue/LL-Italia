@@ -51,7 +51,6 @@ module.exports = {
     // Un invio completo dal modulo Foto: categoria, commessa, fase, livelli.
     const mandaFoto = async (commessa, fase, livelli = {}) => {
       const prima = flow.stato.ricevuti.length;
-      await pagina.selectOption('#categoria', 'ARCHIVIO');
       await pagina.selectOption('#commessa', commessa);
       await pagina.selectOption('#fase', fase);
       for (const [campo, valore] of Object.entries(livelli)) {
@@ -73,7 +72,6 @@ module.exports = {
     // La categoria si sceglie una volta e resta: senza, l'app rifiuta i file
     // prima di guardare i livelli, perché è la categoria a decidere come
     // l'immagine viene preparata.
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
 
     // Scegliere la FASE e aspettare che i menù dei livelli si siano rifatti:
     // il marcatore `data-livelli` dice per quale coppia commessa/fase sono

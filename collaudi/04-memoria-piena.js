@@ -35,8 +35,7 @@ module.exports = {
 
     registro.titolo('Modulo Foto');
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
-    await pagina.selectOption('#categoria', 'ARCHIVIO');
+    await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'MAR');
     await pagina.setInputFiles('#input-galleria', [pesante]);
     await attendiEsito('.foto-anteprima');
@@ -82,8 +81,7 @@ module.exports = {
     registro.titolo('Tolta la restrizione');
     await cdp.send('Storage.overrideQuotaForOrigin', { origin: app.indirizzo });
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
-    await pagina.selectOption('#categoria', 'AVANZAMENTO');
+    await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'MAR');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     const rientrata = await aiuto.attendi(pagina,

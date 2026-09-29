@@ -3,6 +3,7 @@
 // foto, che il flow può usare per la deduplica.
 import * as coda from './coda.js';
 import { impostazioniFoto, normalizzaEndpoint } from './impostazioni.js';
+import { TIPO_ARCHIVIO } from './categorie.js';
 import { versioneApp } from '../../core/versione.js';
 import { spiegazioneStato } from '../../core/errori.js';
 import { idDispositivo } from '../../core/dispositivo.js';
@@ -56,7 +57,16 @@ export function metadati(record, impostazioni, dispositivo = '', versione = '') 
 export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = '', versione = '') {
   return {
     token: impostazioni.token,
-    tipo: record.tipo,
+    // **Mai vuoto.** Dalla 0.37.0 la categoria non si sceglie più e vale
+    // sempre `ARCHIVIO`, ma il campo resta nel contratto perché a valle ci
+    // stanno appese due cose: il flow compone il NOME DEL FILE da qui, e lo
+    // script archiviatore prende solo gli elementi con `Tipo = ARCHIVIO`. Un
+    // invio con `tipo` vuoto atterrerebbe in raccolta e ci resterebbe per
+    // sempre — nessun errore, nessun avviso, e nessuno che se ne accorga
+    // finché non si cerca una foto che si credeva archiviata. Il ripiego
+    // serve ai record accodati da una versione precedente che per qualunque
+    // motivo non avessero il campo.
+    tipo: record.tipo || TIPO_ARCHIVIO,
     commessa: record.commessa,
     // Fase di lavoro, dall'elenco chiuso della shell (core/fasi.js). Vuota
     // solo per le foto accodate prima della 0.31.0. Per un'urbanizzazione qui

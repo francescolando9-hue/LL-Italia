@@ -26,8 +26,7 @@ module.exports = {
 
     flow.stato.stato = 500;   // il flow rifiuta: le foto restano bloccate
     await pagina.goto(app.indirizzo + '/index.html#/foto');
-    await pagina.waitForSelector('#categoria');
-    await pagina.selectOption('#categoria', 'AVANZAMENTO');
+    await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'MAR');
     // Due foto CON l'ora dello scatto: dalla 0.36.0 le copie senza EXIF
     // vengono fermate con un avviso e non entrano in coda.
