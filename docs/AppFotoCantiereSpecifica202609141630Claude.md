@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 15 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 16 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 16 — il telefono che non lascia leggere una foto (0.37.4).** Due foto valide rifiutate a mezzogiorno e partite la sera senza toccarle: a fallire era la **lettura** del file, non il file. Tre correzioni in §4.1 — **una lettura sola, subito** (i byte si leggono una volta e quella copia serve per tutto il resto), **quattro tentativi** a 0,5/1,5/3 s, e l'avviso che **segue il caso**: «il telefono non ha lasciato leggere questa foto», con «Riprova» e **senza** «Aggiungi comunque». Da qui una regola generale: **la frase in testa è quella del caso**, e i file messi da parte si raggruppano per quello che l'operatore deve fare. In §4.1 anche il ripiego di «Scatta» sulla fotocamera di sistema, che spiega un file in raccolta senza firma del canvas. Il contratto **non cambia**.
 >
 > **Rev. 15 — un JPEG si riconosce dai byte (0.37.3).** `preparaImmagine` decideva «già JPEG» dal `type` del file, la lettura dell'ora dai byte: due fonti, due risposte diverse sullo stesso file. Un JPEG con `type` `''` o `application/octet-stream` — su Android succede — veniva **ricodificato in silenzio**, e in archivio finivano byte diversi dall'originale senza nessun errore. Ora la firma `FF D8 FF` sta in un posto solo e la chiedono lì tutti e due (§3). Conseguenza dichiarata: per le foto il `mimeType` del payload è sempre `image/jpeg` e non si prende più dal `type`. Nel §3 anche **come si riconosce, dai byte, da dove arriva un JPEG in raccolta**.
 >
@@ -168,6 +170,8 @@ Perché è grave: per l'archivio di commessa **l'ora dello scatto è il dato**, 
 | **Scelta dalla galleria** — e l'EXIF manca, o la data è assurda | **la foto NON entra in coda:** l'app avvisa e chiede (vedi sotto). Mandata comunque: la data del file se plausibile, altrimenti l'ora dell'invio | `SI` |
 | **Video** | l'ora di accodamento — punto aperto, vedi sotto | `SI` |
 
+⚠️ **«Scatta» può diventare la fotocamera di sistema, e allora la foto arriva dalla seconda riga della tabella, non dalla prima.** Succede in due casi: se il telefono non consente la fotocamera dentro l'app (`getUserMedia` assente o contesto non sicuro) il pulsante «Scatta» è direttamente l'`input capture` di sistema; e se l'apertura della fotocamera interna **fallisce** — permesso negato, nessuna fotocamera, fotocamera occupata da un'altra app — l'app dice cosa è andato storto e apre la fotocamera di sistema al suo posto, invece di lasciare l'operatore senza modo di scattare. In quel caso il file **non** ha la firma del canvas (§3): porta l'EXIF della fotocamera del telefono, i byte originali, e `scattoStimato` `NO` anche quando `DateTimeOriginal` manca, perché lo scatto è di un istante prima. È il ripiego giusto, ma va saputo quando si guarda un file in raccolta e si cerca di capire da dove arriva.
+
 #### Le copie ridotte, e perché si fermano (dalla 0.36.0)
 
 **Il caso, misurato il 17/09/2026.** Cinque foto scelte dalla galleria erano **copie ridotte** — Google Foto dopo «Libera spazio», oppure WhatsApp — con lato lungo 1600 px e **nessun EXIF**. L'app ha stimato `dataScatto` = ora dell'invio, e in archivio sono finite con un'ora falsa nel nome. Se scatto e invio cadono in due mesi diversi, la foto finisce **nel mese sbagliato** e non se ne accorge nessuno: la stima è plausibile, e lo `scattoStimato` = `SI` lo dice a chi va a guardare — cioè a nessuno, prima che sia tardi.
@@ -193,6 +197,22 @@ Quell'ultima riga è la differenza fra uno screenshot da interpretare e uno scre
 **«Non è un JPEG» è un caso a sé dalla 0.37.2** (prima ricadeva in «nessun blocco EXIF»). Dire *«nel file non ci sono i dati della fotocamera»* a chi ha mandato un HEIC è falso: i dati ci sono, è l'app che da quel contenitore non li legge («Cosa NON si legge», qui sotto). La riga lo dice — `non è un JPEG · primi byte 89 50` — e chi legge sa che la via d'uscita non è «cerca l'originale» ma «questo formato l'app non lo sa leggere».
 
 **Il motivo non viaggia nel payload** e non compare in raccolta: sta a video e basta, perché serve a decidere sul momento e a diagnosticare da uno screenshot. Il contratto non cambia.
+
+#### Il telefono che non lascia leggere una foto (dalla 0.37.4)
+
+**Il caso, misurato il 30/09/2026.** Sul Galaxy S21+ di Paolo due foto scattate alle 11:26 **con la fotocamera del telefono** sono state rifiutate dall'app alle 11:31, e le stesse due foto sono partite senza un intoppo alle 19:25, con l'EXIF completo, `ScattoStimato` `NO` e i byte originali. Il file è sempre stato a posto: a fallire era la **lettura**. La riga di diagnosi della 0.37.2 è quella che ha chiuso la domanda in un colpo — `NotReadableError · The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired` — e alle 19:20, sullo stesso file, la stessa causa era uscita come *«Formato immagine non supportato da questo dispositivo»*: stessa causa, un'altra frase, e l'operatore mandato a cercare un originale che aveva già in mano.
+
+**Perché succede.** Su Android il `File` che arriva dal selettore non è un file su disco: è un riferimento a un contenuto (`content://`) tenuto in vita da un'altra applicazione. Quel riferimento può decadere, e decade **fra una lettura e l'altra**. Fino alla 0.37.3 lo stesso `File` veniva riletto da capo quattro o cinque volte in momenti diversi — l'EXIF, la firma, la preparazione, l'anteprima, la copia in IndexedDB — e bastava che una di quelle letture cadesse nel momento sbagliato.
+
+**Tre correzioni, e servono tutte e tre.**
+
+1. **Una lettura sola, subito.** Appena una foto viene scelta se ne leggono i byte (`arrayBuffer`) e quella copia serve per tutto il resto: EXIF, firma, preparazione, anteprima, invio. Un `Blob` costruito su un `ArrayBuffer` sta nella memoria del browser e non dipende più da nessun'altra applicazione, quindi le letture successive non possono fallire. Il **video non passa da qui**: si legge a blocchi al momento dell'invio, perché tenere in memoria un filmato da 200 MB è il modo di far chiudere la pagina al sistema.
+2. **Ritentare.** Quattro tentativi in tutto, a `0,5 s`, `1,5 s` e `3 s` dal primo. Il riferimento decaduto a volte torna leggibile dopo poco, ed è quello che il caso di Paolo dimostra: a mezzogiorno no, la sera sì. Le attese si possono accorciare da `localStorage` (`llitalia.atteseRilettura`, millisecondi separati da virgola): serve al supporto e ai collaudi.
+3. **L'avviso segue il caso.** Se dopo i tentativi la foto non si legge: *«Il telefono non ha lasciato leggere questa foto all'app. La foto è a posto: riprova a sceglierla, oppure usa Scatta»*, con il pulsante **«Riprova»** e **senza «Aggiungi comunque»** — che la manderebbe con un'ora stimata mentre quella vera sta dentro il file, a due tentativi di distanza. «Riprova» ripassa dalla stessa strada con la provenienza di prima: se stavolta la lettura riesce, la foto entra in coda con la sua ora vera, misurata.
+
+**La frase in testa è quella del caso, non una comune a tutti.** Dalla 0.37.4 i file messi da parte si raggruppano per **quello che l'operatore deve fare**, e ogni gruppo ha il suo riquadro con la sua frase: lettura negata, copia ridotta senza dati della fotocamera, file che non è un JPEG, dati della fotocamera senza l'ora, orologio del telefono mai impostato. La riga di diagnosi resta una per file. Con un caso solo — che è quasi sempre — il riquadro è quello di prima; con più casi i pulsanti comuni stanno in fondo all'ultimo riquadro mandabile, e non si ripetono. Il motivo della correzione: il 30/09 la frase *«non hanno la data di scatto, quasi certamente copie ridotte, cerca gli originali»* è comparsa sopra una foto che la data ce l'aveva.
+
+**Il contratto non cambia in niente.** Una foto letta al secondo tentativo è una foto come tutte le altre, e una foto che non si è letta non parte affatto.
 
 **La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la conversione HEIC/PNG → JPEG passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo su quei formati — cioè proprio sugli iPhone, che è il modo più efficace di non accorgersene. Fino alla 0.36.1 il canvas serviva anche alla compressione dell'`AVANZAMENTO`, e la cosa era più facile da provare (§3).
 
@@ -497,6 +517,29 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.4 — la lettura negata dal telefono
+
+**Niente da fare a valle** e contratto invariato: una foto letta al secondo tentativo è una foto come tutte le altre, e una foto che non si è letta non parte affatto.
+
+Due cose che il ricevente può notare, e nessuna è un intervento:
+
+1. **Possono arrivare foto vecchie di qualche ora o di qualche giorno**, con `DataScatto` corretta e `ScattoStimato` `NO`: sono quelle che un telefono aveva rifiutato e che ora, al secondo tentativo o con «Riprova», partono. Non è un ritardo della coda.
+2. **Le foto rifiutate per lettura non arrivano più con un'ora stimata**, perché non arrivano affatto finché non si leggono. Prima potevano atterrare con la data del file: era il male minore di un avviso che diceva la cosa sbagliata.
+
+Previsione scritta prima di provare, e confermata (collaudo `19-lettura-negata.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Prima lettura negata, seconda riuscita | la foto entra in coda e parte, senza nessun avviso | ✓ 4 letture chieste al browser |
+| … byte e data di quella foto | byte identici per impronta, data dall'EXIF, `NO` | ✓ `56a73bb3…`, `2026-09-14T08:31:39+02:00` |
+| Lettura sempre negata | niente in coda, e in testa la frase di QUESTO caso | ✓ *«Il telefono non ha lasciato leggere questa foto all'app»* |
+| … la vecchia frase | **non** deve comparire: né «non ha la data di scatto», né «copia ridotta», né «cerca l'originale» | ✓ |
+| … i pulsanti | «Riprova» presente, «Aggiungi comunque» assente | ✓ |
+| … la riga di diagnosi | nome, peso, tipo, quanti tentativi e in quanto tempo, e la frase del browser | ✓ `4 letture tentate in 0.1 s · NotReadableError: The requested file could not be read…` |
+| «Riprova» quando il telefono torna a collaborare | la foto entra in coda con l'ora vera e i byte originali | ✓ |
+
+**Cosa questo NON dimostra:** il telefono di Paolo. Il guasto qui è **iniettato** — `Blob.prototype.arrayBuffer` sostituito con una versione che rifiuta le prime N letture col `DOMException` vero — perché un file su disco, in un container, si legge sempre. Che sul Galaxy S21+ la prima correzione (una lettura sola) basti da sola non si può sapere da qui: la prova è che quelle foto entrino in coda al primo colpo.
 
 ### Rilascio 0.37.3 — un JPEG si riconosce dai byte
 

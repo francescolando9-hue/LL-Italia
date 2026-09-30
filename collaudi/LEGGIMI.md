@@ -47,6 +47,7 @@ il primo è roba di npm, il secondo sono megabyte di immagini generate.
 | `16-rimanda.js` | **«Rimanda»** nei suoi due casi, foto e bolle. Senza modifiche: **stesso `idClient` e stesso progressivo**, il flow risponde `gia_presente`, l'app lo dice e il contatore delle inviate **non si gonfia** — 6 richieste, 4 file distinti, 2 `gia_presente`. Con modifiche: `idClient` e progressivo nuovi, i livelli corretti, **il piano ricalcolato** dalla nuova unità, l'ora dello scatto invariata, e per le bolle l'`idBolla` dell'originale conservato. |
 | `17-invio-interrotto.js` | Un invio interrotto **torna inviabile**. Due casi: un record lasciato su «invio» da una sessione morta — ricostruito com'era il n. 56, perché quello stato dall'interfaccia non si sa produrre — che al riavvio riparte **da solo**, col contenuto intatto e dicendolo a video; e una richiesta che **non risponde più**, che deve finire in errore invece di restare appesa, perché finché resta appesa il motore non lavora nessun altro elemento. Il tetto vero è otto minuti: il collaudo lo accorcia da `localStorage`, che è la stessa leva del supporto. |
 | `18-jpeg-dai-byte.js` | Gli **stessi byte** JPEG mandati tre volte con tre `type` diversi (`''`, `image/jpg`, `application/octet-stream`) arrivano **identici**, confrontati per impronta, e con la data dello scatto letta. È il caso che può fallire: con tre file diversi, o con un `type` giusto, funzionamento e guasto darebbero lo stesso risultato. Controlla anche l'altra metà della regola — un **PNG vero continua a convertirsi**, e quello che parte inizia per `FF D8 FF` — e la firma stessa: `FF D8` da solo non basta, PNG, HEIC e file vuoto non passano. |
+| `19-lettura-negata.js` | Il telefono che non lascia leggere una foto. Il guasto è **iniettato**: `Blob.prototype.arrayBuffer` rifiuta le prime N letture col `DOMException` vero (`NotReadableError`, col messaggio parola per parola), perché un file su disco in un container si legge sempre. Prova che con la prima lettura negata e la seconda riuscita la foto passa lo stesso, coi byte originali e la data dell'EXIF; che se non si legge mai l'avviso è quello del caso — e **non** «non ha la data di scatto», **non** «copia ridotta», **senza** «Aggiungi comunque» — con quanti tentativi sono stati fatti e in quanto tempo; e che «Riprova», quando il telefono torna a collaborare, accoda la foto con l'ora vera. |
 | `12-fase-e-barra.js` | La **fase di lavoro** si sceglie da un elenco chiuso in entrambi i moduli. Nel modulo Foto è **obbligatoria su ogni invio** (dalla 0.37.0): Invia resta spento, l'app dice perché, e rimettere il menù a «nessuna fase» non fa passare niente — la via d'uscita che c'era per l'avanzamento non esiste più. Nelle bolle si invia col campo vuoto. Scelta una volta si ripropone («nessuna» compresa), e arriva al flow con la grafia esatta. E nel modulo Bolle **Fotografa** e **Invia** stanno in una barra fissa in basso, visibili anche in fondo a una coda lunga. |
 
 ## Le trappole, già pagate
@@ -93,6 +94,10 @@ Vanno detti, altrimenti passano per garanzie che non sono:
 - **I video.** Questo Chromium non decodifica H.264: il file di prova serve solo
   al controllo del peso. Anteprima e durata di un video vero si verificano sul
   telefono.
+- **Che la lettura negata sia risolta sul telefono di Paolo.** Il guasto di
+  `19-lettura-negata.js` è iniettato, e dimostra che le tre correzioni fanno
+  quello che devono. Se sul Galaxy S21+ la prima — una lettura sola — basti da
+  sola, lo dice solo quel telefono.
 - **La conversione da HEIC.** Il Chromium dei collaudi non sa produrre un
   HEIC, quindi `18-jpeg-dai-byte.js` prova l'altra metà della regola — «quello
   che JPEG non è si converte» — su un **PNG**, che segue lo stesso ramo di
