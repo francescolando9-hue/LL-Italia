@@ -147,3 +147,24 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Perché una foto è stata messa da parte: una riga per file, con il motivo
+   esatto e i fatti che lo dimostrano. Serve all'operatore per decidere e
+   all'ufficio per diagnosticare da uno screenshot, quindi deve stare a video
+   senza tocchi in più — ma compatta, perché non è la cosa che si legge tutti
+   i giorni. */
+.foto-perche {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.foto-perche li { margin-bottom: 6px; }
+
+/* Tre livelli di lettura nella stessa riga: il nome del file in grassetto,
+   il motivo in chiaro, i fatti tecnici piu' piccoli. Dentro un .avviso tutto
+   nasce a peso 600: senza questo, la riga tecnica pesa come il motivo e lo
+   screenshot diventa un muro. */
+.foto-perche .tenue { font-weight: 400; font-size: 0.85rem; }

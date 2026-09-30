@@ -71,6 +71,7 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
   const atteso = [
     'bolla.jpg', 'bolla2.jpg', 'foto-cantiere.jpg', 'foto-pesante.jpg', 'video-finto.mp4',
     'scatto-exif.jpg', 'scatto-exif-mm.jpg', 'scatto-exif-assurda.jpg', 'copia-whatsapp.jpg',
+    'schermata.png',
   ];
   if (atteso.every(n => fs.existsSync(path.join(MATERIALE, n)))) {
     console.log('Materiale già presente in', MATERIALE);
@@ -170,6 +171,30 @@ const mb = n => `${(n / 1048576).toFixed(2)} MB`;
     const dataFile = new Date('2026-08-20T10:15:00+02:00');
     fs.utimesSync(dove, dataFile, dataFile);
     console.log('  scritto copia-whatsapp.jpg', mb(copia.length), '(senza EXIF, data del file 2026-08-20)');
+  }
+
+  // Una schermata PNG: non è un JPEG, e l'app la mette da parte per un motivo
+  // DIVERSO dalla copia di WhatsApp — quella è un JPEG senza EXIF, questa non
+  // è un JPEG affatto. Serve a provare che due cause diverse danno a video due
+  // frasi diverse: con un file solo, una frase unica per tutti i casi
+  // passerebbe il collaudo.
+  if (serve('schermata.png')) {
+    const png = Buffer.from(await pagina.evaluate(async () => {
+      const tela = document.createElement('canvas');
+      tela.width = 900; tela.height = 600;
+      const c = tela.getContext('2d');
+      c.fillStyle = '#123456'; c.fillRect(0, 0, 900, 600);
+      c.fillStyle = '#fff'; c.font = 'bold 48px sans-serif';
+      c.fillText('SCHERMATA PNG', 60, 320);
+      const b = await new Promise(r => tela.toBlob(r, 'image/png'));
+      const buf = await b.arrayBuffer();
+      let s = '';
+      const v = new Uint8Array(buf);
+      for (let i = 0; i < v.length; i += 1) s += String.fromCharCode(v[i]);
+      return btoa(s);
+    }), 'base64');
+    fs.writeFileSync(path.join(MATERIALE, 'schermata.png'), png);
+    console.log('  scritto schermata.png', mb(png.length), '(non è un JPEG: causa diversa dalla copia ridotta)');
   }
 
   // Un «video» che serve solo per il controllo del peso: l'app rifiuta i file
