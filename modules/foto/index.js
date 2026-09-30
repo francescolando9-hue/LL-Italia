@@ -12,7 +12,7 @@ import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js'
 import { naviga } from '../../core/router.js';
 import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { timestampDispositivo } from '../../core/orario.js';
-import { dataScattoDaFoto } from '../../core/exif.js';
+import { dataScattoDaFoto, spiegazioneMotivo } from '../../core/exif.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
   sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA,
@@ -278,7 +278,10 @@ async function oraDiScatto(file, provenienza) {
   if (provenienza === 'fotocamera-telefono') {
     return { dataScatto: oraDelloScatto(file), scattoStimato: 'NO' };
   }
-  return { dataScatto: '', scattoStimato: 'SI', senzaData: true, motivo: esito.motivo };
+  return {
+    dataScatto: '', scattoStimato: 'SI', senzaData: true,
+    motivo: esito.motivo, dettaglio: esito.dettaglio,
+  };
 }
 
 async function aggiungiFile(file, provenienza = 'galleria') {
@@ -317,7 +320,12 @@ async function aggiungiFile(file, provenienza = 'galleria') {
       // si chiede. Accodarla e stimare in silenzio è esattamente il difetto
       // misurato il 17/09/2026.
       if (quando.senzaData) {
-        senzaData.push(singolo);
+        // Col file si tiene il MOTIVO: sono nove casi diversi, e fino alla
+        // 0.37.1 uscivano a video con una frase sola. Su tre foto di Paolo
+        // quella frase non distingueva «non c'è nessun EXIF» da «l'EXIF c'è
+        // ma senza data» — due cause diverse, e uno screenshot che non
+        // rispondeva a nessuna delle due.
+        senzaData.push({ file: singolo, motivo: quando.motivo, dettaglio: quando.dettaglio });
         continue;
       }
       const preparata = await preparaImmagine(singolo);
@@ -358,7 +366,7 @@ async function aggiungiFile(file, provenienza = 'galleria') {
 async function accodaSenzaData() {
   const attesa = senzaData;
   senzaData = [];
-  await aggiungiFile(attesa, 'ripiego');
+  await aggiungiFile(attesa.map(voce => voce.file), 'ripiego');
 }
 
 async function invia() {
@@ -443,6 +451,17 @@ async function ridisegna() {
     avvisoSenzaData.innerHTML = '';
   } else {
     const una = senzaData.length === 1;
+    // Una riga per file: nome, peso, tipo DICHIARATO dal selettore, il motivo
+    // in italiano e quello tecnico. Sono i fatti che da uno screenshot non si
+    // indovinano, e che decidono quale delle otto cause è.
+    const perche = senzaData.map(voce => {
+      const tipo = voce.file.type || 'tipo non dichiarato';
+      return `<li><strong>${scappaHtml(voce.file.name || 'file')}</strong>
+        <span class="tenue">— ${pesoLeggibile(voce.file.size)}, ${scappaHtml(tipo)}</span><br>
+        ${scappaHtml(spiegazioneMotivo(voce.motivo))}
+        <span class="tenue">(${scappaHtml(voce.motivo || 'motivo non registrato')}${
+          voce.dettaglio ? ` · ${scappaHtml(voce.dettaglio)}` : ''})</span></li>`;
+    }).join('');
     avvisoSenzaData.innerHTML = `
       <div class="avviso avviso-attenzione">
         <p><strong>${una ? 'Questa foto non ha' : `Queste ${senzaData.length} foto non hanno`} la data di scatto.</strong>
@@ -450,6 +469,7 @@ async function ridisegna() {
         <p class="tenue">${una ? 'È' : 'Sono'} quasi certamente ${una ? 'una copia ridotta' : 'copie ridotte'}
         (Google Foto, WhatsApp). ${una ? 'Non è' : 'Non sono'} ancora in coda: se ${una ? 'la mandi' : 'le mandi'}
         comunque, in archivio ${una ? 'va' : 'vanno'} con la data del file e dichiarata stimata.</p>
+        <ul class="foto-perche">${perche}</ul>
         <div class="azioni-alternative">
           <button id="senza-data-comunque" class="btn btn-secondario btn-minore" type="button">Aggiungi comunque ${una ? 'questa foto' : `queste ${senzaData.length} foto`}</button>
           <button id="senza-data-scarta" class="btn btn-secondario btn-minore" type="button">Cerco ${una ? 'l’originale' : 'gli originali'}</button>

@@ -124,6 +124,50 @@ module.exports = {
     registro.controlla('l’avviso dice che la data di scatto manca', /data di scatto/i.test(avviso));
     registro.controlla('e indica dove sta l’originale', /Fotocamera/.test(avviso),
       'la via d’uscita giusta è l’album Fotocamera, e va detta prima dell’altra');
+    // Dalla 0.37.2 l'avviso dice QUALE dei nove casi è, e cosa ha visto nel
+    // file. Senza, tre foto con tre cause diverse danno a video la stessa
+    // frase — ed è successo: il 30/09 uno screenshot di tre foto di Paolo non
+    // rispondeva a nessuna delle domande che serviva chiudere.
+    registro.dice('riga di diagnosi', await pagina.$eval('.foto-perche', e => e.textContent.replace(/\s+/g, ' ').trim()));
+    registro.controlla('l’avviso dice il nome del file',
+      /copia-whatsapp\.jpg/.test(avviso));
+    registro.controlla('e il tipo che il selettore ha dichiarato',
+      /image\/jpeg/.test(avviso),
+      'su un file senza tipo, o con un tipo strano, è la prima cosa da sapere');
+    registro.controlla('dice il motivo in italiano',
+      /non ci sono i dati della fotocamera/i.test(avviso),
+      'nove casi interni, nove frasi diverse: una sola frase per tutti non distingue niente');
+    registro.controlla('e accanto il motivo tecnico',
+      /nessun blocco EXIF nel file/.test(avviso),
+      'è quello che fa arrivare in ufficio uno screenshot già diagnostico');
+    registro.controlla('coi segmenti JPEG che ha visto',
+      /segmenti/.test(avviso) && /SOS/.test(avviso),
+      'arrivare a SOS senza un APP1/Exif dimostra che il segmento NON c’è, e non che i 128 KiB non bastavano');
+
+    // I motivi sono stringhe scritte a mano dentro `core/exif.js`:
+    // se ne nasce un nono e nessuno scrive la frase corrispondente, a video
+    // esce la frase di ripiego — cioè di nuovo una frase sola per casi
+    // diversi, che è il difetto che questa versione corregge. Qui i motivi si
+    // LEGGONO dal sorgente e si controlla che ognuno abbia la sua.
+    const sorgente = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'core', 'exif.js'), 'utf8');
+    const motivi = [...sorgente.matchAll(/esito\(null, [`']([^`'$]*)/g)].map(m => m[1].trim());
+    registro.dice('motivi trovati in core/exif.js', `${motivi.length} — ${motivi.join(' | ')}`);
+    const frasi = await pagina.evaluate(async elenco => {
+      const m = await import('./core/exif.js');
+      return elenco.map(x => m.spiegazioneMotivo(x));
+    }, motivi);
+    const ripiego = await pagina.evaluate(async () => {
+      const m = await import('./core/exif.js');
+      return m.spiegazioneMotivo('motivo che non esiste');
+    });
+    registro.controlla('i casi sono nove', motivi.length === 9, `trovati ${motivi.length}`);
+    registro.controlla('ogni motivo ha la sua frase in italiano',
+      frasi.every(f => f && f !== ripiego),
+      `senza frase: ${motivi.filter((_, i) => !frasi[i] || frasi[i] === ripiego).join(', ') || 'nessuno'}`);
+    registro.controlla('e sono tutte diverse fra loro',
+      new Set(frasi).size === frasi.length,
+      'due casi con la stessa frase non si distinguono da uno screenshot');
     registro.controlla('la foto NON è ancora in coda',
       (await pagina.$$('.foto-anteprima')).length === 0,
       'accodarla in silenzio, stimando, è esattamente il difetto del 17/09');
@@ -178,6 +222,31 @@ module.exports = {
       Math.abs(new Date(interna.dataScatto).getTime() - istante) < 120000,
       'il fotogramma esce da un canvas e di EXIF non ne ha: l’ora si sa perché è adesso');
     registro.controlla('ed è misurata, non stimata', interna.scattoStimato === 'NO', interna.scattoStimato);
+
+    registro.titolo('Due file, due cause: due frasi diverse');
+    // È il caso vero del 30/09/2026: tre foto messe da parte insieme, una
+    // frase sola per tutte, e dallo screenshot non si capiva quale delle cause
+    // fosse. Qui si mandano DUE file di due cause diverse — un JPEG senza EXIF
+    // e un PNG, che JPEG non è — e si controlla che a video le due righe
+    // dicano cose diverse. Con un file solo questa prova non proverebbe
+    // niente: una frase unica per tutti i casi la passerebbe.
+    await scegli();
+    await pagina.setInputFiles('#input-galleria',
+      [materiale('copia-whatsapp.jpg'), materiale('schermata.png')]);
+    await pagina.waitForSelector('#senza-data-comunque', { timeout: 60000 });
+    const righe = await pagina.$$eval('.foto-perche li',
+      e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+    righe.forEach(r => registro.dice('riga', r));
+    registro.controlla('una riga per file', righe.length === 2, `righe: ${righe.length}`);
+    registro.controlla('il JPEG senza EXIF dice che i dati della fotocamera non ci sono',
+      righe.some(r => /copia-whatsapp/.test(r) && /non ci sono i dati della fotocamera/.test(r)));
+    registro.controlla('il PNG dice invece che il formato non è JPEG',
+      righe.some(r => /schermata\.png/.test(r) && /non è una foto JPEG/.test(r)),
+      'a chi manda un HEIC dire «non ci sono i dati della fotocamera» è falso: ci sono, è l’app che non li legge');
+    registro.controlla('e le due righe non dicono la stessa cosa',
+      righe.length === 2 && righe[0] !== righe[1]);
+    // Si scartano: questo blocco prova l'avviso, non l'invio.
+    await pagina.click('#senza-data-scarta');
 
     registro.titolo('Il campo viaggia sempre, in una forma sola');
     const tutte = flow.stato.ricevuti;

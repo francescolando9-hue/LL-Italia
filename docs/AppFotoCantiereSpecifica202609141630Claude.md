@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 13 del 29/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 14 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 14 — la diagnosi a video (0.37.2).** Quando una foto si ferma perché non ha la data di scatto, l'avviso dice adesso **per ogni file quale dei nove casi è**, in italiano, e accanto i fatti misurati: se è un JPEG, quanti byte si sono letti, quali segmenti si sono visti (§4.1). Motivo: il 30/09 uno screenshot di tre foto messe da parte insieme non distingueva «non c'è nessun EXIF» da «l'EXIF c'è ma senza data» — due cause con due correzioni diverse, e una frase sola per tutte. **«Non è un JPEG» diventa un caso a sé** (prima ricadeva in «nessun blocco EXIF»): a chi manda un HEIC dire che nel file non ci sono i dati della fotocamera è falso. Il contratto **non cambia**: il motivo sta a video, nel payload non entra.
 >
 > **Rev. 13 — quattro punti CHIUSI e un difetto corretto (0.37.1).** I quattro «resta aperto» che questo documento si trascinava dietro sono chiusi con riscontri sul campo, e stanno in §0: vanno letti prima di riaprirli. Il difetto: un invio interrotto restava su «Invio in corso» per sempre — sette giorni sul telefono di Francesco, mai arrivato, segnalato ogni giorno come buco di continuità. Corretto in §4-ter. **Rettifica del 18/09:** il «rilascio che non arriva ai telefoni» non è mai stato osservato — la lettura che lo faceva credere era una copia servita dalla cache, non il contenuto del commit. Nel repo le due costanti di versione erano allineate e il collaudo che le confronta esisteva già. Da allora un riscontro del pubblicato si fa scavalcando la cache (`collaudi/pubblicato.js` lo fa con `no-store`), e una differenza si attribuisce a un commit solo leggendo il commit.
 >
@@ -158,9 +160,23 @@ Se si manda comunque: **`dataScatto` = data del file** (`lastModified`) quando �
 
 Una data EXIF **assurda** (l'orologio mai impostato: `1970`, `2001`, `2008`) vale come assente e segue la stessa strada. Il tag c'è, il valore no.
 
+**Dalla 0.37.2 l'avviso dice, per ogni file, PERCHÉ si è fermato.** Fino alla 0.37.1 i nove casi interni di `core/exif.js` uscivano a video con una frase sola — *«probabilmente è una copia ridotta»* — e il 30/09/2026 uno screenshot di tre foto messe da parte insieme non rispondeva a nessuna delle domande che serviva chiudere: non si distingueva «non c'è nessun EXIF» da «l'EXIF c'è ma senza la data» da «non è nemmeno un JPEG». Tre cause diverse, tre cose diverse da fare.
+
+Adesso sotto l'avviso c'è **una riga per file**, con tre livelli di lettura:
+
+- il **nome del file**, il **peso** e il **tipo dichiarato dal selettore** (`image/jpeg`, `image/png`, o «tipo non dichiarato»);
+- il **motivo in italiano**, per chi deve decidere cosa fare (*«nel file non ci sono i dati della fotocamera»*, *«i dati della fotocamera ci sono, ma senza l'ora dello scatto»*, *«il file non è una foto JPEG»*, *«l'orologio del telefono non era impostato»*, …);
+- fra parentesi, il **motivo tecnico e i fatti misurati**: se è un JPEG, **quanti byte** si sono letti e **quali segmenti** si sono visti prima di arrendersi — per esempio `nessun blocco EXIF nel file · JPEG sì · letti 128 KiB · segmenti APP0(16) APP2(472) DQT(67) SOF(17) DHT(28) SOS`.
+
+Quell'ultima riga è la differenza fra uno screenshot da interpretare e uno screenshot che risponde: **arrivare a `SOS` senza aver incontrato un `APP1/Exif` dimostra che il segmento NON c'è**, e non che i 128 KiB letti non bastavano — che è esattamente l'alternativa che non si poteva escludere il 30/09.
+
+**«Non è un JPEG» è un caso a sé dalla 0.37.2** (prima ricadeva in «nessun blocco EXIF»). Dire *«nel file non ci sono i dati della fotocamera»* a chi ha mandato un HEIC è falso: i dati ci sono, è l'app che da quel contenitore non li legge («Cosa NON si legge», qui sotto). La riga lo dice — `non è un JPEG · primi byte 89 50` — e chi legge sa che la via d'uscita non è «cerca l'originale» ma «questo formato l'app non lo sa leggere».
+
+**Il motivo non viaggia nel payload** e non compare in raccolta: sta a video e basta, perché serve a decidere sul momento e a diagnosticare da uno screenshot. Il contratto non cambia.
+
 **La lettura avviene PRIMA di qualunque ricodifica.** Non è un dettaglio di ordine: la conversione HEIC/PNG → JPEG passa per un canvas, e dal canvas l'EXIF non esce. Leggerlo dopo vorrebbe dire non leggerlo su quei formati — cioè proprio sugli iPhone, che è il modo più efficace di non accorgersene. Fino alla 0.36.1 il canvas serviva anche alla compressione dell'`AVANZAMENTO`, e la cosa era più facile da provare (§3).
 
-**Niente libreria EXIF**: lo stack è vincolato e qui non serve. Si leggono i primi 128 KB del file e si scandiscono i marcatori JPEG fino all'APP1 (`core/exif.js`, ~150 righe). Il contenuto della foto non viene toccato.
+**Niente libreria EXIF**: lo stack è vincolato e qui non serve. Si leggono i primi 128 KB del file e si scandiscono i marcatori JPEG fino all'APP1 (`core/exif.js`, ~300 righe). Il contenuto della foto non viene toccato.
 
 #### Il fuso
 
@@ -459,6 +475,24 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.2 — la diagnosi a video
+
+**Niente da fare a valle**, e niente che cambi nel contratto: il motivo per cui una foto si è fermata resta **sul telefono**, sotto l'avviso. In raccolta non arriva niente di nuovo e niente di diverso.
+
+A cosa serve al ricevente: quando dal cantiere arriva lo screenshot di una foto che non parte, adesso quello screenshot **contiene già la risposta** — non serve chiedere il file originale per sapere se l'EXIF manca, se c'è ma senza la data, o se il file non è un JPEG.
+
+Previsione scritta prima di provare, e confermata (collaudo `10-ora-scatto.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Copia senza EXIF | riga col nome, il peso, `image/jpeg`, il motivo in italiano e i segmenti visti | ✓ `nessun blocco EXIF nel file · JPEG sì · letti 128 KiB · segmenti APP0(16) … SOS` |
+| PNG (non è un JPEG) | motivo **diverso** da quello della copia senza EXIF | ✓ *«il file non è una foto JPEG…»* · `primi byte 89 50` |
+| Due file, due cause | due righe, e non la stessa frase due volte | ✓ |
+| I nove motivi di `core/exif.js` | ognuno la sua frase, tutte diverse | ✓ (i motivi si leggono dal sorgente, non si elencano a mano) |
+| Contratto | nessun campo nuovo, nessun valore cambiato | ✓ |
+
+**Cosa questo NON dimostra:** il caso di Paolo. Quelle tre foto stanno sul suo telefono, e la prova è che rifacendo lo stesso invio con la 0.37.2 la riga dica quale delle cause è — una risposta sola, senza leggere i byte del file.
 
 ### Rilascio 0.37.1 — invii interrotti
 

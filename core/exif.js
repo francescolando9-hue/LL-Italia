@@ -52,28 +52,82 @@ const TAG_PUNTATORE_EXIF = 0x8769;
 const ANNO_MINIMO = 2010;
 const TOLLERANZA_FUTURO = 24 * 60 * 60 * 1000;
 
-// Risultato: `{ dataScatto, pezzi, offsetMinuti }` se l'ora dello scatto è
-// stata letta davvero; `null` in ogni altro caso — chi chiama ripiega, e lo
-// dichiara. `motivo` dice perché, e serve alle diagnosi, non all'operatore.
+// Risultato: `{ dataScatto, conOffsetProprio }` se l'ora dello scatto è stata
+// letta davvero; `dataScatto: ''` in ogni altro caso — chi chiama ripiega, e lo
+// dichiara.
+//
+// `motivo` dice QUALE dei nove casi è, e `dettaglio` cosa si è visto nel
+// file. Dalla 0.37.2 arrivano **all'operatore**, non solo alle diagnosi: fino
+// alla 0.37.1 i casi uscivano a video con una frase sola — «non ha la
+// data di scatto, probabilmente è una copia ridotta» — e su tre foto di
+// Paolo, scattate col telefono e scelte dalla galleria, quella frase non
+// distingueva «non c'è nessun EXIF» da «l'EXIF c'è ma senza la data» da «la
+// data c'è e non è plausibile». Tre cause diverse, tre correzioni diverse, e
+// uno screenshot che non rispondeva a nessuna delle tre.
 export async function dataScattoDaFoto(file) {
+  const visti = [];
   try {
     const testa = await primiByte(file, TESTA);
-    if (!testa) return esito(null, 'file non leggibile');
+    if (!testa) return esito(null, 'file non leggibile', '');
     const vista = new DataView(testa);
-    const inizioTiff = trovaExif(vista);
-    if (inizioTiff < 0) return esito(null, 'nessun blocco EXIF nel file');
+    // Non è nemmeno un JPEG: HEIC, PNG, un file rinominato. Caso a sé, e va
+    // detto a sé: «nel file non ci sono i dati della fotocamera» a chi ha
+    // mandato un HEIC è falso — i dati ci sono, è l'app che da quel formato
+    // non li legge. Due cause diverse, due cose diverse da fare.
+    if (vista.byteLength < 4 || vista.getUint16(0) !== 0xFFD8) {
+      return esito(null, 'non è un JPEG', `primi byte ${primiDue(vista)} · ${letti(vista)}`);
+    }
+    const inizioTiff = trovaExif(vista, visti);
+    if (inizioTiff < 0) return esito(null, 'nessun blocco EXIF nel file', descrivi(vista, visti));
     const tag = leggiTag(vista, inizioTiff);
-    if (!tag.dataOriginale) return esito(null, 'EXIF presente ma senza DateTimeOriginal');
+    if (!tag.dataOriginale) {
+      return esito(null, 'EXIF presente ma senza DateTimeOriginal', descrivi(vista, visti));
+    }
     return interpreta(tag.dataOriginale, tag.offsetOriginale);
   } catch (errore) {
     // Un file corrotto o troncato non deve poter impedire l'invio di una foto:
     // si ripiega sull'ora di accodamento e si dichiara stimata.
-    return esito(null, `lettura EXIF non riuscita: ${errore.message}`);
+    return esito(null, `lettura EXIF non riuscita: ${errore.message}`, '');
   }
 }
 
-function esito(dati, motivo) {
-  return dati ? { ...dati, motivo: '' } : { dataScatto: '', motivo };
+function esito(dati, motivo, dettaglio = '') {
+  return dati ? { ...dati, motivo: '', dettaglio: '' } : { dataScatto: '', motivo, dettaglio };
+}
+
+// Cosa si è visto nel file, in una riga. Sono i fatti che decidono la causa e
+// che da uno screenshot non si possono indovinare: se è un JPEG, quanti byte
+// si sono letti, e **quali segmenti** c'erano prima di arrendersi. Se fra i
+// segmenti manca `APP1/Exif` il blocco non c'è; se c'è ma la data no, il
+// problema è dentro l'EXIF; se non è nemmeno un JPEG, il resto non conta.
+function descrivi(vista, visti) {
+  const jpeg = vista.byteLength >= 2 && vista.getUint16(0) === 0xFFD8;
+  const testa = jpeg ? 'JPEG sì' : `non è un JPEG (primi byte ${primiDue(vista)})`;
+  const segmenti = visti.length > 0 ? `segmenti ${visti.join(' ')}` : 'nessun segmento leggibile';
+  return `${testa} · ${letti(vista)} · ${segmenti}`;
+}
+
+function letti(vista) {
+  return `letti ${Math.round(vista.byteLength / 1024)} KiB`;
+}
+
+function primiDue(vista) {
+  if (vista.byteLength < 2) return 'file troppo corto';
+  const esa = n => n.toString(16).toUpperCase().padStart(2, '0');
+  return `${esa(vista.getUint8(0))} ${esa(vista.getUint8(1))}`;
+}
+
+// Il nome di un marcatore, per la riga di diagnosi. Solo quelli che si
+// incontrano davvero in testa a una foto: gli altri escono come numero.
+function nomeMarcatore(marcatore, exif) {
+  if (marcatore === 0xE0) return 'APP0';
+  if (marcatore === 0xE1) return exif ? 'APP1/Exif' : 'APP1/XMP';
+  if (marcatore >= 0xE2 && marcatore <= 0xEF) return `APP${marcatore - 0xE0}`;
+  if (marcatore === 0xDB) return 'DQT';
+  if (marcatore === 0xC0 || marcatore === 0xC2) return 'SOF';
+  if (marcatore === 0xC4) return 'DHT';
+  if (marcatore === 0xFE) return 'COM';
+  return `FF${marcatore.toString(16).toUpperCase().padStart(2, '0')}`;
 }
 
 function primiByte(file, quanti) {
@@ -92,7 +146,9 @@ function primiByte(file, quanti) {
 // APP0 (JFIF), e cercare l'EXIF solo in testa lo mancherebbe.
 // Restituisce l'offset del **TIFF header**, che è l'origine di tutti gli
 // offset interni all'EXIF.
-function trovaExif(vista) {
+// `visti` — facoltativo — raccoglie i segmenti incontrati, col loro peso: è la
+// riga che serve a capire, da uno screenshot, perché la data non si è letta.
+function trovaExif(vista, visti = null) {
   if (vista.byteLength < 4 || vista.getUint16(0) !== 0xFFD8) return -1;
   let posizione = 2;
   while (posizione + 4 <= vista.byteLength) {
@@ -101,14 +157,21 @@ function trovaExif(vista) {
     // Riempimento: alcuni encoder mettono FF di troppo prima di un marcatore.
     if (marcatore === 0xFF) { posizione += 1; continue; }
     // SOS o EOI: da qui in poi ci sono i pixel, i metadati sono finiti.
-    if (marcatore === 0xDA || marcatore === 0xD9) return -1;
+    if (marcatore === 0xDA || marcatore === 0xD9) {
+      if (visti) visti.push(marcatore === 0xDA ? 'SOS' : 'EOI');
+      return -1;
+    }
     const lunghezza = vista.getUint16(posizione + 2);
     if (lunghezza < 2) return -1;
-    if (marcatore === 0xE1 && posizione + 10 <= vista.byteLength && firmaExif(vista, posizione + 4)) {
-      return posizione + 10;
-    }
+    const exif = marcatore === 0xE1 && posizione + 10 <= vista.byteLength
+      && firmaExif(vista, posizione + 4);
+    if (visti) visti.push(`${nomeMarcatore(marcatore, exif)}(${lunghezza})`);
+    if (exif) return posizione + 10;
     posizione += 2 + lunghezza;
   }
+  // Finito il buffer senza trovarlo: i 128 KiB non sono bastati, ed è un caso
+  // diverso da «il segmento non c'è». `visti` lo mostra.
+  if (visti) visti.push('…buffer finito');
   return -1;
 }
 
@@ -217,4 +280,44 @@ function leggiOffset(testo) {
   const minuti = Number(pezzi[2]) * 60 + Number(pezzi[3]);
   if (minuti > 14 * 60) return null;
   return pezzi[1] === '-' ? -minuti : minuti;
+}
+
+// Il motivo detto all'operatore. I nove casi interni sono precisi ma scritti
+// per chi legge il codice: «DateTimeOriginal» in cantiere non vuol dire
+// niente. Qui c'è la stessa informazione in italiano, e a video si mostrano
+// entrambe — la frase per chi deve decidere cosa fare, il motivo tecnico
+// perché uno screenshot arrivi in ufficio già diagnostico.
+//
+// La corrispondenza si fa sul PREFISSO: quattro dei nove motivi portano in
+// coda il valore che hanno letto, e quel valore serve.
+export function spiegazioneMotivo(motivo) {
+  const testo = String(motivo || '');
+  if (testo.startsWith('file non leggibile')) {
+    return 'il telefono non è riuscito a leggere il file';
+  }
+  if (testo.startsWith('non è un JPEG')) {
+    return 'il file non è una foto JPEG: da questo formato l’app non legge l’ora dello scatto';
+  }
+  if (testo.startsWith('nessun blocco EXIF')) {
+    return 'nel file non ci sono i dati della fotocamera';
+  }
+  if (testo.startsWith('EXIF presente ma senza')) {
+    return 'i dati della fotocamera ci sono, ma senza l’ora dello scatto';
+  }
+  if (testo.startsWith('DateTimeOriginal illeggibile')) {
+    return 'l’ora dello scatto è scritta in un modo che non si riesce a leggere';
+  }
+  if (testo.startsWith('DateTimeOriginal non è una data')) {
+    return 'l’ora dello scatto non è una data valida';
+  }
+  if (testo.startsWith('data assurda')) {
+    return 'l’ora dello scatto è di prima del 2010: l’orologio del telefono non era impostato';
+  }
+  if (testo.startsWith('data nel futuro')) {
+    return 'l’ora dello scatto è nel futuro: l’orologio del telefono è avanti';
+  }
+  if (testo.startsWith('lettura EXIF non riuscita')) {
+    return 'la lettura dei dati della fotocamera si è interrotta';
+  }
+  return 'l’ora dello scatto non si è potuta leggere';
 }
