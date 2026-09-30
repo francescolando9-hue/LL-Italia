@@ -74,7 +74,7 @@ export async function dataScattoDaFoto(file) {
     // detto a sé: «nel file non ci sono i dati della fotocamera» a chi ha
     // mandato un HEIC è falso — i dati ci sono, è l'app che da quel formato
     // non li legge. Due cause diverse, due cose diverse da fare.
-    if (vista.byteLength < 4 || vista.getUint16(0) !== 0xFFD8) {
+    if (!eJpegDaiByte(vista)) {
       return esito(null, 'non è un JPEG', `primi byte ${primiDue(vista)} · ${letti(vista)}`);
     }
     const inizioTiff = trovaExif(vista, visti);
@@ -91,6 +91,45 @@ export async function dataScattoDaFoto(file) {
   }
 }
 
+// --- La firma di un JPEG ----------------------------------------------------
+//
+// **Un JPEG si riconosce dai BYTE, non dal `type` del file.** Dalla 0.37.3 lo
+// decidono qui tutti e due i punti che se lo chiedono — la lettura dell'ora
+// (sotto) e la preparazione dell'immagine (`modules/foto/immagini.js`) — e per
+// questo la funzione sta nella shell e non in un modulo.
+//
+// Perché non il `type`: quello che arriva nel `File` lo scrive il selettore del
+// sistema operativo, e su Android capita `''` o `application/octet-stream` su
+// file che sono JPEG perfetti (file passati per un gestore di file, scaricati,
+// o arrivati da un'app che non dichiara il tipo). Finché i due punti
+// rispondevano a fonti diverse, un file così veniva **ricodificato** dalla
+// preparazione — senza nessun errore, perché la decodifica riesce — mentre
+// l'ora si leggeva regolarmente: byte diversi dall'originale in archivio, cioè
+// la promessa che l'archivio non deve rompere.
+//
+// Tre byte, non due: `FF D8` è il SOI, e il terzo `FF` è l'inizio del marcatore
+// che segue — che in un JPEG c'è sempre. Due soli byte capitano anche in testa
+// a dati che JPEG non sono.
+const FIRMA = [0xFF, 0xD8, 0xFF];
+
+export function eJpegDaiByte(vista) {
+  if (!vista || vista.byteLength < FIRMA.length) return false;
+  return FIRMA.every((byte, i) => vista.getUint8(i) === byte);
+}
+
+// Lo stesso controllo partendo dal file: legge i primi byte e basta.
+// Restituisce `false` — non solleva — su un file che non si riesce a leggere:
+// chi chiama tratterà quel file come «da convertire», e la conversione dirà di
+// suo se non è possibile.
+export async function eJpeg(file) {
+  try {
+    const testa = await primiByte(file, FIRMA.length);
+    return eJpegDaiByte(testa ? new DataView(testa) : null);
+  } catch {
+    return false;
+  }
+}
+
 function esito(dati, motivo, dettaglio = '') {
   return dati ? { ...dati, motivo: '', dettaglio: '' } : { dataScatto: '', motivo, dettaglio };
 }
@@ -101,7 +140,7 @@ function esito(dati, motivo, dettaglio = '') {
 // segmenti manca `APP1/Exif` il blocco non c'è; se c'è ma la data no, il
 // problema è dentro l'EXIF; se non è nemmeno un JPEG, il resto non conta.
 function descrivi(vista, visti) {
-  const jpeg = vista.byteLength >= 2 && vista.getUint16(0) === 0xFFD8;
+  const jpeg = eJpegDaiByte(vista);
   const testa = jpeg ? 'JPEG sì' : `non è un JPEG (primi byte ${primiDue(vista)})`;
   const segmenti = visti.length > 0 ? `segmenti ${visti.join(' ')}` : 'nessun segmento leggibile';
   return `${testa} · ${letti(vista)} · ${segmenti}`;
@@ -149,7 +188,7 @@ function primiByte(file, quanti) {
 // `visti` — facoltativo — raccoglie i segmenti incontrati, col loro peso: è la
 // riga che serve a capire, da uno screenshot, perché la data non si è letta.
 function trovaExif(vista, visti = null) {
-  if (vista.byteLength < 4 || vista.getUint16(0) !== 0xFFD8) return -1;
+  if (!eJpegDaiByte(vista) || vista.byteLength < 4) return -1;
   let posizione = 2;
   while (posizione + 4 <= vista.byteLength) {
     if (vista.getUint8(posizione) !== 0xFF) return -1;

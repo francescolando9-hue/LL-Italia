@@ -11,11 +11,22 @@
 // senza alcun vantaggio. Se invece il telefono produce HEIC o PNG si converte
 // in JPEG a piena risoluzione — il nome del file in raccolta è `.jpg`, e byte
 // HEIC dentro un `.jpg` sarebbero un file che non si apre.
+//
+// **«Già JPEG» si decide dai BYTE, dalla 0.37.3** (`eJpeg`, in `core/exif.js`).
+// Prima si guardava `file.type`, e il `type` lo scrive il selettore del
+// sistema: su Android arriva `''` o `application/octet-stream` su file che sono
+// JPEG perfetti. Quei file venivano **ricodificati in silenzio** — la
+// decodifica riesce, nessun errore da nessuna parte — e in archivio finivano
+// byte diversi dall'originale, mentre l'ora dello scatto si leggeva
+// regolarmente perché quella guardava i byte. Due punti, due fonti, due
+// risposte diverse sullo stesso file: ora la fonte è una sola.
+
+import { eJpeg } from '../../core/exif.js';
 
 const QUALITA_CONVERSIONE = 0.95;
 
 export async function preparaImmagine(file) {
-  if (file.type === 'image/jpeg') return file;
+  if (await eJpeg(file)) return file;
   return ridimensiona(file, Infinity, QUALITA_CONVERSIONE);
 }
 

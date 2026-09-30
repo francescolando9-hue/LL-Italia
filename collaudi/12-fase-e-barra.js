@@ -58,11 +58,26 @@ module.exports = {
       while (flow.stato.ricevuti.length < quanti && Date.now() < fine) await new Promise(r => setTimeout(r, 300));
       return flow.stato.ricevuti.length;
     };
+    // **Si aspetta «Inviata», non «arrivata al flow».** Il flow riceve la
+    // richiesta prima che la pagina abbia finito di registrare la risposta: in
+    // quella finestra il record è ancora su `invio`, e una `reload()` — questo
+    // collaudo ne fa quattro — lo lascia lì. Dalla 0.37.1, al caricamento
+    // dopo, quel record risulta interrotto e **riparte da solo**: al flow
+    // arriva una richiesta in più, e i controlli fatti per posizione si
+    // spostano tutti di uno. Non è un difetto dell'app, è il comportamento
+    // giusto — il flow vero risponde `gia_presente` e non nasce nessun
+    // doppione — ma il collaudo deve smettere di guardare mentre l'invio è a
+    // metà. Trappola pagata il 30/09/2026: fallito 2 controlli su 373, e solo
+    // dentro la suite completa, dove tutto è più lento.
     const mandaBolla = async file => {
+      const primaInviate = await pagina.$$eval('#lista-coda .badge-inviata', e => e.length);
       await pagina.setInputFiles('#input-galleria', [materiale(file)]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
       await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
       await pagina.click('#invia');
+      await aiuto.attendi(pagina,
+        n => document.querySelectorAll('#lista-coda .badge-inviata').length > n,
+        'bolla dichiarata Inviata', 60000, primaInviate);
     };
 
     registro.titolo('Bolle: la fase si sceglie da un elenco, e non è obbligatoria');
@@ -220,7 +235,10 @@ module.exports = {
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.click('#invia');
     await attendiRicevuti(5);
-    const foto = flow.stato.ricevuti[4];
+    // Per CONTENUTO, non per posizione: solo le foto portano `tipo`, e una
+    // richiesta in più (vedi `mandaBolla`) non deve poter spostare il
+    // controllo su un payload che non è quello in prova.
+    const foto = flow.stato.ricevuti.find(r => r && 'tipo' in r);
     registro.dice('payload foto', `fase: ${foto.fase} · tipo: ${JSON.stringify(foto.tipo)}`);
     registro.controlla('al flow arriva il CODICE, non l’etichetta', foto.fase === 'ImpiantoFotovoltaico',
       'è quello che diventa il nome della cartella sul server');

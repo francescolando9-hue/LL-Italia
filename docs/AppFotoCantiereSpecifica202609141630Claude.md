@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 14 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 15 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 15 — un JPEG si riconosce dai byte (0.37.3).** `preparaImmagine` decideva «già JPEG» dal `type` del file, la lettura dell'ora dai byte: due fonti, due risposte diverse sullo stesso file. Un JPEG con `type` `''` o `application/octet-stream` — su Android succede — veniva **ricodificato in silenzio**, e in archivio finivano byte diversi dall'originale senza nessun errore. Ora la firma `FF D8 FF` sta in un posto solo e la chiedono lì tutti e due (§3). Conseguenza dichiarata: per le foto il `mimeType` del payload è sempre `image/jpeg` e non si prende più dal `type`. Nel §3 anche **come si riconosce, dai byte, da dove arriva un JPEG in raccolta**.
 >
 > **Rev. 14 — la diagnosi a video (0.37.2).** Quando una foto si ferma perché non ha la data di scatto, l'avviso dice adesso **per ogni file quale dei nove casi è**, in italiano, e accanto i fatti misurati: se è un JPEG, quanti byte si sono letti, quali segmenti si sono visti (§4.1). Motivo: il 30/09 uno screenshot di tre foto messe da parte insieme non distingueva «non c'è nessun EXIF» da «l'EXIF c'è ma senza data» — due cause con due correzioni diverse, e una frase sola per tutte. **«Non è un JPEG» diventa un caso a sé** (prima ricadeva in «nessun blocco EXIF»): a chi manda un HEIC dire che nel file non ci sono i dati della fotocamera è falso. Il contratto **non cambia**: il motivo sta a video, nel payload non entra.
 >
@@ -64,6 +66,24 @@ Nelle impostazioni del modulo c'è **Configura un altro telefono**: genera un QR
 **Un trattamento solo, dalla 0.37.0: risoluzione originale.** La compressione a 2500 px serviva all'`AVANZAMENTO`, che non esiste più.
 
 Se il file è già JPEG si spediscono **i byte originali, senza ricodificarli**: ricomprimere «a qualità massima» degraderebbe l'immagine senza alcun vantaggio. Se il telefono produce HEIC o PNG si converte in JPEG a piena risoluzione (qualità 0,95), perché il nome del file in raccolta è `.jpg` e byte HEIC dentro un `.jpg` sarebbero un file che non si apre.
+
+**«Già JPEG» si decide dai BYTE, dalla 0.37.3** — la firma `FF D8 FF` in testa al file — e non dal `type` che il selettore dichiara. Fino alla 0.37.2 i due punti che se lo chiedono rispondevano a fonti diverse: la preparazione guardava `file.type`, la lettura dell'ora guardava i byte. Su Android il `type` arriva `''` o `application/octet-stream` su file che sono JPEG perfetti (passati per un gestore di file, scaricati, prodotti da un'app che non lo dichiara): quei file venivano **ricodificati in silenzio** — la decodifica riesce, quindi nessun errore da nessuna parte — e in archivio finivano byte diversi da quelli scattati dal telefono, mentre l'ora arrivava giusta perché quella guardava i byte. Non si vede: la foto si apre, la data è giusta, il peso è plausibile. Si vede solo confrontando le impronte. Adesso la firma sta in un posto solo (`eJpeg`, in `core/exif.js`) e la chiedono lì tutti e due.
+
+**Conseguenza sul MIME dichiarato:** per una foto il payload porta sempre `mimeType: image/jpeg`, che dalla 0.37.3 non si prende più dal `type` del file. Dopo la preparazione una foto è un JPEG per costruzione — o byte originali riconosciuti dalla firma, o un JPEG uscito dalla conversione — e dichiarare `application/octet-stream` su un file che in raccolta si chiama `.jpg` sarebbe dichiarare il falso. Per il **video** la fonte resta il `type` del file: lì è l'unica che c'è. Il flow non vede nessuna differenza rispetto a prima: quei file, fino alla 0.37.2, gli arrivavano ricodificati dal canvas e quindi già come `image/jpeg`.
+
+#### Da dove arriva un JPEG, letto dai suoi byte
+
+Serve in diagnosi, e il 30/09/2026 è servito davvero. Un JPEG **uscito da un canvas** — cioè prodotto dall'app, non dalla fotocamera — ha una struttura riconoscibile: `APP0 «JFIF»`, poi `APP2 «ICC_PROFILE»` di 472 byte, due `DQT`, `SOF0`, quattro `DHT`, `SOS`. **Nessun `APP1/Exif`**, quindi nessun `DateTimeOriginal`. Un JPEG che arriva **dalla fotocamera del telefono** porta invece la struttura di quel telefono, e quasi sempre un `APP1/Exif`.
+
+Fra i canvas dell'app si distingue dalla **qualità**, che si legge nel primo coefficiente della prima tabella `DQT` (misurato sul Chromium dei collaudi):
+
+| Primo coefficiente `DQT` | Qualità | Chi l'ha prodotto |
+|---|---|---|
+| **3** | 0,92 | **«Scatta»**, la fotocamera dentro l'app (`QUALITA_SCATTO`, `core/fotocamera.js`) |
+| **2** | 0,95 | la **conversione** HEIC/PNG → JPEG di `preparaImmagine` |
+| **5** | 0,85 | il vecchio `AVANZAMENTO` (fino alla 0.36.1) e le foto delle **bolle** |
+
+Cautela dichiarata: la tabella è misurata sul Chromium dei collaudi, non su un Pixel. Le tabelle di quantizzazione per una data qualità sono deterministiche e lo stesso encoder gira su Android, ma se un caso dovesse dipendere da questo la prova è diretta: si scatta una foto con «Scatta» sul telefono in questione e si confrontano i byte.
 
 **Ricodificare butta via l'EXIF**, e ora è l'unico caso rimasto in cui succede: la conversione HEIC/PNG passa per un canvas, e dal canvas i metadati non escono. Resta la ragione per cui l'ora dello scatto si legge **prima** della preparazione (§4.1). Conseguenza della semplificazione, da registrare: fino alla 0.36.1 quel comportamento era **collaudabile** — si mandava una foto come `AVANZAMENTO`, i byte arrivavano senza EXIF e l'ora arrivava comunque giusta, e funzionamento e guasto davano risultati diversi. Adesso un JPEG parte com'è, quindi quella prova non ha più oggetto, e l'unica ricodifica rimasta è su formati che il Chromium dei collaudi non sa produrre. Non è un controllo tolto: è un controllo rimasto senza caso, ed è annotato fra le cose che i collaudi non dimostrano.
 
@@ -326,6 +346,8 @@ Perché restava lì. Il motore mette il record su `invio` prima della richiesta 
 
 ⚠️ **Il contratto col flow non cambia in niente.** Un invio ripreso è una richiesta identica a quella di prima, con lo stesso `idClient`.
 
+**Una conseguenza misurata il 30/09/2026, che il ricevente può vedere nello storico del flow.** Il flow riceve la richiesta qualche istante prima che il telefono abbia registrato la risposta, e in quella finestra il record è ancora su `invio`. Se l'app viene chiusa o ricaricata **proprio lì**, alla riapertura quel record risulta interrotto e riparte: al flow arriva una **seconda richiesta con lo stesso `idClient`**, a cui risponde `gia_presente`. In raccolta non nasce niente, e il comportamento è quello giusto — l'alternativa è un elemento fermo per sette giorni. Va saputo perché nello storico delle esecuzioni si legge come una chiamata in più, non come un errore. Lo ha scoperto un collaudo che ricaricava la pagina un istante dopo l'invio, ed è registrato fra le trappole (`collaudi/aiuto.js`, n. 6).
+
 ## 4-bis. Caricamento a blocchi — scritto nell'app, FERMO in attesa del presupposto
 
 > **Stato all'11/09/2026: spento, e va lasciato spento.** Il codice nell'app c'è ed è collaudato in locale; quello che manca è il presupposto lato tenant. Non si riparte dal client: si riparte dalla prova descritta in fondo a questa sezione.
@@ -475,6 +497,26 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.3 — un JPEG si riconosce dai byte
+
+**Niente da fare a valle**, e il contratto non cambia: nessun campo nuovo, nessun campo rinominato, nessun valore diverso da quelli che il flow già riceve. Quello che cambia è **quali byte** partono per certi file, e sono i byte giusti: quelli originali del telefono.
+
+Una cosa che il ricevente deve sapere, e non è un intervento: le foto arrivate **fino alla 0.37.2** da telefoni che dichiaravano un `type` storto sono in raccolta **ricodificate** — immagine giusta, data giusta, byte non originali. Non si distinguono a occhio e non c'è niente da rifare: la promessa dei byte originali vale da qui in avanti. Se dovesse servire riconoscerle, la struttura è quella del canvas descritta in §3 (`APP0 JFIF` + `APP2 ICC_PROFILE`, nessun `APP1/Exif`, primo coefficiente `DQT` = 2).
+
+Previsione scritta prima di provare, e confermata (collaudo `18-jpeg-dai-byte.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Stessi byte JPEG con `type` `''` | in raccolta **byte identici**, confronto per impronta | ✓ impronta `56a73bb3…` uguale, 521810 byte |
+| … con `type` `image/jpg` | idem | ✓ stessa impronta |
+| … con `type` `application/octet-stream` | idem | ✓ stessa impronta |
+| In tutti e tre | la data dello scatto si legge lo stesso | ✓ `2026-09-14T08:31:39+02:00`, `scattoStimato` `NO` |
+| In tutti e tre | `mimeType` dichiarato `image/jpeg` | ✓ |
+| Un PNG vero | **continua a convertirsi**: byte diversi, e quello che parte inizia per `FF D8 FF` | ✓ 21979 → 15363 byte |
+| La firma | `FF D8 FF` sì; `FF D8` da solo, PNG, HEIC e file vuoto no | ✓ |
+
+**Cosa questo NON dimostra:** il caso HEIC. Il Chromium dei collaudi non sa produrre un HEIC, quindi la conversione da HEIC resta provata solo sul PNG, che segue lo stesso ramo. La prova vera è su un iPhone che manda una foto e su cosa atterra in raccolta.
 
 ### Rilascio 0.37.2 — la diagnosi a video
 
