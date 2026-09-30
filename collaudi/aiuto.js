@@ -32,6 +32,19 @@
 //    cinque o sei giri, cioè il tipo di rosso che si archivia come «flake» e
 //    non si guarda più. Si aspetta il marcatore `data-livelli`, che
 //    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto.
+// 6. **«Arrivata al flow» non vuol dire «invio finito».** Il flow riceve la
+//    richiesta prima che la pagina abbia registrato la risposta, e in quella
+//    finestra il record è ancora su `invio`. Chi RICARICA la pagina lì dentro
+//    lascia quel record interrotto e, dalla 0.37.1, al caricamento dopo
+//    riparte da solo: al flow arriva una richiesta in più. Non è un difetto
+//    — il flow vero risponde `gia_presente` e non nasce nessun doppione — ma
+//    ogni controllo fatto sull'INDICE di `flow.stato.ricevuti` si sposta di
+//    uno, e il collaudo legge un payload che non è quello in prova. Due
+//    regole: prima di ricaricare si aspetta lo stato **«Inviata»**, non
+//    l'arrivo al flow; e i payload si cercano per CONTENUTO
+//    (`ricevuti.find(r => 'tipo' in r)`), non per posizione. Trappola pagata
+//    il 30/09/2026: 2 controlli su 373, solo nella suite completa, dove tutto
+//    è più lento — esattamente il rosso che si archivierebbe come «flake».
 // 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
 //    lo controlla come script CommonJS e lascia passare errori che in un
 //    modulo ES sono fatali. Il controllo giusto è

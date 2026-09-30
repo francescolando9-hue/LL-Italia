@@ -80,7 +80,15 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     // giusta — un video salvato come .jpg non si apre.
     genere: extra.genere || 'foto',
     estensione: extra.estensione || 'jpg',
-    mime: fotoBlob.type || 'image/jpeg',
+    // Il MIME dichiarato nel payload. Per una FOTO è sempre `image/jpeg`, e
+    // dalla 0.37.3 non si prende più da `fotoBlob.type`: dopo
+    // `preparaImmagine` una foto è un JPEG per costruzione — o byte originali
+    // riconosciuti dalla firma, o un JPEG prodotto dalla conversione — mentre
+    // `type` può essere `''` o `application/octet-stream` se così l'ha
+    // dichiarato il selettore del sistema. Dichiarare quel tipo manderebbe in
+    // raccolta un `.jpg` con un MIME che non è il suo. Per il VIDEO invece il
+    // tipo del file è l'unica fonte, e va rispettato.
+    mime: extra.genere === 'video' ? (fotoBlob.type || 'video/mp4') : 'image/jpeg',
     durata: extra.durata || 0,
     commessa: '',
     fase: '',
