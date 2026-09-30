@@ -39,6 +39,8 @@ import { timestampDispositivo, timestampConOffset } from './orario.js';
 // L'EXIF sta all'inizio del file, subito dopo il marcatore di apertura: 128 KB
 // sono abbondanti anche con una miniatura EXIF grande, e leggere solo la testa
 // evita di tirare in memoria un file da 12 MB per sei byte di data.
+import { eLetturaNegata, descriviLettura } from './byte.js';
+
 const TESTA = 131072;
 
 const TAG_DATA_ORIGINALE = 0x9003;
@@ -85,6 +87,16 @@ export async function dataScattoDaFoto(file) {
     }
     return interpreta(tag.dataOriginale, tag.offsetOriginale);
   } catch (errore) {
+    // Due cose diverse, e dalla 0.37.4 si dicono diverse. Se il browser non ha
+    // lasciato leggere i byte, il file non c'entra: è il riferimento al
+    // contenuto che è decaduto, e la foto è a posto (`core/byte.js`). Se
+    // invece la lettura è arrivata e la scansione è andata male, il file è
+    // corrotto o troncato — oppure il difetto è qui dentro. Confonderle manda
+    // l'operatore a cercare un originale che ha già in mano.
+    if (eLetturaNegata(errore)) {
+      return esito(null, `i byte del file non si sono potuti leggere: ${errore.name || 'errore'}`,
+        descriviLettura(errore));
+    }
     // Un file corrotto o troncato non deve poter impedire l'invio di una foto:
     // si ripiega sull'ora di accodamento e si dichiara stimata.
     return esito(null, `lettura EXIF non riuscita: ${errore.message}`, '');
@@ -333,6 +345,9 @@ export function spiegazioneMotivo(motivo) {
   const testo = String(motivo || '');
   if (testo.startsWith('file non leggibile')) {
     return 'il telefono non è riuscito a leggere il file';
+  }
+  if (testo.startsWith('i byte del file non si sono potuti leggere')) {
+    return 'il telefono non ha lasciato leggere il file all’app';
   }
   if (testo.startsWith('non è un JPEG')) {
     return 'il file non è una foto JPEG: da questo formato l’app non legge l’ora dello scatto';

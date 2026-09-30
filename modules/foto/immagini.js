@@ -22,6 +22,7 @@
 // risposte diverse sullo stesso file: ora la fonte è una sola.
 
 import { eJpeg } from '../../core/exif.js';
+import { eLetturaNegata } from '../../core/byte.js';
 
 const QUALITA_CONVERSIONE = 0.95;
 
@@ -51,12 +52,22 @@ async function ridimensiona(file, latoMax, qualita) {
 
 // Decodifica via canvas: copre anche i formati che il browser sa leggere ma
 // non produrre (es. HEIC su Safari).
+//
+// **«Non supportato» solo se è vero il formato.** Se la decodifica fallisce
+// perché i byte non si sono potuti leggere, il caso è la lettura e l'errore
+// esce com'è, perché chi chiama lo riconosca (`eLetturaNegata`). Il 30/09/2026
+// una foto perfettamente valida è uscita a video come «Formato immagine non
+// supportato da questo dispositivo»: era un `NotReadableError`, e quella
+// frase ha mandato l'operatore a cercare un originale che aveva già in mano.
 async function decodifica(file) {
+  let primo = null;
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
+  } catch (errore) {
     // Fallback per browser senza createImageBitmap o senza supporto al formato.
+    primo = errore;
   }
+  if (eLetturaNegata(primo)) throw primo;
   const url = URL.createObjectURL(file);
   try {
     const immagine = new Image();

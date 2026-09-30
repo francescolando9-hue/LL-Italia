@@ -161,13 +161,33 @@ module.exports = {
       const m = await import('./core/exif.js');
       return m.spiegazioneMotivo('motivo che non esiste');
     });
-    registro.controlla('i casi sono nove', motivi.length === 9, `trovati ${motivi.length}`);
+    registro.controlla('i casi sono dieci', motivi.length === 10, `trovati ${motivi.length}`);
     registro.controlla('ogni motivo ha la sua frase in italiano',
       frasi.every(f => f && f !== ripiego),
       `senza frase: ${motivi.filter((_, i) => !frasi[i] || frasi[i] === ripiego).join(', ') || 'nessuno'}`);
     registro.controlla('e sono tutte diverse fra loro',
       new Set(frasi).size === frasi.length,
       'due casi con la stessa frase non si distinguono da uno screenshot');
+
+    // Ogni motivo finisce in un gruppo, e il gruppo decide la frase in testa e
+    // se «Aggiungi comunque» compare. Il controllo che conta: un motivo di
+    // LETTURA non deve cadere in un gruppo mandabile — sarebbe il difetto del
+    // 30/09 rimesso dentro, cioè «aggiungi comunque» sopra una foto che l'ora
+    // ce l'ha, dentro il file, a due tentativi di distanza.
+    const gruppi = await pagina.evaluate(async elenco => {
+      const m = await import('./modules/foto/index.js');
+      return elenco.map(x => m.gruppoDiMotivo(x));
+    }, motivi);
+    registro.dice('motivo → gruppo', motivi.map((x, i) => `${x.slice(0, 28)} → ${gruppi[i]}`).join(' | '));
+    const diLettura = motivi
+      .map((x, i) => ({ motivo: x, gruppo: gruppi[i] }))
+      .filter(v => /non si sono potuti leggere|file non leggibile/.test(v.motivo));
+    registro.controlla('i motivi di lettura finiscono nel gruppo «lettura»',
+      diLettura.length === 2 && diLettura.every(v => v.gruppo === 'lettura'),
+      diLettura.map(v => `${v.motivo} → ${v.gruppo}`).join(' | '));
+    registro.controlla('e ogni altro motivo ha un gruppo',
+      gruppi.every(g => ['lettura', 'copia', 'formato', 'senzaOra', 'orologio'].includes(g)),
+      gruppi.join(' '));
     registro.controlla('la foto NON è ancora in coda',
       (await pagina.$$('.foto-anteprima')).length === 0,
       'accodarla in silenzio, stimando, è esattamente il difetto del 17/09');

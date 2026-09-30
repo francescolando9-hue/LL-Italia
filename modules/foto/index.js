@@ -13,6 +13,7 @@ import { naviga } from '../../core/router.js';
 import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { timestampDispositivo } from '../../core/orario.js';
 import { dataScattoDaFoto, spiegazioneMotivo } from '../../core/exif.js';
+import { fileInMemoria, eLetturaNegata, descriviLettura } from '../../core/byte.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
   sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA,
@@ -57,7 +58,100 @@ let livelliCorrenti = { piano: null, unita: null, prospetto: null, mancanti: [] 
 // galleria, quindi qui non si perde niente — mentre accodarlo in silenzio
 // significherebbe archiviare un'ora falsa. Le foto SCATTATE dall'app non
 // passano mai da qui: quelle l'ora ce l'hanno.
+//
+// **Dalla 0.37.4 la lista tiene anche i file che non si sono potuti LEGGERE**,
+// che sono un'altra cosa e vanno detti in un altro modo: lì la foto è a posto
+// e l'ora ce l'ha, è il telefono che non ha lasciato leggere i byte. Ogni
+// voce porta quindi il suo `gruppo`, e a video ogni gruppo ha la SUA frase in
+// testa — non una frase comune, che per tre casi su quattro sarebbe falsa.
 let senzaData = [];
+
+// I casi, raggruppati per quello che l'operatore deve FARE. La frase in testa
+// è quella del gruppo; le righe di diagnosi restano una per file.
+//
+// `mandabile: false` sul gruppo della lettura: «Aggiungi comunque» là sarebbe
+// un danno, perché manderebbe la foto con un'ora stimata mentre quella vera
+// sta dentro il file, a due tentativi di distanza.
+const GRUPPI = {
+  lettura: {
+    mandabile: false,
+    titolo: una => una
+      ? 'Il telefono non ha lasciato leggere questa foto all’app.'
+      : 'Il telefono non ha lasciato leggere queste foto all’app.',
+    seguito: una => una
+      ? 'La foto è a posto: riprova a sceglierla, oppure usa <strong>Scatta</strong>.'
+      : 'Le foto sono a posto: riprova a sceglierle, oppure usa <strong>Scatta</strong>.',
+    spiegazione: () => 'Succede quando il riferimento al file scade fra una lettura e l’altra: '
+      + 'l’app ha già riprovato da sola, senza riuscirci. Non è un problema della foto, '
+      + 'e l’ora dello scatto dentro il file c’è: per questo non si manda «comunque».',
+  },
+  copia: {
+    mandabile: true,
+    titolo: una => una ? 'Questa foto non ha la data di scatto.' : 'Queste foto non hanno la data di scatto.',
+    seguito: una => `Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>: lì la data c’è.`,
+    spiegazione: una => `${una ? 'È' : 'Sono'} quasi certamente ${una ? 'una copia ridotta' : 'copie ridotte'} `
+      + '(Google Foto, WhatsApp): nel file non c’è nessun dato della fotocamera.',
+  },
+  formato: {
+    mandabile: true,
+    titolo: una => una ? 'Questo file non è una foto JPEG.' : 'Questi file non sono foto JPEG.',
+    seguito: una => `Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>, oppure usa <strong>Scatta</strong>.`,
+    spiegazione: () => 'Da un HEIC o da un PNG l’app non sa leggere l’ora dello scatto. '
+      + 'La foto si può mandare lo stesso — viene convertita in JPEG — ma con l’ora stimata.',
+  },
+  senzaOra: {
+    mandabile: true,
+    titolo: una => una
+      ? 'Di questa foto ci sono i dati della fotocamera, ma non l’ora dello scatto.'
+      : 'Di queste foto ci sono i dati della fotocamera, ma non l’ora dello scatto.',
+    seguito: una => `Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>: lì l’ora di solito c’è.`,
+    spiegazione: () => 'Capita su una foto ritagliata o ri-salvata: il programma che l’ha riscritta '
+      + 'ha tenuto marca e modello e ha perso l’ora.',
+  },
+  orologio: {
+    mandabile: true,
+    titolo: una => una
+      ? 'L’orologio del telefono non era impostato quando questa foto è stata scattata.'
+      : 'L’orologio del telefono non era impostato quando queste foto sono state scattate.',
+    seguito: () => 'L’ora scritta nel file non è credibile, quindi non si usa.',
+    spiegazione: una => `Se ${una ? 'la mandi' : 'le mandi'} comunque, in archivio `
+      + `${una ? 'va' : 'vanno'} con la data del file e dichiarata stimata.`,
+  },
+};
+
+// Dal motivo tecnico al gruppo. La corrispondenza si fa sul PREFISSO, come in
+// `spiegazioneMotivo`: quattro motivi portano in coda il valore che hanno
+// letto, e quel valore serve nella riga di diagnosi.
+// Una riga per file: nome, peso, tipo DICHIARATO dal selettore, il motivo in
+// italiano e quello tecnico. Sono i fatti che da uno screenshot non si
+// indovinano, e che decidono quale dei dieci casi è.
+function rigaPerche(voce) {
+  const tipo = voce.file.type || 'tipo non dichiarato';
+  return `<li><strong>${scappaHtml(voce.file.name || 'file')}</strong>
+    <span class="tenue">— ${pesoLeggibile(voce.file.size)}, ${scappaHtml(tipo)}</span><br>
+    ${scappaHtml(spiegazioneMotivo(voce.motivo))}
+    <span class="tenue">(${scappaHtml(voce.motivo || 'motivo non registrato')}${
+      voce.dettaglio ? ` · ${scappaHtml(voce.dettaglio)}` : ''})</span></li>`;
+}
+
+// Esportata per il collaudo: il controllo che conta è che un motivo di
+// LETTURA non finisca in un gruppo mandabile — sarebbe il difetto del
+// 30/09/2026 rimesso dentro, con «Aggiungi comunque» sopra una foto che l'ora
+// ce l'ha. Un motivo nuovo che non si riconosce cade in `copia`, che è il
+// ripiego prudente: dice «manca la data» e lascia mandare.
+export function gruppoDiMotivo(motivo) {
+  const testo = String(motivo || '');
+  if (testo.startsWith('i byte del file non si sono potuti leggere')
+    || testo.startsWith('lettura dei byte non riuscita')
+    || testo.startsWith('file non leggibile')) return 'lettura';
+  if (testo.startsWith('non è un JPEG')) return 'formato';
+  if (testo.startsWith('EXIF presente ma senza') || testo.startsWith('DateTimeOriginal')) return 'senzaOra';
+  if (testo.startsWith('data assurda') || testo.startsWith('data nel futuro')) return 'orologio';
+  // Restano «nessun blocco EXIF» e la lettura EXIF finita male su byte
+  // arrivati: in tutti e due i casi nel file non c'è niente da leggere, e la
+  // via d'uscita è la stessa.
+  return 'copia';
+}
 
 // L'id della foto inviata che si sta rimandando, o stringa vuota. Il riquadro
 // sta FUORI dalla lista della coda e si ricostruisce solo quando cambia questo
@@ -314,8 +408,28 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         });
         continue;
       }
+      // **Una lettura sola, subito** (dalla 0.37.4). Da qui in poi si lavora
+      // su una copia in memoria: EXIF, firma, preparazione, anteprima e copia
+      // in IndexedDB leggevano ognuna il `File` del selettore, e su Android
+      // quel riferimento può decadere fra una lettura e l'altra — è il caso
+      // del 30/09/2026, due foto rifiutate a mezzogiorno e partite la sera
+      // senza toccarle. Se la lettura non riesce nemmeno dopo i tentativi, il
+      // file si mette da parte con il SUO caso: la foto è a posto e l'ora ce
+      // l'ha, quindi «Aggiungi comunque» sarebbe la cosa sbagliata.
+      let leggibile;
+      try {
+        leggibile = await fileInMemoria(singolo);
+      } catch (errore) {
+        if (!eLetturaNegata(errore)) throw errore;
+        senzaData.push({
+          file: singolo, provenienza, gruppo: 'lettura',
+          motivo: `i byte del file non si sono potuti leggere: ${errore.name || 'errore'}`,
+          dettaglio: descriviLettura(errore),
+        });
+        continue;
+      }
       // Prima la data, poi la preparazione: dopo, l'EXIF non c'è più.
-      const quando = await oraDiScatto(singolo, provenienza);
+      const quando = await oraDiScatto(leggibile, provenienza);
       // Senza ora dello scatto la foto NON entra in coda: si mette da parte e
       // si chiede. Accodarla e stimare in silenzio è esattamente il difetto
       // misurato il 17/09/2026.
@@ -325,15 +439,18 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         // quella frase non distingueva «non c'è nessun EXIF» da «l'EXIF c'è
         // ma senza data» — due cause diverse, e uno screenshot che non
         // rispondeva a nessuna delle due.
-        senzaData.push({ file: singolo, motivo: quando.motivo, dettaglio: quando.dettaglio });
+        senzaData.push({
+          file: leggibile, provenienza, gruppo: gruppoDiMotivo(quando.motivo),
+          motivo: quando.motivo, dettaglio: quando.dettaglio,
+        });
         continue;
       }
-      const preparata = await preparaImmagine(singolo);
+      const preparata = await preparaImmagine(leggibile);
       if (preparata.size > limiteByte) {
         troppoGrandi.push(pesoLeggibile(preparata.size));
         continue;
       }
-      const anteprima = await creaAnteprima(singolo);
+      const anteprima = await creaAnteprima(leggibile);
       await coda.aggiungiBozza(preparata, anteprima, singolo.name, TIPO_ARCHIVIO, {
         genere: 'foto', estensione: 'jpg',
         dataScatto: quando.dataScatto, scattoStimato: quando.scattoStimato,
@@ -344,6 +461,19 @@ async function aggiungiFile(file, provenienza = 'galleria') {
       if (memoriaPiena(errore)) {
         errori.push(messaggioSalvataggio(errore, 'la foto'));
         break;
+      }
+      // Una lettura negata che arriva fin qui — dalla decodifica, dalla copia
+      // in IndexedDB — è lo stesso caso di prima e va detta allo stesso modo.
+      // Fino alla 0.37.3 usciva come «Formato immagine non supportato da
+      // questo dispositivo»: stessa causa, un'altra frase, e l'operatore
+      // mandato a cercare un originale che aveva già in mano.
+      if (eLetturaNegata(errore)) {
+        senzaData.push({
+          file: singolo, provenienza, gruppo: 'lettura',
+          motivo: `i byte del file non si sono potuti leggere: ${errore.name || 'errore'}`,
+          dettaglio: descriviLettura(errore),
+        });
+        continue;
       }
       errori.push(`${singolo.name || 'file'}: ${messaggioSalvataggio(errore, 'la foto')}`);
     }
@@ -364,9 +494,25 @@ async function aggiungiFile(file, provenienza = 'galleria') {
 // avere una strada propria, così il limite di peso, la preparazione
 // dell'immagine e la gestione della memoria piena restano scritti una volta.
 async function accodaSenzaData() {
-  const attesa = senzaData;
-  senzaData = [];
+  // Solo i gruppi che si possono mandare: quelle che non si sono lette
+  // restano da parte, perché l'ora vera è dentro il file e mandarle con una
+  // stima sarebbe buttarla via.
+  const attesa = senzaData.filter(voce => GRUPPI[voce.gruppo].mandabile);
+  senzaData = senzaData.filter(voce => !GRUPPI[voce.gruppo].mandabile);
   await aggiungiFile(attesa.map(voce => voce.file), 'ripiego');
+}
+
+// «Riprova» sui file che non si sono letti: si ripassa da `aggiungiFile` con
+// la provenienza di prima, così se stavolta la lettura riesce la foto entra in
+// coda con la sua ora vera, misurata, come se il primo tentativo non fosse mai
+// andato male. Se fallisce di nuovo, torna qui.
+async function riprovaLettura() {
+  const attesa = senzaData.filter(voce => voce.gruppo === 'lettura');
+  senzaData = senzaData.filter(voce => voce.gruppo !== 'lettura');
+  if (attesa.length === 0) return;
+  // I file di una stessa ripassata hanno la stessa provenienza: è quella con
+  // cui sono stati scelti.
+  await aggiungiFile(attesa.map(voce => voce.file), attesa[0].provenienza || 'galleria');
 }
 
 async function invia() {
@@ -450,35 +596,56 @@ async function ridisegna() {
   if (senzaData.length === 0) {
     avvisoSenzaData.innerHTML = '';
   } else {
-    const una = senzaData.length === 1;
-    // Una riga per file: nome, peso, tipo DICHIARATO dal selettore, il motivo
-    // in italiano e quello tecnico. Sono i fatti che da uno screenshot non si
-    // indovinano, e che decidono quale delle otto cause è.
-    const perche = senzaData.map(voce => {
-      const tipo = voce.file.type || 'tipo non dichiarato';
-      return `<li><strong>${scappaHtml(voce.file.name || 'file')}</strong>
-        <span class="tenue">— ${pesoLeggibile(voce.file.size)}, ${scappaHtml(tipo)}</span><br>
-        ${scappaHtml(spiegazioneMotivo(voce.motivo))}
-        <span class="tenue">(${scappaHtml(voce.motivo || 'motivo non registrato')}${
-          voce.dettaglio ? ` · ${scappaHtml(voce.dettaglio)}` : ''})</span></li>`;
-    }).join('');
-    avvisoSenzaData.innerHTML = `
+    // **Un riquadro per CASO, con la frase del caso in testa** (dalla 0.37.4).
+    // Prima la frase era una sola per tutti — «non hanno la data di scatto,
+    // quasi certamente copie ridotte, cerca gli originali» — e il 30/09/2026
+    // è comparsa sopra una foto che la data ce l'aveva: non si era potuta
+    // leggere, l'originale era già quello, e la frase mandava a cercare una
+    // cosa che non esisteva.
+    const ordine = ['lettura', 'copia', 'formato', 'senzaOra', 'orologio'];
+    const presenti = ordine.filter(nome => senzaData.some(voce => voce.gruppo === nome));
+    const mandabili = senzaData.filter(voce => GRUPPI[voce.gruppo].mandabile);
+    const ultimoMandabile = presenti.filter(nome => GRUPPI[nome].mandabile).pop();
+    avvisoSenzaData.innerHTML = presenti.map(nome => {
+      const gruppo = GRUPPI[nome];
+      const voci = senzaData.filter(voce => voce.gruppo === nome);
+      const una = voci.length === 1;
+      // Le azioni comuni stanno in fondo all'ultimo riquadro mandabile: con
+      // un caso solo — che è quasi sempre — il riquadro è esattamente quello
+      // di prima, e con più casi i pulsanti non si ripetono.
+      const azioni = [];
+      if (nome === 'lettura') {
+        azioni.push(`<button id="lettura-riprova" class="btn btn-secondario btn-minore" type="button">Riprova</button>`);
+        azioni.push(`<button id="lettura-scarta" class="btn btn-secondario btn-minore" type="button">Lascia ${una ? 'perdere questa foto' : 'perdere queste foto'}</button>`);
+      }
+      if (nome === ultimoMandabile) {
+        const quante = mandabili.length === 1 ? 'questa foto' : `queste ${mandabili.length} foto`;
+        const unaSola = mandabili.length === 1;
+        azioni.push(`<button id="senza-data-comunque" class="btn btn-secondario btn-minore" type="button">Aggiungi comunque ${quante}</button>`);
+        azioni.push(`<button id="senza-data-scarta" class="btn btn-secondario btn-minore" type="button">Cerco ${unaSola ? 'l’originale' : 'gli originali'}</button>`);
+      }
+      return `
       <div class="avviso avviso-attenzione">
-        <p><strong>${una ? 'Questa foto non ha' : `Queste ${senzaData.length} foto non hanno`} la data di scatto.</strong>
-        Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>: lì la data c’è.</p>
-        <p class="tenue">${una ? 'È' : 'Sono'} quasi certamente ${una ? 'una copia ridotta' : 'copie ridotte'}
-        (Google Foto, WhatsApp). ${una ? 'Non è' : 'Non sono'} ancora in coda: se ${una ? 'la mandi' : 'le mandi'}
-        comunque, in archivio ${una ? 'va' : 'vanno'} con la data del file e dichiarata stimata.</p>
-        <ul class="foto-perche">${perche}</ul>
-        <div class="azioni-alternative">
-          <button id="senza-data-comunque" class="btn btn-secondario btn-minore" type="button">Aggiungi comunque ${una ? 'questa foto' : `queste ${senzaData.length} foto`}</button>
-          <button id="senza-data-scarta" class="btn btn-secondario btn-minore" type="button">Cerco ${una ? 'l’originale' : 'gli originali'}</button>
-        </div>
+        <p><strong>${gruppo.titolo(una)}</strong> ${gruppo.seguito(una)}</p>
+        <p class="tenue">${gruppo.spiegazione(una)}</p>
+        <ul class="foto-perche">${voci.map(rigaPerche).join('')}</ul>
+        <div class="azioni-alternative">${azioni.join('')}</div>
       </div>`;
-    avvisoSenzaData.querySelector('#senza-data-comunque')
-      .addEventListener('click', () => { accodaSenzaData(); });
-    avvisoSenzaData.querySelector('#senza-data-scarta')
-      .addEventListener('click', () => { senzaData = []; ridisegna(); });
+    }).join('');
+    const riprova = avvisoSenzaData.querySelector('#lettura-riprova');
+    if (riprova) riprova.addEventListener('click', () => { riprovaLettura(); });
+    const lasciaPerdere = avvisoSenzaData.querySelector('#lettura-scarta');
+    if (lasciaPerdere) lasciaPerdere.addEventListener('click', () => {
+      senzaData = senzaData.filter(voce => voce.gruppo !== 'lettura');
+      ridisegna();
+    });
+    const comunque = avvisoSenzaData.querySelector('#senza-data-comunque');
+    if (comunque) comunque.addEventListener('click', () => { accodaSenzaData(); });
+    const scarta = avvisoSenzaData.querySelector('#senza-data-scarta');
+    if (scarta) scarta.addEventListener('click', () => {
+      senzaData = senzaData.filter(voce => !GRUPPI[voce.gruppo].mandabile);
+      ridisegna();
+    });
     portaInVista(avvisoSenzaData);
   }
 
