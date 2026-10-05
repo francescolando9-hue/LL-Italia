@@ -113,17 +113,116 @@ module.exports = {
       'una fase senza riga risulta «senza livelli»: si può scegliere, la foto parte, e finisce nella cartella sbagliata senza far rumore');
     registro.controlla('e l’anagrafica non ha righe per fasi che non esistono',
       coerenza.regolaSenzaFase.length === 0, coerenza.regolaSenzaFase.join(' · ') || 'nessuna');
-    registro.controlla('i codici di lotto sono i quattro attesi',
-      coerenza.lotti.join(',') === 'Lotto1,Lotto2,Lotto3,Lotto4', coerenza.lotti.join(' '));
+    registro.controlla('i codici di lotto sono i tre attesi',
+      coerenza.lotti.join(',') === 'Lotto1,Lotto2,Lotto3', coerenza.lotti.join(' '),
+      'Lotto4 è uscito dal master il 05/10/2026: SNU ha tre lotti, come BRU');
     registro.controlla('in ordine alfabetico',
       coerenza.fasi.join(',') === [...coerenza.fasi].sort((a, b) => a.localeCompare(b, 'it')).join(','),
       'in un elenco di ventisette voci si cerca per lettera, non per abitudine');
+
+    // **L'anagrafica è la copia di un master che vive su L:**, e qui si
+    // controlla che sia ESATTAMENTE quella copia: l'impronta SHA-256 della
+    // sua forma canonica — chiavi ordinate, nessuno spazio, UTF-8 — deve
+    // essere quella del master della versione dichiarata. L'impronta è stata
+    // calcolata due volte in modo indipendente il 05/10/2026: in Python dal
+    // JSON del master, come la può rifare Cowork sul file su L:, e in
+    // JavaScript dal blocco dell'app. Coincidevano.
+    //
+    // Serve a due cose: una voce corretta a mano nel repo fa diventare rosso
+    // questo controllo (si rigenera dal master, non si ritocca), e un master
+    // cambiato su L: senza riallineare l'app si vede confrontando due
+    // numeri, invece di accorgersene da una foto finita nella cartella
+    // sbagliata. È quello che è successo fra il 04 e il 05/10: il master è
+    // cambiato due volte e l'app no.
+    //
+    // A ogni nuovo master: si rigenera il blocco, e si aggiornano INSIEME
+    // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
+    // del master e non dall'app — altrimenti il controllo confronterebbe
+    // l'app con se stessa.
+    const VERSIONE_MASTER = '202610050932';
+    const IMPRONTA_MASTER = '0e736ea7f4c00ae5b597047695048b788df6aa75687713178fe35fe66022f3e6';
+    registro.titolo('L’anagrafica è la copia esatta del master');
+    const copia = await pagina.evaluate(async () => {
+      const ana = await import('./core/anagrafica.js');
+      const canonico = v => Array.isArray(v) ? `[${v.map(canonico).join(',')}]`
+        : v && typeof v === 'object'
+          ? `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonico(v[k])}`).join(',')}}`
+          : JSON.stringify(v);
+      return { versione: ana.ANAGRAFICA.versione, testo: canonico(ana.ANAGRAFICA) };
+    });
+    const impronta = require('crypto').createHash('sha256').update(copia.testo, 'utf8').digest('hex');
+    registro.dice('versione e impronta nell’app', `${copia.versione} · ${impronta.slice(0, 16)}… · ${Buffer.byteLength(copia.testo)} byte`);
+    registro.controlla('la versione è quella del master', copia.versione === VERSIONE_MASTER,
+      `app ${copia.versione} · master ${VERSIONE_MASTER}`);
+    registro.controlla('e il contenuto è identico, voce per voce', impronta === IMPRONTA_MASTER,
+      impronta === IMPRONTA_MASTER ? 'impronta uguale'
+        : `impronta diversa (${impronta.slice(0, 16)}…): qualcosa è stato ritoccato a mano, o il master è cambiato`);
+
+    // I numeri del master, scritti a mano: l'impronta dice SE qualcosa è
+    // cambiato, questi dicono COSA — ed è la riga che si legge quando
+    // l'impronta diventa rossa.
+    const numeri = await pagina.evaluate(async () => {
+      const a = await import('./core/anagrafica.js');
+      const { FASI } = await import('./core/fasi.js');
+      const edifici = ['MAR', 'MNG', 'SNZ2.2'];
+      const out = { voci: Object.keys(a.ANAGRAFICA.livelliPerFase).length, edifici: {}, lotti: {} };
+      for (const c of edifici) {
+        const p = a.pianiDi(c);
+        out.edifici[c] = {
+          piani: p.length,
+          ultimo: p[p.length - 1].codice,
+          crescente: p.every((x, i) => i === 0 || Number(x.ordine) > Number(p[i - 1].ordine)),
+          unita: a.unitaDi(c).length,
+          unitaSulTetto: a.unitaDi(c).filter(u => u.piano === 'Tetto').length,
+          tettoInInterrato: a.pianiPerFase(c, 'Interrato').some(x => x.codice === 'Tetto'),
+        };
+      }
+      for (const c of ['SNU', 'BRU']) out.lotti[c] = a.lottiDi(c).map(l => l.codice || l);
+      let combinazioni = 0;
+      const uniche = [];
+      for (const c of edifici) {
+        for (const f of FASI.map(x => x.codice)) {
+          const regola = a.ANAGRAFICA.livelliPerFase[f];
+          const unici = a.livelliUnici(c, f);
+          for (const liv of ['piano', 'unita', 'prospetto']) {
+            if (regola[liv] !== 'O') continue;
+            combinazioni += 1;
+            if (unici[liv]) uniche.push(`${c} · ${f} · ${unici[liv].codice}`);
+          }
+        }
+      }
+      out.combinazioni = combinazioni;
+      out.uniche = uniche;
+      return out;
+    });
+    registro.dice('numeri dell’anagrafica', numeri);
+    registro.controlla('30 voci per fase: 27 fasi e 3 lotti', numeri.voci === 30, String(numeri.voci));
+    registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
+      numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
+    registro.controlla('in tutti e tre il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
+      Object.values(numeri.edifici).every(e => e.ultimo === 'Tetto' && e.crescente),
+      'i piani stanno nel loro ordine proprio, non in ordine alfabetico: «P10» prima di «P2» non vuol dire niente');
+    registro.controlla('nessuna unità sul Tetto',
+      Object.values(numeri.edifici).every(e => e.unitaSulTetto === 0),
+      'il Tetto è un piano a sé, non una parte comune e non un alloggio');
+    registro.controlla('unità invariate: MAR 15, MNG 16, SNZ2.2 51',
+      numeri.edifici.MAR.unita === 15 && numeri.edifici.MNG.unita === 16 && numeri.edifici['SNZ2.2'].unita === 51);
+    registro.controlla('e il filtro di Interrato esclude il Tetto',
+      Object.values(numeri.edifici).every(e => !e.tettoInInterrato),
+      'ordine positivo: «Interrato, Tetto» non è una cartella che qualcuno cerchi');
+    registro.controlla('lotti: SNU 3, BRU 3',
+      numeri.lotti.SNU.join(',') === 'Lotto1,Lotto2,Lotto3' && numeri.lotti.BRU.join(',') === 'Lotto1,Lotto2,Lotto3');
+    registro.controlla('voce unica: una sola combinazione su 45, SNZ2.2 · Interrato · P-1',
+      numeri.combinazioni === 45 && numeri.uniche.length === 1 && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1',
+      `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
 
     registro.titolo('Urbanizzazioni: al posto delle fasi, i lotti');
     await scegliCommessa('#commessa', 'SNU');
     const lottiSNU = await voci('#fase');
     registro.dice('SNU offre', lottiSNU.join(' '));
-    registro.controlla('SNU ha quattro lotti', lottiSNU.join(',') === 'Lotto1,Lotto2,Lotto3,Lotto4');
+    registro.controlla('SNU ha tre lotti, e Lotto4 non c’è più',
+      lottiSNU.join(',') === 'Lotto1,Lotto2,Lotto3',
+      'tolto dal master il 05/10/2026: mandarlo lo farebbe depositare come «codice di fase sconosciuto»');
     registro.controlla('l’etichetta del campo dice «Lotto», non «Fase di lavoro»',
       (await pagina.$eval('#etichetta-fase', e => e.textContent.trim())) === 'Lotto');
     registro.controlla('a video il lotto ha lo spazio, nel valore no',
@@ -233,7 +332,9 @@ module.exports = {
     registro.controlla('e non quelli di unità e prospetto',
       !(await visibile('#campo-unita')) && !(await visibile('#campo-prospetto')));
     registro.dice('MAR: piani offerti', (await voci('#piano')).join(' '));
-    registro.controlla('sono i tre di MAR', (await voci('#piano')).join(',') === 'P0,P1,P2');
+    registro.controlla('sono i quattro di MAR, col Tetto in fondo',
+      (await voci('#piano')).join(',') === 'P0,P1,P2,Tetto',
+      'il Tetto è un piano a sé dal 04/10/2026, subito sopra l’ultimo piano');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
     registro.controlla('con la foto pronta ma senza piano, Invia è spento',
@@ -272,7 +373,7 @@ module.exports = {
     registro.dice('MNG: quante unità', String((await voci('#unita')).length));
     registro.controlla('le unità sono raggruppate per piano',
       (await pagina.$$eval('#unita optgroup', o => o.length)) > 1,
-      '55 voci di fila su SNZ2.2 non si scorrono col pollice');
+      '51 voci di fila su SNZ2.2 non si scorrono col pollice');
     await pagina.selectOption('#unita', '1B');
     const aiutoUnita = await pagina.$eval('#aiuto-unita', e => e.textContent.replace(/\s+/g, ' ').trim());
     registro.dice('aiuto sotto il menù', aiutoUnita);
@@ -350,7 +451,7 @@ module.exports = {
     await pagina.waitForSelector('#cantiere');
     await scegliCommessa('#cantiere', 'SNU');
     registro.controlla('anche una bolla di SNU prende il lotto',
-      (await voci('#fase')).join(',') === 'Lotto1,Lotto2,Lotto3,Lotto4'
+      (await voci('#fase')).join(',') === 'Lotto1,Lotto2,Lotto3'
       && (await pagina.$eval('#etichetta-fase', e => e.textContent.trim())) === 'Lotto',
       'il selettore è condiviso di proposito: due elenchi separati diventerebbero due verità');
     await scegliCommessa('#cantiere', 'MNG');
@@ -388,6 +489,71 @@ module.exports = {
     registro.controlla('e viaggiano sempre, anche quando valgono null',
       tutti.every(r => 'piano' in r && 'unita' in r && 'prospetto' in r),
       'un campo assente e un campo null si comportano diversamente in un flow: meglio uno solo dei due');
+
+    // Il Tetto a video, nei due posti dove il master lo vuole e nel posto
+    // dove non lo vuole. Si torna al modulo Foto: i menu dei piani e delle
+    // unità ci sono solo lì.
+    registro.titolo('Il Tetto: in fondo ai piani, mai fra le unità');
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.waitForSelector('#commessa');
+    for (const commessa of ['MNG', 'SNZ2.2']) {
+      await scegliCommessa('#commessa', commessa);
+      await scegliFase('Strutture');
+      const piani = await voci('#piano');
+      const ultimaVoce = await pagina.$$eval('#piano option', o => o[o.length - 1].textContent.trim());
+      registro.dice(`${commessa}, Strutture: piani offerti`, piani.join(' '));
+      registro.controlla(`${commessa}: il Tetto è l’ultima voce del menù dei piani`,
+        piani[piani.length - 1] === 'Tetto' && ultimaVoce === 'Tetto', ultimaVoce);
+    }
+    await scegliCommessa('#commessa', 'SNZ2.2');
+    await scegliFase('FinituraAlloggi');
+    const gruppi = await pagina.$$eval('#unita optgroup', o => o.map(e => e.label));
+    const valoriUnita = await voci('#unita');
+    registro.dice('SNZ2.2, FinituraAlloggi: gruppi del menù delle unità', gruppi.join(' · '));
+    registro.controlla('fra le unità il Tetto non c’è, né come gruppo né come voce',
+      !gruppi.includes('Tetto') && !valoriUnita.includes('Tetto') && valoriUnita.length === 51,
+      `${valoriUnita.length} unità — il Tetto non ha unità, e una fase che chiede l’unità non lo offre`);
+
+    // **Un Lotto4 rimasto in memoria** (punto 4 della 0.37.8). L'app ricorda
+    // l'ultima fase scelta, una per modulo (`ultimaFase` in `llitalia.foto` e
+    // in `llitalia.bolle`), e alla riapertura la riseleziona solo se è ancora
+    // fra le voci. Un telefono che aveva mandato una foto o una bolla di SNU
+    // col Lotto4 ce l'ha ancora in memoria: deve ritrovarsi con «— nessun
+    // lotto —», non con Lotto4 selezionato. È la stessa trappola della 0.37.7,
+    // e il caso è quello che può fallire: il valore in memoria è proprio
+    // quello che è sparito.
+    registro.titolo('Un Lotto4 rimasto in memoria non resta selezionato');
+    for (const [modulo, selettore, chiave, extra] of [
+      ['foto', '#commessa', 'llitalia.foto', { ultimaCommessa: 'SNU' }],
+      ['bolle', '#cantiere', 'llitalia.bolle', { ultimoCantiere: 'SNU' }],
+    ]) {
+      await pagina.evaluate(({ chiave, extra }) => {
+        const dati = JSON.parse(localStorage.getItem(chiave) || '{}');
+        localStorage.setItem(chiave, JSON.stringify({ ...dati, ...extra, ultimaFase: 'Lotto4' }));
+      }, { chiave, extra });
+      await pagina.goto(app.indirizzo + `/index.html#/${modulo}`);
+      await pagina.reload();
+      await pagina.waitForSelector(selettore);
+      await scegliCommessa(selettore, 'SNU');
+      const stato = await pagina.$eval('#fase', e => ({
+        valore: e.value, testo: e.options[e.selectedIndex].textContent.trim(),
+      }));
+      registro.dice(`${modulo}: in memoria Lotto4, a video`, `«${stato.testo}» (valore ${JSON.stringify(stato.valore)})`);
+      registro.controlla(`${modulo}: Lotto4 non è selezionato, si riparte da «— nessun lotto —»`,
+        stato.valore === '' && /nessun lotto/.test(stato.testo));
+    }
+    // Nel modulo Foto la fase è obbligatoria: senza lotto Invia resta spento.
+    // Nelle bolle no — è facoltativa per scelta di Francesco — quindi lì
+    // «nessun lotto» è una scelta valida, e il collaudo non pretende altro.
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.reload();
+    await pagina.waitForSelector('#commessa');
+    await scegliCommessa('#commessa', 'SNU');
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    registro.controlla('foto: senza lotto Invia resta spento',
+      await pagina.$eval('#invia', e => e.disabled),
+      'la foto non parte né col Lotto4 né senza lotto: aspetta che l’operatore scelga');
 
     registro.controllaConsole(errori);
     await contesto.close();

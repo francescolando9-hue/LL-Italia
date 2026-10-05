@@ -8,6 +8,18 @@
 // copia è questa, e compare nella pagina Informazioni: quando l'ufficio dice
 // «ho aggiornato l'anagrafica» si confronta quel numero, invece di fidarsi.
 //
+// **Si rigenera, non si ritocca.** Il blocco si riscrive per intero dal JSON
+// del master, e il collaudo `15-livelli.js` confronta l'impronta SHA-256
+// della sua forma canonica (chiavi ordinate, nessuno spazio, UTF-8) con
+// quella del master della versione dichiarata: una voce corretta a mano qui
+// fa diventare rosso il collaudo. A ogni master nuovo si aggiornano insieme il
+// blocco, `VERSIONE_MASTER` e `IMPRONTA_MASTER` nel collaudo — l'impronta
+// calcolata dal file del master, non da questo.
+//
+// Fra il 04 e il 05/10/2026 il master è cambiato due volte (il Tetto come
+// piano a sé in MAR, MNG e SNZ2.2; Lotto4 tolto da SNU) e l'app no: la 0.37.8
+// l'ha riallineata, e da allora l'impronta lo avrebbe detto subito.
+//
 // A cosa serve. Dal 18/09/2026 l'archivio di commessa sul server ha UN LIVELLO
 // sotto la fase, e dove quel livello è obbligatorio **sostituisce la cartella
 // del mese** — deciso da Francesco:
@@ -37,7 +49,7 @@
 import { FASI, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202609182010',
+  versione: '202610050932',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -73,20 +85,21 @@ export const ANAGRAFICA = {
     Lotto1:                       { piano: '-', unita: '-', prospetto: '-' },
     Lotto2:                       { piano: '-', unita: '-', prospetto: '-' },
     Lotto3:                       { piano: '-', unita: '-', prospetto: '-' },
-    Lotto4:                       { piano: '-', unita: '-', prospetto: '-' },
   },
   commesse: {
     MAR: {
       tipo: 'edificio',
       piani: [
-        { codice: 'P0', etichetta: 'Piano terra',   ordine: 0 },
-        { codice: 'P1', etichetta: 'Piano primo',   ordine: 1 },
-        { codice: 'P2', etichetta: 'Piano secondo', ordine: 2 },
+        { codice: 'P0',    etichetta: 'Piano terra',   ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',   ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo', ordine: 2 },
+        { codice: 'Tetto', etichetta: 'Tetto',         ordine: 3 },
       ],
       unita: {
-        P0: ['0.01', '0.02', '0.03', '0.04', '0.05'],
-        P1: ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06'],
-        P2: ['2.01', '2.02', '2.03', '2.04'],
+        P0:    ['0.01', '0.02', '0.03', '0.04', '0.05'],
+        P1:    ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06'],
+        P2:    ['2.01', '2.02', '2.03', '2.04'],
+        Tetto: [],
       },
       etichetteUnita: {},
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
@@ -94,76 +107,93 @@ export const ANAGRAFICA = {
     MNG: {
       tipo: 'edificio',
       piani: [
-        { codice: 'P-2', etichetta: 'Secondo piano interrato', ordine: -2 },
-        { codice: 'P-1', etichetta: 'Primo piano interrato',   ordine: -1 },
-        { codice: 'P0',  etichetta: 'Piano terra',             ordine: 0 },
-        { codice: 'P1',  etichetta: 'Piano primo',             ordine: 1 },
-        { codice: 'P2',  etichetta: 'Piano secondo',           ordine: 2 },
-        { codice: 'P3',  etichetta: 'Piano terzo',             ordine: 3 },
-        { codice: 'P4',  etichetta: 'Piano quarto',            ordine: 4 },
-        { codice: 'P5',  etichetta: 'Piano quinto',            ordine: 5 },
-        { codice: 'P6',  etichetta: 'Piano sesto',             ordine: 6 },
-        { codice: 'P7',  etichetta: 'Piano settimo',           ordine: 7 },
-        { codice: 'P8',  etichetta: 'Piano ottavo',            ordine: 8 },
+        { codice: 'P-2',   etichetta: 'Secondo piano interrato', ordine: -2 },
+        { codice: 'P-1',   etichetta: 'Primo piano interrato',   ordine: -1 },
+        { codice: 'P0',    etichetta: 'Piano terra',             ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',             ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo',           ordine: 2 },
+        { codice: 'P3',    etichetta: 'Piano terzo',             ordine: 3 },
+        { codice: 'P4',    etichetta: 'Piano quarto',            ordine: 4 },
+        { codice: 'P5',    etichetta: 'Piano quinto',            ordine: 5 },
+        { codice: 'P6',    etichetta: 'Piano sesto',             ordine: 6 },
+        { codice: 'P7',    etichetta: 'Piano settimo',           ordine: 7 },
+        { codice: 'P8',    etichetta: 'Piano ottavo',            ordine: 8 },
+        { codice: 'Tetto', etichetta: 'Tetto',                   ordine: 9 },
       ],
       unita: {
-        'P-2': [], 'P-1': [],
-        P0: ['0A'],
-        P1: ['1A', '1B'], P2: ['2A', '2B'], P3: ['3A', '3B'], P4: ['4A', '4B'],
-        P5: ['5A', '5B'], P6: ['6A', '6B'], P7: ['7A', '7B'],
-        P8: ['8B'],
+        'P-2': [],
+        'P-1': [],
+        P0:    ['0A'],
+        P1:    ['1A', '1B'],
+        P2:    ['2A', '2B'],
+        P3:    ['3A', '3B'],
+        P4:    ['4A', '4B'],
+        P5:    ['5A', '5B'],
+        P6:    ['6A', '6B'],
+        P7:    ['7A', '7B'],
+        P8:    ['8B'],
+        Tetto: [],
       },
       etichetteUnita: {
         '0A': 'Trilocale con giardino esterno',
-        '1A': 'Quadrilocale', '1B': 'Cinquelocali',
-        '2A': 'Quadrilocale', '2B': 'Cinquelocali',
-        '3A': 'Quadrilocale', '3B': 'Cinquelocali',
-        '4A': 'Quadrilocale', '4B': 'Cinquelocali',
-        '5A': 'Quadrilocale', '5B': 'Cinquelocali',
-        '6A': 'Quadrilocale', '6B': 'Cinquelocali',
-        '7A': 'Quadrilocale', '7B': 'Cinquelocali',
-        '8B': "Attico (superficie di quadrilocale piu' cinquelocali)",
+        '8B': 'Attico (superficie di quadrilocale più cinquelocali)',
+        '1A': 'Quadrilocale',
+        '1B': 'Cinquelocali',
+        '2A': 'Quadrilocale',
+        '2B': 'Cinquelocali',
+        '3A': 'Quadrilocale',
+        '3B': 'Cinquelocali',
+        '4A': 'Quadrilocale',
+        '4B': 'Cinquelocali',
+        '5A': 'Quadrilocale',
+        '5B': 'Cinquelocali',
+        '6A': 'Quadrilocale',
+        '6B': 'Cinquelocali',
+        '7A': 'Quadrilocale',
+        '7B': 'Cinquelocali',
       },
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
     'SNZ2.2': {
       tipo: 'edificio',
       piani: [
-        { codice: 'P-1', etichetta: 'Primo piano interrato', ordine: -1 },
-        { codice: 'P0',  etichetta: 'Piano terra',           ordine: 0 },
-        { codice: 'P1',  etichetta: 'Piano primo',           ordine: 1 },
-        { codice: 'P2',  etichetta: 'Piano secondo',         ordine: 2 },
-        { codice: 'P3',  etichetta: 'Piano terzo',           ordine: 3 },
-        { codice: 'P4',  etichetta: 'Piano quarto',          ordine: 4 },
-        { codice: 'P5',  etichetta: 'Piano quinto',          ordine: 5 },
-        { codice: 'P6',  etichetta: 'Piano sesto',           ordine: 6 },
-        { codice: 'P7',  etichetta: 'Piano settimo',         ordine: 7 },
-        { codice: 'P8',  etichetta: 'Piano ottavo',          ordine: 8 },
-        { codice: 'P9',  etichetta: 'Piano nono',            ordine: 9 },
-        { codice: 'P10', etichetta: 'Piano decimo',          ordine: 10 },
-        { codice: 'P11', etichetta: 'Piano undicesimo',      ordine: 11 },
-        { codice: 'P12', etichetta: 'Piano dodicesimo',      ordine: 12 },
+        { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
+        { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',           ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo',         ordine: 2 },
+        { codice: 'P3',    etichetta: 'Piano terzo',           ordine: 3 },
+        { codice: 'P4',    etichetta: 'Piano quarto',          ordine: 4 },
+        { codice: 'P5',    etichetta: 'Piano quinto',          ordine: 5 },
+        { codice: 'P6',    etichetta: 'Piano sesto',           ordine: 6 },
+        { codice: 'P7',    etichetta: 'Piano settimo',         ordine: 7 },
+        { codice: 'P8',    etichetta: 'Piano ottavo',          ordine: 8 },
+        { codice: 'P9',    etichetta: 'Piano nono',            ordine: 9 },
+        { codice: 'P10',   etichetta: 'Piano decimo',          ordine: 10 },
+        { codice: 'P11',   etichetta: 'Piano undicesimo',      ordine: 11 },
+        { codice: 'P12',   etichetta: 'Piano dodicesimo',      ordine: 12 },
+        { codice: 'Tetto', etichetta: 'Tetto',                 ordine: 13 },
       ],
       unita: {
         'P-1': [],
-        P0:  ['0A', '0B', '0C'],
-        P1:  ['1A', '1B', '1C', '1D'],
-        P2:  ['2A', '2B', '2C', '2D'],
-        P3:  ['3A', '3B', '3C', '3D'],
-        P4:  ['4A', '4B', '4C', '4D'],
-        P5:  ['5A', '5B', '5C', '5D'],
-        P6:  ['6A', '6B', '6C', '6D'],
-        P7:  ['7A', '7B', '7C', '7D'],
-        P8:  ['8A', '8B', '8C', '8D'],
-        P9:  ['9A', '9B', '9C', '9D'],
-        P10: ['10A', '10B', '10C', '10D'],
-        P11: ['11A', '11B', '11C', '11D'],
-        P12: ['12A', '12B', '12C', '12D'],
+        P0:    ['0A', '0B', '0C'],
+        P1:    ['1A', '1B', '1C', '1D'],
+        P2:    ['2A', '2B', '2C', '2D'],
+        P3:    ['3A', '3B', '3C', '3D'],
+        P4:    ['4A', '4B', '4C', '4D'],
+        P5:    ['5A', '5B', '5C', '5D'],
+        P6:    ['6A', '6B', '6C', '6D'],
+        P7:    ['7A', '7B', '7C', '7D'],
+        P8:    ['8A', '8B', '8C', '8D'],
+        P9:    ['9A', '9B', '9C', '9D'],
+        P10:   ['10A', '10B', '10C', '10D'],
+        P11:   ['11A', '11B', '11C', '11D'],
+        P12:   ['12A', '12B', '12C', '12D'],
+        Tetto: [],
       },
       etichetteUnita: {},
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
-    SNU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3', 'Lotto4'] },
+    SNU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },
     BRU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },
   },
 };
@@ -416,8 +446,8 @@ export function opzioniLivello(voci, segnaposto, scelto, scappaHtml) {
     }).join('');
 }
 
-// Le unità raggruppate per piano. Sono tante — 55 su SNZ2.2 — e un elenco
-// piatto di 55 voci non si scorre col pollice: i gruppi danno al dito un
+// Le unità raggruppate per piano. Sono tante — 51 su SNZ2.2 — e un elenco
+// piatto di 51 voci non si scorre col pollice: i gruppi danno al dito un
 // appiglio, e il piano resta leggibile accanto all'unità senza che lo si debba
 // scegliere (lo determina l'unità, §`livelliRichiesti`).
 export function opzioniUnita(codiceCommessa, scelta, scappaHtml) {
