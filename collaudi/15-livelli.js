@@ -160,10 +160,71 @@ module.exports = {
     registro.controlla('per Interrato solo i piani sotto quota',
       pianiInterrato.join(',') === 'P-2,P-1',
       '«Interrato, piano terzo» è una scelta che non vuol dire niente');
+    registro.controlla('e il menù del piano si vede, perché c’è da scegliere',
+      await visibile('#piano') && !(await visibile('#unico-piano')),
+      'due voci: si chiede, come sempre');
+
+    // **Una voce sola: non si chiede** (dalla 0.37.7). SNZ2.2 ha un solo piano
+    // sotto quota, e l'app apriva lo stesso un menù con «— scegli il piano —»
+    // e `P-1` come unica voce: un tocco obbligatorio per una scelta che non
+    // c'era. Previsione scritta prima di provare: menù nascosto, valore scritto
+    // a video, Invia acceso senza toccare niente, `piano: "P-1"` nel payload.
+    registro.titolo('Un piano solo possibile: non si chiede, lo sceglie l’app');
     await scegliCommessa('#commessa', 'SNZ2.2');
     await scegliFase('Interrato');
-    registro.controlla('su SNZ2.2, che ha un interrato solo, ne offre uno',
-      (await voci('#piano')).join(',') === 'P-1');
+    registro.controlla('su SNZ2.2 c’è un interrato solo', (await voci('#piano')).join(',') === 'P-1');
+    registro.controlla('il menù del piano NON si vede',
+      !(await visibile('#piano')),
+      'una tendina con una voce sola è un tocco per niente');
+    const unico = await pagina.$eval('#unico-piano', e => e.textContent.replace(/\s+/g, ' ').trim());
+    registro.dice('al suo posto si legge', unico);
+    registro.controlla('al suo posto si legge il piano che parte, e perché',
+      await visibile('#unico-piano') && /P-1/.test(unico) && /Primo piano interrato/.test(unico)
+        && /unico piano interrato/.test(unico),
+      'l’operatore deve vedere in che cartella va la foto anche quando non c’è niente da scegliere');
+    registro.controlla('il campo «Piano» resta a video', await visibile('#campo-piano'));
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso da solo', 10000);
+    registro.controlla('Invia si accende senza toccare il piano',
+      !(await pagina.$eval('#invia', e => e.disabled)));
+    const primaUnico = flow.stato.ricevuti.length;
+    await pagina.click('#invia');
+    const fineUnico = Date.now() + 90000;
+    while (flow.stato.ricevuti.length === primaUnico && Date.now() < fineUnico) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const interrato = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    registro.dice('payload', `fase: ${JSON.stringify(interrato.fase)} · piano: ${JSON.stringify(interrato.piano)}`);
+    registro.controlla('nel payload il piano c’è, ed è P-1',
+      interrato.fase === 'Interrato' && interrato.piano === 'P-1',
+      'non chiederlo non vuol dire non mandarlo: a valle il percorso è Interrato\\P-1\\');
+
+    // La trappola: il valore messo dall'app non deve diventare una scelta.
+    // `Strutture` su SNZ2.2 offre TUTTI i piani, `P-1` compreso: se il menù
+    // rifatto si portasse dietro il valore di prima, `P-1` resterebbe
+    // selezionato senza che nessuno l'abbia scelto — una preselezione, cioè
+    // la foto nella cartella sbagliata senza far rumore. Il caso è scelto
+    // perché possa fallire: con una fase che `P-1` non ce l'ha, il valore
+    // cadrebbe da sé e la prova non proverebbe niente.
+    registro.titolo('Il piano scelto dall’app non si porta dietro come scelta');
+    await scegliFase('Strutture');
+    const pianiStrutture = await voci('#piano');
+    registro.dice('SNZ2.2, Strutture: piani offerti', pianiStrutture.join(' '));
+    registro.controlla('Strutture offre anche P-1, quindi la prova può fallire',
+      pianiStrutture.includes('P-1') && pianiStrutture.length > 1);
+    registro.controlla('il menù torna a vedersi', await visibile('#piano') && !(await visibile('#unico-piano')));
+    registro.controlla('e parte dal segnaposto, NON da P-1',
+      (await pagina.$eval('#piano', e => e.value)) === '',
+      'P-1 l’aveva messo l’app per Interrato: per Strutture la scelta è dell’operatore');
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    registro.controlla('e senza scelta Invia resta spento',
+      await pagina.$eval('#invia', e => e.disabled));
+    // Si toglie la foto: il blocco dopo ne vuole una sola, la sua.
+    // La conferma «Eliminare questa foto?» la accetta già `nuovoTelefono`.
+    await pagina.click('.foto-rimuovi');
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 0, 'foto tolta', 10000);
 
     registro.titolo('Piano obbligatorio: senza, non si parte');
     await scegliCommessa('#commessa', 'MAR');

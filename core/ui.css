@@ -205,6 +205,22 @@ body {
 }
 .campo .aiuto { margin-top: 4px; }
 
+/* Un livello con una voce sola: non si sceglie, si legge (dalla 0.37.7). Ha
+   l'aspetto di un dato e non di un comando — niente bordo da campo, niente
+   freccia — perché un riquadro che sembra toccabile e non fa niente confonde
+   più di un menù. L'altezza resta quella di un campo, così la pagina non
+   salta quando si passa da una fase all'altra. */
+.valore-unico {
+  margin: 0;
+  min-height: var(--tocco);
+  padding: 12px 14px;
+  border-radius: var(--raggio);
+  background: var(--sfondo);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.valore-unico .tenue { display: block; margin-top: 2px; font-size: 0.9rem; font-weight: 400; }
+
 /* Interruttore (checkbox grande) */
 .campo-interruttore {
   display: flex;

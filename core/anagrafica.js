@@ -281,13 +281,53 @@ export function livelliRichiesti(codice, codiceFase) {
   return { piano, unita, prospetto, pianoDerivato: unita && regola.piano === 'D' };
 }
 
+// **Un livello con una sola voce possibile non si chiede: lo sceglie l'app**
+// (dalla 0.37.7). Il caso che l'ha fatto notare: SNZ2.2, fase `Interrato` —
+// la commessa ha un solo piano sotto quota, e l'app apriva lo stesso un menù
+// con «— scegli il piano —» e una voce sola, `P-1`. Un tocco obbligatorio per
+// una scelta che non c'era.
+//
+// Non contraddice la regola di `opzioniLivello` — nessuna preselezione — ma
+// ne è il confine: quella regola esiste perché una voce preselezionata che
+// nessuno guarda archivia la foto nell'appartamento sbagliato. Con UNA voce
+// sola non c'è un appartamento sbagliato: l'unico valore possibile non può
+// essere quello errato. Da due voci in su si torna a chiedere, sempre.
+//
+// La regola sta qui, nello strato dei dati, e non solo nella vista: così il
+// livello parte anche se il menù non c'è (il riquadro di «Rimanda», una
+// vista che si ridisegna in ritardo), e il blocco dell'invio non lo chiede.
+export function voceUnica(voci) {
+  return Array.isArray(voci) && voci.length === 1 ? voci[0] : null;
+}
+
+export function livelliUnici(codice, codiceFase) {
+  const richiesti = livelliRichiesti(codice, codiceFase);
+  return {
+    piano: richiesti.piano ? voceUnica(pianiPerFase(codice, codiceFase)) : null,
+    unita: richiesti.unita ? voceUnica(unitaDi(codice)) : null,
+    prospetto: richiesti.prospetto ? voceUnica(prospettiDi(codice)) : null,
+  };
+}
+
+// Le scelte dell'operatore, completate con le voci uniche. Una scelta fatta
+// vince sempre: la voce unica riempie solo un vuoto.
+function completaScelte(codice, codiceFase, scelte = {}) {
+  const unici = livelliUnici(codice, codiceFase);
+  return {
+    piano: scelte.piano || (unici.piano && unici.piano.codice) || '',
+    unita: scelte.unita || (unici.unita && unici.unita.codice) || '',
+    prospetto: scelte.prospetto || (unici.prospetto && unici.prospetto.codice) || '',
+  };
+}
+
 // I tre valori da mandare, normalizzati: il codice dove il livello si applica,
 // `null` dove non si applica. **Mai stringa vuota**: una colonna vuota e una
 // colonna assente si distinguono in raccolta, `''` invece è un valore che
 // somiglia a un dato e non lo è — ed è già costato venti foto entrate senza
 // colonne il 10/09.
-export function livelliDaMandare(codice, codiceFase, scelte = {}) {
+export function livelliDaMandare(codice, codiceFase, scelteFatte = {}) {
   const richiesti = livelliRichiesti(codice, codiceFase);
+  const scelte = completaScelte(codice, codiceFase, scelteFatte);
   const unita = richiesti.unita ? (scelte.unita || null) : null;
   const piano = richiesti.piano
     ? (scelte.piano || null)
@@ -301,8 +341,9 @@ export function livelliDaMandare(codice, codiceFase, scelte = {}) {
 
 // Quali livelli mancano all'appello, per bloccare l'invio e dirlo. Le etichette
 // sono quelle che l'operatore legge nel messaggio, non i nomi dei campi.
-export function livelliMancanti(codice, codiceFase, scelte = {}) {
+export function livelliMancanti(codice, codiceFase, scelteFatte = {}) {
   const richiesti = livelliRichiesti(codice, codiceFase);
+  const scelte = completaScelte(codice, codiceFase, scelteFatte);
   return [
     richiesti.piano && !scelte.piano && 'il piano',
     richiesti.unita && !scelte.unita && 'l’unità',
@@ -428,7 +469,16 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci) {
   // `iniziale` vale SOLO alla prima costruzione: è l'ultima scelta salvata,
   // o il valore del record che si sta rimandando. Riapplicarlo dopo
   // rimetterebbe una fase che l'operatore ha appena riportato a «nessuna».
-  const precedente = menu.dataset.chiave === undefined ? (menu.value || iniziale || '') : menu.value;
+  //
+  // Un valore messo dall'APP — la voce unica, sotto — non è una scelta e non si
+  // porta dietro: passando da `Interrato` (un solo piano, `P-1`) a `Strutture`
+  // (tutti i piani, `P-1` compreso) il menù rifatto troverebbe `P-1` fra le
+  // voci e lo terrebbe selezionato, cioè una preselezione che nessuno ha
+  // fatto. È esattamente quello che `opzioniLivello` esiste per impedire.
+  const automatico = menu.dataset.automatico === '1';
+  delete menu.dataset.automatico;
+  const precedente = automatico ? ''
+    : menu.dataset.chiave === undefined ? (menu.value || iniziale || '') : menu.value;
   menu.dataset.chiave = chiave;
   menu.innerHTML = costruisci(precedente);
   // Se il valore di prima non è più fra le opzioni, `value` resta vuoto da
@@ -436,6 +486,45 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci) {
   // invece di partire con un dato che non vale più per questa commessa.
   if (precedente && menu.querySelector(`option[value="${CSS.escape(precedente)}"]`)) {
     menu.value = precedente;
+  }
+}
+
+// La voce unica a video: il menù si nasconde e al suo posto si legge il valore
+// che parte, con il perché. Non si nasconde il campo intero: l'operatore deve
+// vedere in quale cartella va la foto, anche quando non c'è niente da
+// scegliere — è lo stesso motivo per cui il piano ricavato dall'unità si
+// scrive sotto il menù dell'unità.
+//
+// L'unica voce si scrive anche nel menù nascosto, e lo si marca come messo
+// dall'app: chi legge il valore lo trova, e `rifaiSeServe` sa che non è una
+// scelta da portarsi dietro.
+const PERCHE_UNICA = {
+  piano: fase => fase === 'Interrato'
+    ? 'è l’unico piano interrato di questa commessa: lo sceglie l’app'
+    : 'è l’unico piano di questa commessa: lo sceglie l’app',
+  unita: () => 'è l’unica unità di questa commessa: la sceglie l’app',
+  prospetto: () => 'è l’unico prospetto di questa commessa: lo sceglie l’app',
+};
+
+function mostraVoceUnica(radice, prefisso, livello, menu, voce, fase, scappaHtml) {
+  if (!menu) return;
+  const riga = radice.querySelector(`#unico-${prefisso}${livello}`);
+  if (voce) {
+    menu.value = voce.codice;
+    menu.dataset.automatico = '1';
+    menu.classList.add('nascosto');
+    if (riga) {
+      const testo = voce.etichetta && voce.etichetta !== voce.codice
+        ? `${voce.codice} — ${voce.etichetta}` : voce.codice;
+      riga.innerHTML = `${scappaHtml(testo)}<span class="tenue">${scappaHtml(PERCHE_UNICA[livello](fase))}</span>`;
+      riga.classList.remove('nascosto');
+    }
+    return;
+  }
+  menu.classList.remove('nascosto');
+  if (riga) {
+    riga.innerHTML = '';
+    riga.classList.add('nascosto');
   }
 }
 
@@ -457,6 +546,7 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
     return { fase, piano: null, unita: null, prospetto: null, mancanti: [] };
   }
   const richiesti = livelliRichiesti(codiceCommessa, fase);
+  const unici = livelliUnici(codiceCommessa, fase);
 
   const campoPiano = radice.querySelector(`#campo-${prefisso}piano`);
   const menuPiano = radice.querySelector(`#${prefisso}piano`);
@@ -467,6 +557,7 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   } else if (menuPiano) {
     menuPiano.value = '';
   }
+  mostraVoceUnica(radice, prefisso, 'piano', menuPiano, unici.piano, fase, scappaHtml);
 
   const campoUnita = radice.querySelector(`#campo-${prefisso}unita`);
   const menuUnita = radice.querySelector(`#${prefisso}unita`);
@@ -477,6 +568,7 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   } else if (menuUnita) {
     menuUnita.value = '';
   }
+  mostraVoceUnica(radice, prefisso, 'unita', menuUnita, unici.unita, fase, scappaHtml);
 
   const campoProspetto = radice.querySelector(`#campo-${prefisso}prospetto`);
   const menuProspetto = radice.querySelector(`#${prefisso}prospetto`);
@@ -487,6 +579,7 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   } else if (menuProspetto) {
     menuProspetto.value = '';
   }
+  mostraVoceUnica(radice, prefisso, 'prospetto', menuProspetto, unici.prospetto, fase, scappaHtml);
 
   const scelte = {
     piano: menuPiano ? menuPiano.value : '',
@@ -551,14 +644,17 @@ export function campiLivelli(prefisso = '', conLivelli = true) {
       <div class="campo nascosto" id="campo-${prefisso}piano">
         <label for="${prefisso}piano">Piano</label>
         <select id="${prefisso}piano" required></select>
+        <p id="unico-${prefisso}piano" class="valore-unico nascosto"></p>
       </div>
       <div class="campo nascosto" id="campo-${prefisso}unita">
         <label for="${prefisso}unita">Unità</label>
         <select id="${prefisso}unita" required></select>
+        <p id="unico-${prefisso}unita" class="valore-unico nascosto"></p>
         <p id="aiuto-${prefisso}unita" class="aiuto tenue"></p>
       </div>
       <div class="campo nascosto" id="campo-${prefisso}prospetto">
         <label for="${prefisso}prospetto">Prospetto</label>
         <select id="${prefisso}prospetto" required></select>
+        <p id="unico-${prefisso}prospetto" class="valore-unico nascosto"></p>
       </div>`;
 }
