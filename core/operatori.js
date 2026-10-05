@@ -8,32 +8,42 @@
 // sbagliato senza far rumore, e che rende inutile qualunque conteggio per
 // operatore.
 //
-// L'ordine è quello dato da Francesco, non alfabetico: si sceglie col pollice
-// da un elenco corto, e chi usa l'app più spesso sta in cima.
+// **L'ordine è alfabetico sul nome come si legge a video** (nome, poi
+// cognome), deciso da Francesco il 05/10/2026. Fino alla 0.37.5 era un ordine
+// d'uso — chi apre l'app più spesso in cima — e aveva due difetti: va rimesso
+// a mano a ogni ingresso, e dipende da chi lo valuta. L'ordine alfabetico non
+// si valuta: si collauda, e un nome aggiunto in fondo fa fallire il collaudo
+// invece di restare lì per mesi.
+//
+// L'ordine sta QUI e in nessun altro posto: non si riordina a video. Un
+// secondo ordinamento sarebbe un secondo elenco, e due elenchi divergono.
 //
 // Sta nella shell e non in un modulo perché è di tutti: due elenchi separati
 // potrebbero divergere, e un nome presente in un modulo e assente nell'altro
 // sarebbe esattamente il problema che questo file esiste per eliminare.
 export const OPERATORI = [
+  'Alessio Ferrara',
+  'Andrea Gondos',
+  'Domenico Caminiti',
+  'Emanuele Zaccaro',
+  'Enzo Santovito',
+  'Florin Zaharia',
+  'Francesco Lando',
+  'Giovanni Lippolis',
+  'Maurizio Lando',
   'Paolo Sanzarello',
   'Riccardo Zaccaro',
-  'Emanuele Zaccaro',
-  'Rosario Incarbone',
   'Roberto Borinschi',
-  'Florin Zaharia',
-  'Andrea Gondos',
-  'Enzo Santovito',
-  'Francesco Lando',
-  // Aggiunti il 05/10/2026 su indicazione di Francesco, in coda e nell'ordine
-  // in cui sono stati dati: l'ordine dei primi nove non si tocca, perché è
-  // quello con cui chi usa l'app tutti i giorni trova il proprio nome senza
-  // leggerlo. Se uno di questi diventa un utente abituale va spostato in
-  // alto, ma è una decisione di Francesco, non una regola automatica.
-  'Alessio Ferrara',
-  'Giovanni Lippolis',
-  'Domenico Caminiti',
-  'Maurizio Lando',
+  'Rosario Incarbone',
 ];
+
+// Il confronto con cui l'elenco è ordinato, e con cui il collaudo lo verifica:
+// alfabetico italiano, senza distinzione di maiuscole e accenti. Sta qui perché
+// chi aggiunge un nome possa rimetterlo al posto giusto con la stessa regola
+// con cui il collaudo glielo chiederà.
+export function confrontaOperatori(a, b) {
+  return String(a).localeCompare(String(b), 'it', { sensitivity: 'base' });
+}
 
 export function operatoreValido(nome) {
   return OPERATORI.includes(String(nome || '').trim());
