@@ -24,6 +24,15 @@ export const OPERATORI = [
   'Andrea Gondos',
   'Enzo Santovito',
   'Francesco Lando',
+  // Aggiunti il 05/10/2026 su indicazione di Francesco, in coda e nell'ordine
+  // in cui sono stati dati: l'ordine dei primi nove non si tocca, perché è
+  // quello con cui chi usa l'app tutti i giorni trova il proprio nome senza
+  // leggerlo. Se uno di questi diventa un utente abituale va spostato in
+  // alto, ma è una decisione di Francesco, non una regola automatica.
+  'Alessio Ferrara',
+  'Giovanni Lippolis',
+  'Domenico Caminiti',
+  'Maurizio Lando',
 ];
 
 export function operatoreValido(nome) {
