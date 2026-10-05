@@ -15,8 +15,15 @@ module.exports = {
     await pagina.goto(app.indirizzo + '/index.html');
     await pagina.evaluate(dati => {
       localStorage.clear();
-      localStorage.setItem('llitalia.bolle', JSON.stringify(dati));
-    }, { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 20, ultimaFase: 'Bonifica' });
+      localStorage.setItem('llitalia.bolle', JSON.stringify(dati.bolle));
+      // Anche il modulo Foto, perché il nome dell'operatore è della shell e si
+      // prova sui DUE moduli: senza endpoint la foto resterebbe in coda e il
+      // controllo misurerebbe la configurazione invece del nome.
+      localStorage.setItem('llitalia.foto', JSON.stringify(dati.foto));
+    }, {
+      bolle: { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 20, ultimaFase: 'Bonifica' },
+      foto: { endpoint: flow.endpoint('foto'), token: 'PROVA', conservaUltime: 10, limiteMB: 20, ultimaFase: 'Bonifica' },
+    });
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#autore', { timeout: 20000 });
 
@@ -26,9 +33,28 @@ module.exports = {
     const elenco = await pagina.$$eval('#autore option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
     const nomi = elenco.filter(o => o.v).map(o => o.t);
     registro.dice('nomi selezionabili', nomi);
-    registro.controlla('ci sono i nove nomi concordati', nomi.length === 9);
+    // Il menu si confronta con l'elenco della SHELL, non con una copia scritta
+    // qui: è l'unico modo di accorgersi se quello che si sceglie col pollice
+    // smette di essere quello che `core/operatori.js` dichiara. Il numero resta
+    // scritto a mano apposta: un nome che sparisce per sbaglio non si vede
+    // confrontando due cose che cambiano insieme, e questo controllo diventa
+    // rosso finché qualcuno non legge l'elenco e aggiorna il numero.
+    const elencoShell = await pagina.evaluate(async () => {
+      const m = await import('./core/operatori.js');
+      return m.OPERATORI;
+    });
+    registro.dice('elenco in core/operatori.js', elencoShell);
+    registro.controlla('ci sono i tredici nomi concordati', nomi.length === 13, `trovati ${nomi.length}`);
+    registro.controlla('il menu è esattamente l\'elenco della shell, nello stesso ordine',
+      nomi.join('|') === elencoShell.join('|'),
+      'un nome presente in un posto e assente nell\'altro è il problema che quel file esiste per eliminare');
     registro.controlla('nell\'ordine dato, non alfabetico',
-      nomi[0] === 'Paolo Sanzarello' && nomi[nomi.length - 1] === 'Francesco Lando');
+      nomi[0] === 'Paolo Sanzarello' && nomi.join('|') !== [...nomi].sort().join('|'),
+      'chi usa l\'app tutti i giorni sta in cima e trova il proprio nome senza leggere l\'elenco');
+    registro.controlla('e ci sono i quattro aggiunti il 05/10/2026',
+      ['Alessio Ferrara', 'Giovanni Lippolis', 'Domenico Caminiti', 'Maurizio Lando']
+        .every(nome => nomi.includes(nome)),
+      nomi.slice(9).join(' · '));
 
     const primo = elenco[0];
     registro.controlla('parte da un segnaposto, non da un nome',
@@ -58,9 +84,44 @@ module.exports = {
     await aiuto.attendi(pagina,
       () => document.querySelector('#bolle-contatori .bolle-chip:nth-child(2) .valore').textContent === '1',
       'bolla inviata', 60000);
-    registro.dice('operatore arrivato al flow', flow.stato.ricevuti[0].operatore);
+    registro.dice('operatore arrivato al flow (bolle)', flow.stato.ricevuti[0].operatore);
     registro.controlla('è esattamente il nome dell\'elenco',
       flow.stato.ricevuti[0].operatore === 'Rosario Incarbone');
+
+    // **Lo stesso elenco serve i due moduli.** Il nome è un'impostazione della
+    // shell, non del modulo, e qui si dimostra fino in fondo: un nome aggiunto
+    // il 05/10/2026 si sceglie una volta e arriva uguale nel payload delle
+    // bolle e in quello delle foto. Senza questo controllo, «c'è anche nelle
+    // foto» resterebbe una deduzione dalla struttura del codice.
+    const nuovo = 'Maurizio Lando';
+    await pagina.goto(app.indirizzo + '/index.html#/impostazioni');
+    await pagina.waitForSelector('#autore', { timeout: 20000 });
+    const nelleImpostazioni = await pagina.$$eval('#autore option',
+      o => o.map(e => e.textContent.trim()));
+    registro.controlla('il nome nuovo si può scegliere dalle impostazioni',
+      nelleImpostazioni.includes(nuovo), nelleImpostazioni.join(' · '));
+    await pagina.selectOption('#autore', nuovo);
+    await pagina.click('#modulo-impostazioni button[type="submit"]');
+    const primaFoto = flow.stato.ricevuti.length;
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.waitForSelector('#commessa', { timeout: 20000 });
+    await pagina.selectOption('#commessa', 'MAR');
+    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MAR|'),
+      'menù della fase pronto', 10000);
+    await pagina.selectOption('#fase', 'Cantiere');
+    await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1,
+      'anteprima', 60000);
+    await pagina.click('#invia');
+    const fine = Date.now() + 90000;
+    while (flow.stato.ricevuti.length === primaFoto && Date.now() < fine) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const foto = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    registro.dice('operatore arrivato al flow (foto cantiere)', foto.operatore);
+    registro.controlla('un nome aggiunto arriva anche dal modulo Foto',
+      foto.operatore === nuovo && 'tipo' in foto,
+      `${foto.operatore} · tipo ${foto.tipo}`);
 
     registro.titolo('Telefono aggiornato da una versione col campo libero');
     const casi = [
@@ -83,6 +144,10 @@ module.exports = {
     registro.titolo('Un nome non riconosciuto riporta al benvenuto');
     await pagina.evaluate(() => localStorage.setItem('llitalia.app', JSON.stringify({ autore: 'P. Sanzarello' })));
     await pagina.goto(app.indirizzo + '/index.html#/foto');
+    // Ricarica vera: se la pagina è GIÀ su `#/foto` un `goto` allo stesso
+    // indirizzo non ridisegna, la guardia sul nome non gira, e il collaudo
+    // leggerebbe la pagina di prima credendo di leggere quella di adesso.
+    await pagina.reload();
     await pagina.waitForSelector('#autore, #commessa', { timeout: 20000 });
     const dove = await pagina.evaluate(() => location.hash);
     registro.controlla('l\'app chiede di scegliere invece di mandare un nome sbagliato',

@@ -4,3 +4,7 @@ core/configurazione.js
 # Collaudi: dipendenza di sviluppo e materiale generato, mai nel repo.
 collaudi/node_modules
 collaudi/materiale/
+# `npm install playwright` li scrive da sé (LEGGIMI, «Come si eseguono»):
+# sono la dipendenza di sviluppo, non l'app, che resta senza npm.
+collaudi/package.json
+collaudi/package-lock.json
