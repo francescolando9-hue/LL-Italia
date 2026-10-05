@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 16 del 30/09/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 17 del 05/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 17 — un livello con una voce sola non si chiede (0.37.7).** Se un livello obbligatorio ha una sola voce possibile — oggi solo SNZ2.2 in fase `Interrato`, piano `P-1` — il menù non compare: l'app la sceglie, la scrive a video e la manda. Da due voci in su si chiede sempre, e il valore messo dall'app non si porta dietro quando si cambia fase (§4.5). Contratto invariato.
 >
 > **Rev. 16 — il telefono che non lascia leggere una foto (0.37.4).** Due foto valide rifiutate a mezzogiorno e partite la sera senza toccarle: a fallire era la **lettura** del file, non il file. Tre correzioni in §4.1 — **una lettura sola, subito** (i byte si leggono una volta e quella copia serve per tutto il resto), **quattro tentativi** a 0,5/1,5/3 s, e l'avviso che **segue il caso**: «il telefono non ha lasciato leggere questa foto», con «Riprova» e **senza** «Aggiungi comunque». Da qui una regola generale: **la frase in testa è quella del caso**, e i file messi da parte si raggruppano per quello che l'operatore deve fare. In §4.1 anche il ripiego di «Scatta» sulla fotocamera di sistema, che spiega un file in raccolta senza firma del canvas. Il contratto **non cambia**.
 >
@@ -341,6 +343,10 @@ Lotto2\202609\<file>                    urbanizzazioni: il lotto fa da fase
 
 **Il filtro sui piani.** Per la fase `Interrato` l'app offre **solo i piani con ordine negativo**: «Interrato, piano terzo» è una scelta che non vuol dire niente, e in cartella diventerebbe un percorso che nessuno cerca.
 
+**Una voce sola: non si chiede, la sceglie l'app** (dalla 0.37.7). Se per quella commessa e quella fase un livello obbligatorio ha **una sola voce possibile**, il menù non compare: al suo posto si legge il valore che parte e il perché — *«P-1 — Primo piano interrato · è l'unico piano interrato di questa commessa: lo sceglie l'app»* — e il valore viaggia nel payload come se l'operatore l'avesse scelto. Il caso che l'ha fatto notare: SNZ2.2 in fase `Interrato` apriva un menù con «— scegli il piano —» e `P-1` come unica voce, cioè un tocco obbligatorio per una scelta che non c'era. Con l'anagrafica di oggi è **l'unico caso** in cui la regola scatta (misurato su tutte le commesse e tutte le fasi), ma vale per tutti e tre i livelli: un prospetto unico o un'unità unica seguono la stessa strada.
+
+Non contraddice la regola «nessuna preselezione» dei menù dei livelli: ne è il confine. Quella regola esiste perché una voce preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato; con una voce sola un appartamento sbagliato non c'è. **Da due voci in su si chiede sempre.** E il valore messo dall'app **non si porta dietro come scelta**: passando da `Interrato` (solo `P-1`) a `Strutture` (tutti i piani, `P-1` compreso) il menù riparte dal segnaposto e non da `P-1` — altrimenti la voce scelta dall'app diventerebbe esattamente la preselezione che quella regola impedisce. Il campo «Piano» resta a video anche quando non c'è niente da scegliere: l'operatore deve vedere in quale cartella va la foto.
+
 **`null`, mai stringa vuota.** Dove il livello non si applica il campo arriva `null` e non `''`. Vale la regola già registrata dei campi vuoti: una colonna con `''` somiglia a un dato e non lo è, e sui campi numerici una stringa vuota è già costata venti foto entrate senza colonne il 10/09. I tre campi **viaggiano sempre**, anche quando valgono `null`: un campo assente e un campo nullo si comportano diversamente in un flow, e meglio uno solo dei due casi.
 
 **Commesse senza anagrafica.** `SNZ2.1` e `MRS` sono concluse e in anagrafica non ci sono; una commessa nuova non ce l'ha ancora. Per loro non c'è nessun livello da offrire: le fasi restano tutte disponibili e i tre campi arrivano `null`. A valle la foto finisce nella cartella del mese con un'anomalia — **voluto**: non si blocca chi sta scattando in cantiere per un dato che manca in ufficio.
@@ -517,6 +523,22 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.7 — un livello con una voce sola non si chiede
+
+**Niente da fare a valle** e contratto invariato: il piano parte come prima, l'unica differenza è che non lo sceglie più l'operatore quando c'è una voce sola. Per SNZ2.2 in fase `Interrato` in raccolta arriva sempre `Piano = P-1`, come arrivava quando l'operatore lo sceglieva a mano.
+
+Previsione scritta prima di provare, e confermata (collaudo `15-livelli.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| SNZ2.2 + `Interrato` | menù del piano nascosto, al suo posto `P-1 — Primo piano interrato` e il perché | ✓ |
+| … con una foto pronta | Invia si accende senza toccare il piano | ✓ |
+| … il payload | `fase: "Interrato"`, `piano: "P-1"` | ✓ |
+| MNG + `Interrato` (due interrati) | il menù resta, si sceglie fra `P-2` e `P-1` | ✓ |
+| SNZ2.2, da `Interrato` a `Strutture` | il menù torna e parte dal segnaposto, **non** da `P-1`; senza scelta Invia resta spento | ✓ |
+
+L'ultimo caso è scelto perché possa fallire: `Strutture` su SNZ2.2 offre anche `P-1`, quindi un menù che si portasse dietro il valore di prima lo terrebbe selezionato. Con una fase che `P-1` non l'avesse, il valore cadrebbe da sé e la prova non proverebbe niente.
 
 ### Rilascio 0.37.4 — la lettura negata dal telefono
 
