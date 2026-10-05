@@ -48,13 +48,45 @@ module.exports = {
     registro.controlla('il menu è esattamente l\'elenco della shell, nello stesso ordine',
       nomi.join('|') === elencoShell.join('|'),
       'un nome presente in un posto e assente nell\'altro è il problema che quel file esiste per eliminare');
-    registro.controlla('nell\'ordine dato, non alfabetico',
-      nomi[0] === 'Paolo Sanzarello' && nomi.join('|') !== [...nomi].sort().join('|'),
-      'chi usa l\'app tutti i giorni sta in cima e trova il proprio nome senza leggere l\'elenco');
-    registro.controlla('e ci sono i quattro aggiunti il 05/10/2026',
+
+    // **L'ordine è alfabetico**, dalla 0.37.6. Prima era un ordine d'uso, che
+    // andava rimesso a mano a ogni ingresso e dipendeva da chi lo valutava:
+    // questo invece si collauda, e un nome aggiunto in fondo — che è il modo
+    // naturale di aggiungerne uno — fa fallire il collaudo subito.
+    //
+    // Il confronto è quello della shell (`confrontaOperatori`), non un
+    // `sort()` scritto qui: ordinare con una regola diversa da quella del file
+    // vorrebbe dire provare un ordine che non è quello che l'app dichiara.
+    const ordinato = await pagina.evaluate(async () => {
+      const m = await import('./core/operatori.js');
+      return [...m.OPERATORI].sort(m.confrontaOperatori);
+    });
+    registro.dice('elenco riordinato dalla regola della shell', ordinato);
+    registro.controlla('l\'elenco è già in ordine alfabetico',
+      nomi.join('|') === ordinato.join('|'),
+      `fuori posto: ${nomi.filter((n, i) => n !== ordinato[i]).join(' · ') || 'nessuno'}`);
+    // La regola di confronto, sui tre casi in cui un ordinamento per codice
+    // darebbe un risultato diverso: senza `localeCompare('it')` una minuscola
+    // finisce dopo tutte le maiuscole e una lettera accentata dopo la Z, che
+    // su un elenco di nomi propri è quello che fa sembrare l'ordine rotto a
+    // chi lo legge. I tre casi sono scelti così: con la regola sbagliata
+    // danno tutti e tre il segno opposto.
+    const regola = await pagina.evaluate(async () => {
+      const m = await import('./core/operatori.js');
+      return {
+        minuscola: m.confrontaOperatori('alfa', 'Beta'),
+        accento: m.confrontaOperatori('Elia', 'Èlia'),
+        accentoPrimaDiF: m.confrontaOperatori('Èlia', 'Fabio'),
+      };
+    });
+    registro.dice('la regola di confronto sui casi che la distinguono', regola);
+    registro.controlla('e la regola è quella italiana, non quella dei codici',
+      regola.minuscola < 0 && regola.accento === 0 && regola.accentoPrimaDiF < 0,
+      'maiuscole e accenti non contano: è un elenco di nomi, non di codici');
+    registro.controlla('ci sono i quattro aggiunti il 05/10/2026',
       ['Alessio Ferrara', 'Giovanni Lippolis', 'Domenico Caminiti', 'Maurizio Lando']
         .every(nome => nomi.includes(nome)),
-      nomi.slice(9).join(' · '));
+      nomi.join(' · '));
 
     const primo = elenco[0];
     registro.controlla('parte da un segnaposto, non da un nome',
@@ -102,6 +134,38 @@ module.exports = {
       nelleImpostazioni.includes(nuovo), nelleImpostazioni.join(' · '));
     await pagina.selectOption('#autore', nuovo);
     await pagina.click('#modulo-impostazioni button[type="submit"]');
+
+    // **Il telefono ricorda il NOME, non la posizione nell'elenco.** È il
+    // presupposto che ha reso sicuro il riordino alfabetico della 0.37.6: se
+    // sul telefono fosse salvato un indice, cambiare l'ordine cambierebbe in
+    // silenzio il nome di chi l'aveva già scelto — e in raccolta gli invii
+    // risulterebbero di un'altra persona, senza nessun errore da nessuna
+    // parte. Qui si legge quello che c'è scritto davvero sul dispositivo.
+    const salvato = await pagina.evaluate(() => localStorage.getItem('llitalia.app'));
+    registro.dice('cosa c\'è scritto sul telefono', salvato);
+    registro.controlla('sul telefono è salvato il nome, non una posizione',
+      JSON.parse(salvato).autore === nuovo,
+      'con un indice salvato, riordinare l\'elenco cambierebbe l\'autore di chi aveva già scelto');
+
+    // E il contrario: un telefono che aveva scelto il proprio nome con
+    // l'ordine di PRIMA lo ritrova scelto, uguale, dopo il riordino. Il caso
+    // scelto è quello che può fallire: «Paolo Sanzarello» era il primo
+    // dell'elenco nella 0.37.5 e nella 0.37.6 è il decimo, quindi un ripiego
+    // sulla posizione darebbe un nome diverso invece dello stesso.
+    await pagina.evaluate(() => localStorage.setItem('llitalia.app',
+      JSON.stringify({ autore: 'Paolo Sanzarello' })));
+    await pagina.goto(app.indirizzo + '/index.html#/impostazioni');
+    await pagina.reload();
+    await pagina.waitForSelector('#autore', { timeout: 20000 });
+    const ritrovato = await pagina.$eval('#autore', e => e.value);
+    registro.dice('nome salvato con l\'ordine della 0.37.5, riletto adesso', ritrovato);
+    registro.controlla('chi aveva già scelto ritrova il suo nome, non quello al suo posto',
+      ritrovato === 'Paolo Sanzarello',
+      `era il 1° dell'elenco, adesso è il ${elencoShell.indexOf('Paolo Sanzarello') + 1}°`);
+    // Si rimette il nome in prova prima di proseguire.
+    await pagina.selectOption('#autore', nuovo);
+    await pagina.click('#modulo-impostazioni button[type="submit"]');
+
     const primaFoto = flow.stato.ricevuti.length;
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#commessa', { timeout: 20000 });
