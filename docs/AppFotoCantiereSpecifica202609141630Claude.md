@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 17 del 05/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 18 del 05/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 18 — anagrafica riallineata al master (0.37.8).** Il master dell'anagrafica è cambiato due volte, il 04 e il 05/10/2026, e l'app no. Ora è la copia del master `202610050932`: il **Tetto** è un piano a sé in MAR, MNG e SNZ2.2, senza unità, in fondo ai menù dei piani; **SNU ha tre lotti**, `Lotto4` non c'è più. E da adesso l'allineamento si verifica: il collaudo confronta l'impronta del blocco con quella del master (§4.5). Contratto invariato.
 >
 > **Rev. 17 — un livello con una voce sola non si chiede (0.37.7).** Se un livello obbligatorio ha una sola voce possibile — oggi solo SNZ2.2 in fase `Interrato`, piano `P-1` — il menù non compare: l'app la sceglie, la scrive a video e la manda. Da due voci in su si chiede sempre, e il valore messo dall'app non si porta dietro quando si cambia fase (§4.5). Contratto invariato.
 >
@@ -289,7 +291,7 @@ Il campo arriva **vuoto** solo per le bolle e per le foto accodate prima della 0
 
 **Elenco chiuso**, lo stesso per Bolle e Foto, nella shell (`core/fasi.js`), dato da Francesco il 14/09/2026, in ordine alfabetico. **Non si scrive a mano**: «Murature», «murature» e «Muratura» in colonna sarebbero tre fasi.
 
-**Per le urbanizzazioni il LOTTO prende il posto della fase (dalla 0.36.0).** Su `SNU` e `BRU` il menù non mostra le fasi ma i lotti di quella commessa — `Lotto1`…`Lotto4` per SNU, `Lotto1`…`Lotto3` per BRU — e il valore viaggia **nello stesso campo `fase`**, col suo codice senza spazi, come `FinituraAlloggi`. A valle è sempre la stessa cosa: la cartella immediatamente sotto la commessa. A video l'etichetta ha lo spazio («Lotto 2»), nel campo no. Il selettore è **condiviso col modulo Bolle**, quindi anche una bolla di SNU prende il lotto: è voluto.
+**Per le urbanizzazioni il LOTTO prende il posto della fase (dalla 0.36.0).** Su `SNU` e `BRU` il menù non mostra le fasi ma i lotti di quella commessa — `Lotto1`…`Lotto3` per tutte e due (SNU ne aveva quattro fino al master del 05/10/2026, che ha tolto `Lotto4`) — e il valore viaggia **nello stesso campo `fase`**, col suo codice senza spazi, come `FinituraAlloggi`. A valle è sempre la stessa cosa: la cartella immediatamente sotto la commessa. A video l'etichetta ha lo spazio («Lotto 2»), nel campo no. Il selettore è **condiviso col modulo Bolle**, quindi anche una bolla di SNU prende il lotto: è voluto.
 
 **Un filtro sulle fasi (dalla 0.36.0).** Una commessa senza piani interrati **non vede la fase `Interrato`** — è il caso di `MAR`: offrirla vorrebbe dire offrire una cartella che non esisterà mai. Una commessa **senza anagrafica** (le concluse `SNZ2.1` e `MRS`, o una nuova) non si filtra: non sapere com'è fatta non è un motivo per togliere voci a chi sta scattando.
 
@@ -341,7 +343,11 @@ Lotto2\202609\<file>                    urbanizzazioni: il lotto fa da fase
 
 ⚠️ **La mappa unità → piano NON si deduce dal codice dell'unità.** Le commesse numerano diversamente: `1.01` in MAR, `1A` in MNG e in SNZ2.2. Una regola «primo carattere» funzionerebbe su `1A` → `P1` e **sbaglierebbe su `10A`**, che sta al `P10` e finirebbe al `P1` — in una cartella che esiste, nell'appartamento di un altro. Si legge dalla mappa, sempre. Il collaudo `15-livelli.js` prova proprio `10A`, perché è il caso su cui le due strade danno risultati diversi.
 
-**Il filtro sui piani.** Per la fase `Interrato` l'app offre **solo i piani con ordine negativo**: «Interrato, piano terzo» è una scelta che non vuol dire niente, e in cartella diventerebbe un percorso che nessuno cerca.
+**Il Tetto (dalla 0.37.8, master del 04/10/2026).** In MAR, MNG e SNZ2.2 c'è un piano in più, `Tetto`, subito sopra l'ultimo: è un **piano a sé**, non una parte comune, e **non ha unità**. Compare quindi in fondo al menù dei piani di ogni fase che chiede il piano (`Strutture\Tetto\`, `Impermeabilizzazioni\Tetto\`…), e non compare mai fra le unità né come piano ricavato da un'unità. I piani stanno nel loro **ordine proprio**, dal più basso al Tetto, e non in ordine alfabetico: «P10» prima di «P2» non vorrebbe dire niente. `Piano = Tetto` è un valore di testo come gli altri, e lo script lo accetta già.
+
+**Il filtro sui piani.** Per la fase `Interrato` l'app offre **solo i piani con ordine negativo**: «Interrato, piano terzo» è una scelta che non vuol dire niente, e in cartella diventerebbe un percorso che nessuno cerca. Il Tetto, che ha ordine positivo, ne resta fuori da sé.
+
+**L'anagrafica dell'app è la copia esatta del master, e lo si verifica** (dalla 0.37.8). Il blocco di `core/anagrafica.js` si rigenera per intero dal JSON del master, non si ritocca voce per voce, e il collaudo `15-livelli.js` confronta l'**impronta SHA-256** della sua forma canonica con quella del master della versione dichiarata. La forma canonica è il JSON con le chiavi ordinate, senza spazi, in UTF-8 — in Python `json.dumps(dati, sort_keys=True, ensure_ascii=False, separators=(',', ':'))` — quindi l'impronta si può rifare dal file su `L:` senza aprire il repo. Per il master `202610050932` è `0e736ea7f4c00ae5b597047695048b788df6aa75687713178fe35fe66022f3e6` (5133 byte). Il motivo: fra il 04 e il 05/10/2026 il master è cambiato due volte e l'app no, e nessuno se n'è accorto per giorni; con l'impronta lo si vede confrontando due numeri.
 
 **Una voce sola: non si chiede, la sceglie l'app** (dalla 0.37.7). Se per quella commessa e quella fase un livello obbligatorio ha **una sola voce possibile**, il menù non compare: al suo posto si legge il valore che parte e il perché — *«P-1 — Primo piano interrato · è l'unico piano interrato di questa commessa: lo sceglie l'app»* — e il valore viaggia nel payload come se l'operatore l'avesse scelto. Il caso che l'ha fatto notare: SNZ2.2 in fase `Interrato` apriva un menù con «— scegli il piano —» e `P-1` come unica voce, cioè un tocco obbligatorio per una scelta che non c'era. Con l'anagrafica di oggi è **l'unico caso** in cui la regola scatta (misurato su tutte le commesse e tutte le fasi), ma vale per tutti e tre i livelli: un prospetto unico o un'unità unica seguono la stessa strada.
 
@@ -523,6 +529,38 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.8 — anagrafica riallineata al master
+
+**Niente da fare a valle**, e contratto invariato. `Piano = Tetto` è un valore di testo come gli altri, e lo script lo accetta e lo deposita in `<Fase>\Tetto\`.
+
+**Cosa era diverso, misurato prima di toccare l'app** (app `202609182010`, master `202610050932`):
+
+| Differenza | Attesa | Note |
+|---|---|---|
+| `Tetto` fra i piani di MAR, MNG e SNZ2.2, con `unita.Tetto: []` | sì | master del 04/10 |
+| `Lotto4` in `livelliPerFase` e fra i lotti di SNU | sì | master del 05/10 |
+| Etichetta dell'unità `8B` di MNG: `piu'` nell'app, `più` nel master | **no** | solo a video, dalla 0.36.0; presa dal master su conferma di Francesco |
+
+`core/fasi.js` era già allineato: 27 fasi, e Lotto4 non c'è mai stato — i lotti vivono solo nell'anagrafica.
+
+**Cosa resta in memoria sui telefoni.** L'app ricorda l'ultima fase scelta, una per modulo (`ultimaFase`), e alla riapertura la riseleziona solo se è ancora fra le voci. Un Lotto4 rimasto in memoria riparte quindi da «— nessun lotto —» in tutti e due i moduli. Nel modulo Foto la fase è obbligatoria e Invia resta spento; nelle **bolle**, dove è facoltativa, «nessun lotto» è una scelta valida, quindi una bolla di SNU può partire senza lotto se l'operatore non lo sceglie — mai con Lotto4. Gli elementi già in coda con Lotto4 partono come sono: l'anomalia dello script è il segnale voluto.
+
+Previsione scritta prima di provare, e confermata (collaudo `15-livelli.js`):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Versione e impronta | `202610050932` · `0e736ea7…` | ✓ |
+| Voci in `livelliPerFase` | 30 (27 fasi + 3 lotti) | ✓ |
+| Piani | MAR 4, MNG 12, SNZ2.2 15, Tetto in fondo, ordine crescente | ✓ |
+| Unità | MAR 15, MNG 16, SNZ2.2 51; nessuna sul Tetto | ✓ |
+| Lotti | SNU 3, BRU 3 | ✓ |
+| Voce unica | una combinazione su 45: SNZ2.2 · Interrato · P-1 | ✓ |
+| A video, MNG e SNZ2.2 + `Strutture` | Tetto ultima voce del menù dei piani | ✓ |
+| A video, SNZ2.2 + `FinituraAlloggi` | nessun Tetto fra le unità (51 voci) | ✓ |
+| Lotto4 in memoria | «— nessun lotto —» in Foto e in Bolle; in Foto Invia spento | ✓ |
+
+**Il controllo dell'impronta è stato visto fallire**, su due copie guastate apposta: un'etichetta del Tetto ritoccata a mano (versione verde, **impronta rossa** — è il caso per cui l'impronta serve) e l'anagrafica della 0.37.7 (versione e impronta rosse, 15 controlli rossi in tutto).
 
 ### Rilascio 0.37.7 — un livello con una voce sola non si chiede
 
