@@ -232,18 +232,28 @@ async function configura(pagina, indirizzoApp, impostazioni = {}) {
     if (dati.foto) localStorage.setItem('llitalia.foto', JSON.stringify(dati.foto));
   }, {
     app: { autore: 'Paolo Sanzarello', ...(impostazioni.app || {}) },
-    // Come un telefono che la fase l'ha già scelta una volta, così negli altri
-    // collaudi il campo viaggia pieno; il caso senza fase lo prova
-    // 12-fase-e-barra.js.
-    //
-    // **Una fase SENZA livelli**, dalla 0.36.0: `Murature` pretende il piano,
-    // e usarla qui bloccherebbe l'invio in tutti i collaudi che non hanno
-    // niente a che fare coi livelli — che li misurerebbero invece della cosa
-    // che provano. I livelli hanno il loro collaudo (15-livelli.js), dove la
-    // fase si sceglie a mano.
-    bolle: impostazioni.bolle ? { ultimaFase: 'Bonifica', ...impostazioni.bolle } : undefined,
-    foto: impostazioni.foto ? { ultimaFase: 'Bonifica', ...impostazioni.foto } : undefined,
+    // Fino alla 0.37.8 qui si preimpostava `ultimaFase: 'Bonifica'`, «come un
+    // telefono che la fase l'ha già scelta una volta», e i collaudi partivano
+    // con la fase già nel menù. Dalla 0.37.9 la fase non si ricorda più —
+    // è il difetto delle 38 bolle del 05/10/2026 — quindi quel valore non lo
+    // legge più nessuno, e un collaudo che manda una foto la fase la SCEGLIE,
+    // come l'operatore. Vedi `scegliFase` qui sotto.
+    bolle: impostazioni.bolle || undefined,
+    foto: impostazioni.foto || undefined,
   });
+}
+
+// Scegliere la fase come la sceglie l'operatore, aspettando che il menù sia
+// pronto per quella commessa (trappola 4ter). Serve a ogni collaudo che manda
+// una foto: dalla 0.37.9 la fase si parte da «— scegli la fase —» e senza non
+// si invia. `Bonifica` non pretende livelli: è il percorso più corto, e i
+// livelli hanno il loro collaudo (15-livelli.js).
+async function scegliFase(pagina, fase = 'Bonifica', limite = 10000) {
+  await attendi(pagina, () => {
+    const menu = document.querySelector('#fase');
+    return Boolean(menu && menu.dataset.livelli !== undefined && menu.querySelectorAll('option').length > 1);
+  }, 'menù della fase pronto', limite);
+  await pagina.selectOption('#fase', fase);
 }
 
 // Riparte pulito: contatori del giorno e code svuotati (trappola 4).
@@ -296,5 +306,5 @@ function materiale(nome) {
 module.exports = {
   RADICE, MATERIALE, PORTA_APP, PORTA_FLOW,
   avviaStatico, avviaFlow, apriBrowser, nuovoTelefono,
-  attendi, attendiInstallazione, configura, puliscine, creaRegistro, materiale,
+  attendi, attendiInstallazione, configura, scegliFase, puliscine, creaRegistro, materiale,
 };

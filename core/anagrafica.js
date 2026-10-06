@@ -425,10 +425,18 @@ export function valoreFaseAmmesso(codiceCommessa, codice) {
   return vociSelettoreFase(codiceCommessa).some(v => v.codice === codice);
 }
 
-export function opzioniFaseOLotto(codiceCommessa, ultima, scappaHtml) {
+// Il segnaposto dice la verità sul campo (dalla 0.37.9). Dove la fase è
+// FACOLTATIVA — le bolle — la prima voce è «— nessuna fase —» ed è una
+// scelta valida: il vuoto in raccolta è un'informazione. Dove è
+// OBBLIGATORIA — le foto — la prima voce è «— scegli la fase —»: chiamarla
+// «nessuna fase» farebbe credere a una scelta che lì non esiste.
+export function opzioniFaseOLotto(codiceCommessa, ultima, scappaHtml, obbligatoria = false) {
   const voci = vociSelettoreFase(codiceCommessa);
   const nota = voci.some(v => v.codice === ultima);
-  const nessuna = eUrbanizzazione(codiceCommessa) ? '— nessun lotto —' : '— nessuna fase —';
+  const lotto = eUrbanizzazione(codiceCommessa);
+  const nessuna = obbligatoria
+    ? (lotto ? '— scegli il lotto —' : '— scegli la fase —')
+    : (lotto ? '— nessun lotto —' : '— nessuna fase —');
   return `<option value=""${nota ? '' : ' selected'}>${nessuna}</option>`
     + voci.map(v => `<option value="${scappaHtml(v.codice)}"${v.codice === ultima ? ' selected' : ''}>${scappaHtml(v.etichetta)}</option>`).join('');
 }
@@ -494,7 +502,7 @@ export function opzioniUnita(codiceCommessa, scelta, scappaHtml) {
 // fatte le opzioni: finché non cambia, il menù si lascia stare — rifarlo a
 // ogni ridisegno butterebbe la scelta appena fatta dall'operatore, e i
 // ridisegni qui sono continui (ne parte uno per ogni foto preparata).
-function rifaiSeServe(menu, chiave, iniziale, costruisci) {
+function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true) {
   if (!menu || menu.dataset.chiave === chiave) return;
   // `iniziale` vale SOLO alla prima costruzione: è l'ultima scelta salvata,
   // o il valore del record che si sta rimandando. Riapplicarlo dopo
@@ -505,10 +513,19 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci) {
   // (tutti i piani, `P-1` compreso) il menù rifatto troverebbe `P-1` fra le
   // voci e lo terrebbe selezionato, cioè una preselezione che nessuno ha
   // fatto. È esattamente quello che `opzioniLivello` esiste per impedire.
+  //
+  // `portaDietro = false` vale per la FASE (dalla 0.37.9): quando il menù si
+  // rifa perché è cambiata la commessa, si riparte dal segnaposto anche se la
+  // fase di prima esiste nell'elenco nuovo. Una fase scelta per MAR non è una
+  // scelta per MNG. Alla PRIMA costruzione vale solo `iniziale`, che arriva
+  // vuoto ovunque tranne nel riquadro di «Rimanda», dove è il valore del
+  // record da correggere — un dato da rivedere, non un suggerimento.
   const automatico = menu.dataset.automatico === '1';
   delete menu.dataset.automatico;
+  const primaVolta = menu.dataset.chiave === undefined;
   const precedente = automatico ? ''
-    : menu.dataset.chiave === undefined ? (menu.value || iniziale || '') : menu.value;
+    : primaVolta ? (menu.value || iniziale || '')
+      : portaDietro ? menu.value : '';
   menu.dataset.chiave = chiave;
   menu.innerHTML = costruisci(precedente);
   // Se il valore di prima non è più fra le opzioni, `value` resta vuoto da
@@ -558,12 +575,18 @@ function mostraVoceUnica(radice, prefisso, livello, menu, voce, fase, scappaHtml
   }
 }
 
-export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso = '', iniziali = {}, conLivelli = true) {
+// `opzioni.faseObbligatoria` cambia solo il segnaposto del menù della fase
+// («— scegli la fase —» invece di «— nessuna fase —»): che senza fase non si
+// invii lo decide il modulo, come prima.
+export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso = '', iniziali = {}, conLivelli = true, opzioni = {}) {
   const menuFase = radice.querySelector(`#${prefisso}fase`);
   if (!menuFase) return { fase: '', piano: null, unita: null, prospetto: null, mancanti: [] };
 
+  // La fase NON si porta dietro (dalla 0.37.9): al cambio di commessa si
+  // riparte dal segnaposto. Vedi `rifaiSeServe` e `azzeraFase`.
   rifaiSeServe(menuFase, `fase:${codiceCommessa}`, iniziali.fase,
-    precedente => opzioniFaseOLotto(codiceCommessa, precedente, scappaHtml));
+    precedente => opzioniFaseOLotto(codiceCommessa, precedente, scappaHtml, Boolean(opzioni.faseObbligatoria)),
+    false);
   const etichetta = radice.querySelector(`#etichetta-${prefisso}fase`);
   if (etichetta) etichetta.textContent = etichettaSelettoreFase(codiceCommessa);
 
@@ -641,6 +664,23 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
     ...livelliDaMandare(codiceCommessa, fase, scelte),
     mancanti: livelliMancanti(codiceCommessa, fase, scelte),
   };
+}
+
+// **Dopo un invio la fase riparte** (dalla 0.37.9, decisione di Francesco del
+// 06/10/2026). Il 05/10 sono partite 38 bolle consecutive con la stessa fase,
+// sbagliata: la pagina non si ricarica dopo Invia, il menù restava com'era, e
+// la bolla dopo partiva con la fase di quella prima senza che nessuno la
+// guardasse. Insieme alla memoria sul telefono (`ultimaFase`, che non si legge
+// e non si scrive più) era una preselezione: un valore che nessuno sceglie e
+// che manda il dato nel posto sbagliato senza far rumore.
+//
+// I moduli la chiamano subito dopo aver confermato l'invio, PRIMA del
+// ridisegno: col menù della fase vuoto i livelli non si chiedono, e il
+// ridisegno li svuota da sé — il piano dell'invio prima non diventa il
+// piano di quello dopo.
+export function azzeraFase(radice, prefisso = '') {
+  const menu = radice.querySelector(`#${prefisso}fase`);
+  if (menu) menu.value = '';
 }
 
 // Il blocco dei quattro menù, identico in tutti i posti in cui compare: i due

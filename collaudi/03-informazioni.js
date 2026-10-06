@@ -32,6 +32,9 @@ module.exports = {
     // vengono fermate con un avviso e non entrano in coda.
     await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg'), materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 2, 'anteprime', 60000);
+    // Dalla 0.37.9 la fase non è più preselezionata: si sceglie, come fa
+    // l'operatore, altrimenti Invia resta spento.
+    await aiuto.scegliFase(pagina);
     await pagina.click('#invia');
     await aiuto.attendi(pagina,
       () => document.querySelector('#foto-contatori .foto-chip.errore .valore').textContent === '2',

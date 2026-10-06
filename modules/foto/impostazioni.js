@@ -12,7 +12,8 @@ const PREDEFINITE = {
   token: 'collaudo',
   conservaUltime: 10,
   ultimaCommessa: '',
-  ultimaFase: '',
+  // `ultimaFase` non c'è più dalla 0.37.9: la fase non si ricorda. Sui
+  // telefoni che l'avevano la chiave resta salvata, e non la legge nessuno.
   // Tetto di peso per un singolo invio, in MB. Serve ai video, che non si
   // possono comprimere nel browser: il contenuto viaggia in base64 dentro
   // JSON, che aggiunge un terzo, e oltre una certa taglia il flow rifiuta.

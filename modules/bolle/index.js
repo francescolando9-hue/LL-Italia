@@ -7,7 +7,7 @@ import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto } from '../../core/anagrafica.js';
+import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, azzeraFase } from '../../core/anagrafica.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -303,8 +303,8 @@ function messaggioDuplicato(gia) {
 async function invia() {
   const selezione = radice.querySelector('#cantiere');
   const cantiere = selezione ? selezione.value : '';
-  // La fase è facoltativa: vuota è un valore legittimo, e si ricorda anche
-  // quella, così «nessuna» resta «nessuna» al prossimo giro.
+  // La fase è facoltativa: vuota è un valore legittimo — dice che nessuno
+  // l'ha indicata — e dalla 0.37.9 è anche lo stato di partenza di ogni invio.
   const selezioneFase = radice.querySelector('#fase');
   const fase = selezioneFase ? selezioneFase.value : '';
   if (!cantiere) return;
@@ -313,9 +313,14 @@ async function invia() {
   const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    // Cantiere e fase si ripropongono al prossimo invio: il giro felice resta
-    // di tre tocchi anche con un campo in più.
-    salvaImpostazioniBolle({ ultimoCantiere: cantiere, ultimaFase: fase });
+    // Il cantiere si ripropone, la FASE NO (dalla 0.37.9, decisione di
+    // Francesco del 06/10/2026). Il 05/10 sono partite 38 bolle di fila con la
+    // stessa fase sbagliata: il menù restava com'era dopo Invia, e la bolla
+    // dopo partiva con la fase di quella prima senza che nessuno la guardasse.
+    // La fase scelta vale per QUESTO invio — anche se porta più foto — e
+    // quello dopo riparte da «— nessuna fase —».
+    salvaImpostazioniBolle({ ultimoCantiere: cantiere });
+    azzeraFase(radice);
     // La bolla dopo è un'altra: la composizione si chiude qui, altrimenti
     // basterebbe distrarsi per unire due bolle diverse.
     unaSolaBolla = false;
@@ -397,8 +402,9 @@ async function ridisegna() {
   // Fase, o lotto dove la commessa è un'urbanizzazione: il menù lo costruisce
   // la shell, con le stesse regole del modulo Foto. Senza livelli: l'ultimo
   // argomento è `false`.
+  // Nessuna fase iniziale: si parte sempre da «— nessuna fase —».
   faseCorrente = sincronizzaLivelli(radice, cantiereScelto, scappaHtml, '',
-    { fase: impostazioniBolle().ultimaFase }, false).fase;
+    {}, false).fase;
   const pulsanteInvia = radice.querySelector('#invia');
   pulsanteInvia.disabled = bozze.length === 0 || !cantiereScelto;
   pulsanteInvia.textContent = bozze.length === 0

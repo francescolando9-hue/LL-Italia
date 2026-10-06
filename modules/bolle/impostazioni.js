@@ -17,7 +17,8 @@ const PREDEFINITE = {
   mock: false,
   conservaUltime: 20,
   ultimoCantiere: '',
-  ultimaFase: '',
+  // `ultimaFase` non c'è più dalla 0.37.9: la fase non si ricorda. Sui
+  // telefoni che l'avevano la chiave resta salvata, e non la legge nessuno.
 };
 
 // La modalità mock è uno strumento di sviluppo, non un'opzione d'uso: in
