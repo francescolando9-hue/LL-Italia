@@ -6,6 +6,8 @@
 >
 > **Va aggiornato quando un documento di `docs/` cambia nome** — cioè quando nasce, sparisce o cambia natura. Un indice che punta a un file che non esiste più è peggio di nessun indice: manda un `404` a chi si fidava.
 >
+> **Qui non si scrivono numeri di revisione né stati** (dal 06/10/2026): erano già rimasti indietro di due e di sette revisioni. La revisione corrente si legge in testa a ogni documento.
+>
 > **I nomi qui dentro non cambiano a ogni revisione.** In un repository la storia la tiene git: la data nel nome è quella di **creazione**, quella dell'ultima modifica la dà `git log`, e la revisione corrente si legge in testa al documento. È lo standard di gruppo per i documenti versionati (skill `ll-italia` §9, confermato da Francesco il 14/09/2026) e vale al posto del «modello B» dei file su `L:`, che rinomina a ogni giro perché lì una cronologia non c'è. Conseguenza pratica: gli indirizzi qui sotto restano validi, e questo indice si tocca di rado.
 
 Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs/<nome del file>` — oppure direttamente nel repo, cartella `docs/`.
@@ -14,16 +16,16 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 
 | Documento | Cosa contiene |
 |---|---|
-| `AppBolleSpecificaFunzionale202609011935Claude.md` | **Specifica funzionale, rev. 6 — prevale su tutto** per il modulo Bolle: contratto di invio (token nel corpo, `dataInvio`, `202 Accepted` senza corpo, `api-version=2024-10-01`), campi `progressivo`, `idDispositivo` e **`fase`** (dalla 0.31.0: **colonna `Fase` da aggiungere** in `BolleInArrivo`), il **lotto al posto della fase** per SNU e BRU, **«Rimanda»** su ogni bolla inviata. La rev. 6 **ritira** i tre livelli `piano` / `unita` / `prospetto` dal contratto delle bolle: `BolleInArrivo` non ha quelle colonne, e mandare campi che vengono scartati è peggio che non mandarli. |
-| `AppBolleFlowRicezione202609031937Claude.md` | Rev. 7. Il flow `BolleInArrivoRicevitore` e la raccolta `BolleInArrivo`: struttura delle azioni, colonne, procedure di modifica, esiti dei collaudi. Vale come **modello per gli altri flow** del gruppo. |
-| `AppBolleContinuitaRunbook202609031100Claude.md` | Rev. 8. Documento unico e **autosufficiente** per il lavoro a valle, dalla raccolta in poi: controllo di continuità, buchi nella sequenza, eccezioni. È quello da caricare in Cowork per riprendere il tratto magazzino. |
+| `AppBolleSpecificaFunzionale202609011935Claude.md` | **Specifica funzionale — prevale su tutto** per il modulo Bolle: schermate, giro dell'operatore, contratto di invio, progressivo e identità del dispositivo, bolla su più pagine, «Rimanda». Le decisioni recenti stanno nelle revisioni in testa (fra cui: livelli fuori dal contratto delle bolle, fase e cantiere che non si preselezionano). |
+| `AppBolleFlowRicezione202609031937Claude.md` | Il flow `BolleInArrivoRicevitore` e la raccolta `BolleInArrivo`: struttura delle azioni, colonne, procedure di modifica, esiti dei collaudi. Vale come **modello per gli altri flow** del gruppo. |
+| `AppBolleContinuitaRunbook202609031100Claude.md` | Documento unico e **autosufficiente** per il lavoro a valle, dalla raccolta in poi: cosa arriva certo dall'app e cosa no, controllo di continuità, buchi nella sequenza, eccezioni. È quello da caricare in Cowork per riprendere il tratto magazzino. |
 | `AppBolleLeggibilita202609031500Claude.md` | Metodo e taratura del controllo di leggibilità delle foto: perché avvisa senza bloccare, e su quali misure sono state fissate le soglie. |
 
 ## Modulo Foto cantiere
 
 | Documento | Cosa contiene |
 |---|---|
-| `AppFotoCantiereSpecifica202609141630Claude.md` | **Rev. 13** — in testa, §0, i **punti chiusi** con la data del riscontro: non si riaprono senza leggerli. Specifica del modulo: **una sola categoria** — dal 29/09/2026 tutto va in archivio e il campo `tipo` vale sempre `ARCHIVIO` — video, contratto di invio (`dataScatto` = ora dello scatto letta dall'EXIF con l'avviso sulle copie ridotte, `scattoStimato`, **`fase`** da elenco chiuso — codice senza spazi = nome della cartella — obbligatoria per le foto da archiviare, e i tre **livelli `piano` / `unita` / `prospetto`** con la regola fase per fase, §4.5) — **27 fasi dal 18/09/2026**, con `SistemazioneEsterna`, **obbligatorie su ogni invio dalla 0.37.0** — **«Rimanda»** nei suoi due casi, esiti dei collaudi del 10 e del 14/09 e dei rilasci 0.29.0 e 0.36.0, stato del caricamento a blocchi, requisiti del flow — fra cui le **colonne `ScattoStimato`, `Fase`, `Piano`, `Unita` e `Prospetto` da aggiungere** in raccolta — e lo smistamento del venerdì, §6, dove **il livello sostituisce la cartella del mese**. Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, rinominato il 14/09 e da allora stabile: le revisioni si scrivono dentro il documento. |
+| `AppFotoCantiereSpecifica202609141630Claude.md` | Specifica del modulo Foto cantiere. In testa, §0, i **punti chiusi** con la data del riscontro: non si riaprono senza leggerli. Poi schermate, preparazione di foto e video, contratto di invio (`dataScatto`, `fase`, i livelli `piano` / `unita` / `prospetto`, §4.5), «Rimanda», invii interrotti, i requisiti del flow, gli esiti dei collaudi e dei rilasci (§5) e lo smistamento del venerdì (§6). Sostituisce `AppFotoCantiereSpecifica202609101728Claude.md`, rinominato il 14/09 e da allora stabile. |
 | `FotoCantiereBriefingRicevente.md` | Stato **reale** di raccolta e flow, misurato sul tenant nel collaudo del 10/09/2026. **Dove diverge dalla specifica qui sopra, fa fede questo:** contiene ciò che è stato misurato, non ciò che era previsto. Nome stabile per la stessa ragione di questo indice. |
 
 ## Non in questo repo
