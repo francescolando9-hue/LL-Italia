@@ -21,7 +21,7 @@ import {
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
-import { impostazioniFoto, salvaImpostazioniFoto } from './impostazioni.js';
+import { impostazioniFoto } from './impostazioni.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniFoto } from './vista-impostazioni.js';
@@ -207,13 +207,11 @@ async function vista(el) {
   }
   assicuraStile();
   radice = el;
-  const impostazioni = impostazioniFoto();
 
-  const notaCommessa = CANTIERI.some(c => c.codice === impostazioni.ultimaCommessa);
-  const segnapostoCommessa = notaCommessa ? '' : '<option value="" selected>— scegli il cantiere —</option>';
-  const opzioniCommessa = segnapostoCommessa + CANTIERI.map(c =>
-    `<option value="${scappaHtml(c.codice)}"${c.codice === impostazioni.ultimaCommessa ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`
-  ).join('');
+  // Il cantiere non si preseleziona (dalla 0.38.0): si parte sempre da
+  // «— scegli il cantiere —». Il perché è scritto nel modulo Bolle.
+  const opzioniCommessa = '<option value="" selected>— scegli il cantiere —</option>'
+    + CANTIERI.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('');
 
   el.innerHTML = `
     <div id="foto-contatori" class="foto-contatori"></div>
@@ -533,10 +531,11 @@ async function invia() {
   });
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    // La commessa si ricorda, la fase no (dalla 0.37.9): la fase vale per
-    // QUESTO invio — anche se porta più foto — e quello dopo riparte da
-    // «— scegli la fase —». Vedi `azzeraFase` in core/anagrafica.js.
-    salvaImpostazioniFoto({ ultimaCommessa: commessa });
+    // Cantiere, fase e livelli valgono per QUESTO invio — anche se porta più
+    // foto — e quello dopo riparte da «— scegli il cantiere —» e «— scegli la
+    // fase —». Niente si ricorda sul telefono (fase dalla 0.37.9, cantiere
+    // dalla 0.38.0). Vedi `azzeraFase` in core/anagrafica.js.
+    radice.querySelector('#commessa').value = '';
     azzeraFase(radice);
     radice.querySelector('#nota').value = '';
   }

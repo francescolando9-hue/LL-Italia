@@ -16,9 +16,9 @@ const PREDEFINITE = {
   token: 'collaudo',
   mock: false,
   conservaUltime: 20,
-  ultimoCantiere: '',
-  // `ultimaFase` non c'è più dalla 0.37.9: la fase non si ricorda. Sui
-  // telefoni che l'avevano la chiave resta salvata, e non la legge nessuno.
+  // `ultimaFase` (dalla 0.37.9) e `ultimoCantiere` (dalla 0.38.0) non ci sono
+  // più: né la fase né il cantiere si ricordano. Sui telefoni che le avevano
+  // le chiavi restano salvate, e non le legge nessuno.
 };
 
 // La modalità mock è uno strumento di sviluppo, non un'opzione d'uso: in

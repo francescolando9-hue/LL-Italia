@@ -72,10 +72,14 @@ module.exports = {
     // doppione — ma il collaudo deve smettere di guardare mentre l'invio è a
     // metà. Trappola pagata il 30/09/2026: fallito 2 controlli su 373, e solo
     // dentro la suite completa, dove tutto è più lento.
+    // Dalla 0.38.0 anche il cantiere si sceglie a ogni invio: lo sceglie qui,
+    // come l'operatore. Se il cantiere è già MAR la scelta non cambia niente,
+    // e soprattutto non tocca la fase già scelta.
     const mandaBolla = async file => {
       const primaInviate = await pagina.$$eval('#lista-coda .badge-inviata', e => e.length);
       await pagina.setInputFiles('#input-galleria', [materiale(file)]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
+      if ((await pagina.$eval('#cantiere', e => e.value)) !== 'MAR') await pagina.selectOption('#cantiere', 'MAR');
       await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
       await pagina.click('#invia');
       await aiuto.attendi(pagina,
@@ -260,8 +264,15 @@ module.exports = {
     registro.titolo('Scelta e poi tolta, l’invio si blocca di nuovo');
     // La via d'uscita che c'era per l'avanzamento non esiste più: riportare il
     // menù a «nessuna fase» non fa passare niente.
+    // Il cantiere si sceglie (dalla 0.38.0 non si preseleziona più): senza,
+    // Invia sarebbe spento per lui, e il controllo passerebbe per il motivo
+    // sbagliato.
     await accodaFoto();
+    await pagina.selectOption('#commessa', 'SNZ2.2');
+    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
+      'menù della fase pronto', 10000);
     await pagina.selectOption('#fase', 'ImpiantoFotovoltaico');
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.selectOption('#fase', '');
     await aiuto.attendi(pagina, () => document.querySelector('#invia').disabled, 'Invia spento', 10000);
     registro.controlla('tornati a «— scegli la fase —», Invia si spegne',

@@ -582,11 +582,16 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   const menuFase = radice.querySelector(`#${prefisso}fase`);
   if (!menuFase) return { fase: '', piano: null, unita: null, prospetto: null, mancanti: [] };
 
-  // La fase NON si porta dietro (dalla 0.37.9): al cambio di commessa si
-  // riparte dal segnaposto. Vedi `rifaiSeServe` e `azzeraFase`.
+  // La fase NON si porta dietro al cambio di commessa (dalla 0.37.9): da MAR a
+  // MNG si riparte dal segnaposto. Con UNA eccezione, dalla 0.38.0: quando si
+  // arriva da «nessun cantiere». Il cantiere parte vuoto a ogni invio, e capita
+  // di toccare prima la fase: scegliere il cantiere la prima volta COMPLETA il
+  // contesto, non lo cambia, e perdere in silenzio una fase appena scelta
+  // farebbe partire la bolla senza. Vedi `rifaiSeServe` e `azzeraFase`.
+  const daNessunCantiere = menuFase.dataset.chiave === 'fase:';
   rifaiSeServe(menuFase, `fase:${codiceCommessa}`, iniziali.fase,
     precedente => opzioniFaseOLotto(codiceCommessa, precedente, scappaHtml, Boolean(opzioni.faseObbligatoria)),
-    false);
+    daNessunCantiere);
   const etichetta = radice.querySelector(`#etichetta-${prefisso}fase`);
   if (etichetta) etichetta.textContent = etichettaSelettoreFase(codiceCommessa);
 
@@ -605,8 +610,14 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   const menuPiano = radice.querySelector(`#${prefisso}piano`);
   if (campoPiano) campoPiano.classList.toggle('nascosto', !richiesti.piano);
   if (richiesti.piano) {
+    // I livelli ripartono quando cambia la fase (dalla 0.38.0, decisione di
+    // Francesco del 06/10/2026), anche dentro lo stesso invio: è la fase a
+    // decidere quali livelli servono, e un piano scelto per un'altra fase è
+    // fuori contesto. Per questo la fase è nella chiave di tutti e tre i
+    // menù, e il valore di prima non si porta dietro.
     rifaiSeServe(menuPiano, `piano:${codiceCommessa}:${fase}`, iniziali.piano,
-      precedente => opzioniLivello(pianiPerFase(codiceCommessa, fase), '— scegli il piano —', precedente, scappaHtml));
+      precedente => opzioniLivello(pianiPerFase(codiceCommessa, fase), '— scegli il piano —', precedente, scappaHtml),
+      false);
   } else if (menuPiano) {
     menuPiano.value = '';
   }
@@ -616,8 +627,9 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   const menuUnita = radice.querySelector(`#${prefisso}unita`);
   if (campoUnita) campoUnita.classList.toggle('nascosto', !richiesti.unita);
   if (richiesti.unita) {
-    rifaiSeServe(menuUnita, `unita:${codiceCommessa}`, iniziali.unita,
-      precedente => opzioniUnita(codiceCommessa, precedente, scappaHtml));
+    rifaiSeServe(menuUnita, `unita:${codiceCommessa}:${fase}`, iniziali.unita,
+      precedente => opzioniUnita(codiceCommessa, precedente, scappaHtml),
+      false);
   } else if (menuUnita) {
     menuUnita.value = '';
   }
@@ -627,8 +639,9 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   const menuProspetto = radice.querySelector(`#${prefisso}prospetto`);
   if (campoProspetto) campoProspetto.classList.toggle('nascosto', !richiesti.prospetto);
   if (richiesti.prospetto) {
-    rifaiSeServe(menuProspetto, `prospetto:${codiceCommessa}`, iniziali.prospetto,
-      precedente => opzioniLivello(prospettiDi(codiceCommessa), '— scegli il prospetto —', precedente, scappaHtml));
+    rifaiSeServe(menuProspetto, `prospetto:${codiceCommessa}:${fase}`, iniziali.prospetto,
+      precedente => opzioniLivello(prospettiDi(codiceCommessa), '— scegli il prospetto —', precedente, scappaHtml),
+      false);
   } else if (menuProspetto) {
     menuProspetto.value = '';
   }
@@ -678,6 +691,13 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
 // ridisegno: col menù della fase vuoto i livelli non si chiedono, e il
 // ridisegno li svuota da sé — il piano dell'invio prima non diventa il
 // piano di quello dopo.
+//
+// Dalla 0.38.0 anche il cantiere torna a «— scegli il cantiere —» dopo Invia,
+// e il cambio di commessa rifà il menù della fase da solo: oggi questa
+// funzione è una seconda difesa, e toglierla non cambia niente a video —
+// misurato rimettendo il guasto apposta il 06/10/2026. Resta perché la fase
+// non deve dipendere dal cantiere per ripartire: il giorno che il cantiere
+// tornasse a restare dopo Invia, la fase ripartirebbe lo stesso.
 export function azzeraFase(radice, prefisso = '') {
   const menu = radice.querySelector(`#${prefisso}fase`);
   if (menu) menu.value = '';

@@ -24,7 +24,7 @@ Target: browser mobile recenti (Chrome Android in primis, poi Safari iOS). Camer
 Principi non negoziabili
 Offline-first (modulo Bolle): lo scatto non deve MAI perdersi. Prima la coda locale, poi l'invio; retry con backoff al ritorno della rete; l'elemento esce dalla coda solo a conferma del server (idempotenza via uuid client).
 Il modulo Bolle è capture-only: niente OCR, niente dati estratti, niente scritture su Lists, niente logica di attribuzione.
-UI in italiano, essenziale, tap target grandi: il flusso felice di Bolle è 3 tocchi — foto → cantiere (ultimo usato preselezionato) → invia. Per gli scatti multipli si resta dentro la fotocamera dell'app: uscire e rientrare a ogni pagina è la cosa che confonde chi ha poca dimestichezza.
+UI in italiano, essenziale, tap target grandi: il flusso felice di Bolle è 4 tocchi — foto → apri il menù del cantiere → scegli il cantiere → invia. Dalla 0.38.0 (decisione di Francesco del 06/10/2026) il cantiere non si ricorda e non si preseleziona, come la fase dalla 0.37.9: un tocco in più per invio, non per bolla, perché un cantiere rimasto dall'invio prima porta la bolla sulla commessa sbagliata senza rumore. Per gli scatti multipli si resta dentro la fotocamera dell'app: uscire e rientrare a ogni pagina è la cosa che confonde chi ha poca dimestichezza.
 Nessun segreto nel repo: URL endpoint e chiavi si inseriscono nelle Impostazioni e vivono solo in localStorage del dispositivo.
 Collaudo sui numeri, mai sull'esito formale: contatori locali scatti/inviate/in coda/errore sempre visibili; un invio "riuscito" si dimostra contando foto scattate vs foto atterrate.
 Convenzioni di lavoro

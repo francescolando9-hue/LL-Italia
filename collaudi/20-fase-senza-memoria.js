@@ -37,19 +37,23 @@ module.exports = {
   async esegui({ browser, app, flow, registro, aiuto }) {
     const { contesto, pagina, errori } = await nuovoTelefono(browser);
     // Un telefono che arriva da una versione con la memoria: `ultimaFase`
-    // c'è già, e vale `Cantiere` in tutti e due i moduli. E l'ultimo
-    // cantiere è MAR, che si ripropone (quello sì, per decisione): il modulo
-    // si apre GIÀ su MAR, come su un telefono vero.
+    // c'è già, e vale `Cantiere` in tutti e due i moduli.
     //
-    // Non è un dettaglio. La prima stesura sceglieva il cantiere dopo
-    // l'apertura, e il cambio di commessa cancellava la fase in memoria prima
-    // che il collaudo la guardasse: rimettendo apposta la lettura della
-    // memoria, il controllo «all'apertura» restava verde. Un controllo che
-    // non può fallire non prova niente — trovato il 06/10/2026 proprio
-    // guastando il codice per vederlo diventare rosso.
+    // Dove si guarda, non è un dettaglio. La prima stesura (0.37.9) sceglieva
+    // il cantiere dopo l'apertura, e il cambio di commessa cancellava la fase
+    // in memoria prima che il collaudo la guardasse: rimettendo apposta la
+    // lettura della memoria, il controllo «all'apertura» restava verde. Un
+    // controllo che non può fallire non prova niente — trovato il 06/10/2026
+    // proprio guastando il codice per vederlo diventare rosso.
+    //
+    // Dalla 0.38.0 il cantiere parte vuoto, e la fase scelta PRIMA del
+    // cantiere si conserva quando lo si sceglie (completa il contesto, non lo
+    // cambia). Una fase riletta dalla memoria, quindi, si vedrebbe subito
+    // all'apertura e passerebbe anche al primo cantiere: il controllo si fa
+    // all'apertura, prima di toccare qualunque menù.
     await configura(pagina, app.indirizzo, {
-      bolle: { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 30, ultimaFase: 'Cantiere', ultimoCantiere: 'MAR' },
-      foto: { endpoint: flow.endpoint('foto'), token: 'PROVA', conservaUltime: 30, limiteMB: 20, ultimaFase: 'Cantiere', ultimaCommessa: 'MAR' },
+      bolle: { endpoint: flow.endpoint('bolle'), token: 'PROVA', conservaUltime: 30, ultimaFase: 'Cantiere' },
+      foto: { endpoint: flow.endpoint('foto'), token: 'PROVA', conservaUltime: 30, limiteMB: 20, ultimaFase: 'Cantiere' },
     });
 
     const statoFase = () => pagina.$eval('#fase', e => ({
@@ -76,16 +80,19 @@ module.exports = {
     registro.titolo('Bolle: all’apertura la fase NON è quella in memoria');
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#cantiere');
-    await attendiMenu('MAR');
-    registro.controlla('il modulo si apre già sull’ultimo cantiere, MAR',
-      (await pagina.$eval('#cantiere', e => e.value)) === 'MAR',
-      'senza questo la prova sotto non potrebbe fallire');
+    await attendiMenu('');
+    registro.dice('cantiere a video', `${JSON.stringify(await pagina.$eval('#cantiere', e => e.value))} (dalla 0.38.0 non si preseleziona)`);
     registro.dice('in memoria sul telefono', await inMemoria('llitalia.bolle'));
     let stato = await statoFase();
     registro.dice('a video', `«${stato.testo}» (valore ${JSON.stringify(stato.valore)})`);
     registro.controlla('si parte da «— nessuna fase —», non dalla fase in memoria',
       stato.valore === '' && /nessuna fase/.test(stato.testo),
       'la memoria rileggeva «Cantiere»: è il primo dei due meccanismi delle 38 bolle');
+    await pagina.selectOption('#cantiere', 'MAR');
+    await attendiMenu('MAR');
+    registro.controlla('scelto il cantiere, la fase resta «— nessuna fase —»',
+      (await statoFase()).valore === '',
+      'una fase riletta dalla memoria passerebbe al primo cantiere insieme a una scelta vera');
 
     registro.titolo('Bolle: dopo un invio il menù torna allo stato di partenza');
     await pagina.selectOption('#fase', 'ImpiantoAscensore');
@@ -100,8 +107,12 @@ module.exports = {
     registro.controlla('subito dopo Invia la fase è tornata a «— nessuna fase —»',
       stato.valore === '',
       'è il secondo meccanismo: il menù restava com’era e la bolla dopo partiva con la stessa fase');
+    // Dalla 0.38.0 anche il cantiere riparte: lo si sceglie di nuovo, e la
+    // fase NON si tocca.
     await pagina.setInputFiles('#input-galleria', [materiale('bolla2.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
+    await pagina.selectOption('#cantiere', 'MAR');
+    await attendiMenu('MAR');
     await pagina.click('#invia');
     await attendiInviate(2, 'seconda bolla inviata');
     registro.controlla('la bolla dopo, senza toccare il menù, parte SENZA fase',
@@ -112,6 +123,10 @@ module.exports = {
       'il valore vecchio può restare, purché nessuno lo legga e nessuno lo aggiorni');
 
     registro.titolo('Bolle: al cambio di cantiere la fase riparte');
+    // Da un cantiere a un ALTRO: il passaggio da «nessun cantiere» al primo
+    // conserva la fase, ed è un'altra prova (collaudo 21).
+    await pagina.selectOption('#cantiere', 'MAR');
+    await attendiMenu('MAR');
     await pagina.selectOption('#fase', 'Strutture');
     await pagina.selectOption('#cantiere', 'MNG');
     await attendiMenu('MNG');
@@ -127,8 +142,7 @@ module.exports = {
     await attendiInviate(3, 'terza bolla inviata');
     await pagina.reload();
     await pagina.waitForSelector('#cantiere');
-    await pagina.selectOption('#cantiere', 'MNG');
-    await attendiMenu('MNG');
+    await attendiMenu('');
     registro.controlla('dopo la ricarica: «— nessuna fase —»', (await statoFase()).valore === '');
 
     registro.titolo('Bolle: più foto in un invio solo — una scelta, per quell’invio');
@@ -136,6 +150,8 @@ module.exports = {
     // una serie di scatti della fotocamera interna: tutte le foto entrano
     // insieme e partono col primo Invia. Ognuna è una bolla a sé (`idBolla`
     // diversi), e la fase scelta vale per tutte quelle dell'invio.
+    await pagina.selectOption('#cantiere', 'MNG');
+    await attendiMenu('MNG');
     await pagina.selectOption('#fase', 'Interrato');
     await pagina.setInputFiles('#input-galleria',
       [materiale('bolla.jpg'), materiale('bolla2.jpg'), materiale('foto-cantiere.jpg')]);
@@ -154,20 +170,20 @@ module.exports = {
 
     // ===================================================================
     registro.titolo('Foto: all’apertura si parte da «scegli», non dalla memoria');
-    // La commessa ricordata, a questo punto, è quella dell'ultimo invio di
-    // foto: nessuno ancora, quindi la MAR della configurazione.
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#commessa');
-    await attendiMenu('MAR');
-    registro.controlla('il modulo si apre già sull’ultima commessa, MAR',
-      (await pagina.$eval('#commessa', e => e.value)) === 'MAR',
-      'senza questo la prova sotto non potrebbe fallire');
+    await attendiMenu('');
+    registro.dice('cantiere a video', JSON.stringify(await pagina.$eval('#commessa', e => e.value)));
     registro.dice('in memoria sul telefono', await inMemoria('llitalia.foto'));
     stato = await statoFase();
     registro.dice('a video', `«${stato.testo}» (valore ${JSON.stringify(stato.valore)})`);
     registro.controlla('si parte da «— scegli la fase —»',
       stato.valore === '' && /scegli la fase/.test(stato.testo),
       'qui la fase è obbligatoria: «nessuna fase» suggerirebbe una scelta che non esiste');
+    await pagina.selectOption('#commessa', 'MAR');
+    await attendiMenu('MAR');
+    registro.controlla('scelto il cantiere, la fase resta «— scegli la fase —»',
+      (await statoFase()).valore === '');
 
     registro.titolo('Foto: dopo un invio fase e livelli tornano allo stato di partenza');
     // `Strutture` col piano: prova anche i livelli, che senza fase non si
@@ -188,6 +204,10 @@ module.exports = {
       stato.valore === '' && /scegli la fase/.test(stato.testo), `«${stato.testo}»`);
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    // Il cantiere si rimette (dalla 0.38.0 riparte anche lui): così Invia
+    // spento dice proprio «manca la fase», e non «manca il cantiere».
+    await pagina.selectOption('#commessa', 'MAR');
+    await attendiMenu('MAR');
     await pagina.waitForTimeout(300);
     registro.controlla('una foto nuova senza fase: Invia resta spento',
       await pagina.$eval('#invia', e => e.disabled),
@@ -207,8 +227,7 @@ module.exports = {
       (await statoFase()).valore === '');
     await pagina.reload();
     await pagina.waitForSelector('#commessa');
-    await pagina.selectOption('#commessa', 'MAR');
-    await attendiMenu('MAR');
+    await attendiMenu('');
     registro.controlla('dopo la ricarica: «— scegli la fase —»', (await statoFase()).valore === '');
 
     registro.titolo('Urbanizzazioni: «scegli il lotto» nelle foto, «nessun lotto» nelle bolle');
