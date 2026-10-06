@@ -16,7 +16,7 @@ import { dataScattoDaFoto, spiegazioneMotivo } from '../../core/exif.js';
 import { fileInMemoria, eLetturaNegata, descriviLettura } from '../../core/byte.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
-  sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA,
+  sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA, azzeraFase,
 } from '../../core/anagrafica.js';
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
@@ -533,7 +533,11 @@ async function invia() {
   });
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    salvaImpostazioniFoto({ ultimaCommessa: commessa, ultimaFase: fase });
+    // La commessa si ricorda, la fase no (dalla 0.37.9): la fase vale per
+    // QUESTO invio — anche se porta più foto — e quello dopo riparte da
+    // «— scegli la fase —». Vedi `azzeraFase` in core/anagrafica.js.
+    salvaImpostazioniFoto({ ultimaCommessa: commessa });
+    azzeraFase(radice);
     radice.querySelector('#nota').value = '';
   }
   await ridisegna();
@@ -585,8 +589,9 @@ async function ridisegna() {
   // Fase (o lotto), piano, unità, prospetto: li accende, li spegne e li
   // ricostruisce la shell, con le regole dell'anagrafica. Torna quello che
   // partirà — piano derivato compreso — e cosa manca ancora all'appello.
+  // Nessuna fase iniziale: si parte sempre da «— scegli la fase —».
   livelliCorrenti = sincronizzaLivelli(radice, commessaScelta, scappaHtml, '',
-    { fase: impostazioniFoto().ultimaFase });
+    {}, true, { faseObbligatoria: true });
 
   // Foto senza ora dello scatto: fermate prima dell'invio, con le due vie
   // d'uscita scritte. La prima è quella giusta e va detta per prima — l'album
@@ -796,7 +801,7 @@ function lettureRimando(riquadro, record) {
     piano: record.piano || '',
     unita: record.unita || '',
     prospetto: record.prospetto || '',
-  });
+  }, true, { faseObbligatoria: true });
   const nota = riquadro.querySelector('#r-nota').value.trim();
   const uguale = (a, b) => (a || '') === (b || '');
   const cambiato = !uguale(commessa, record.commessa)

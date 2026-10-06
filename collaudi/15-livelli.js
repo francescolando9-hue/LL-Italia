@@ -539,8 +539,12 @@ module.exports = {
         valore: e.value, testo: e.options[e.selectedIndex].textContent.trim(),
       }));
       registro.dice(`${modulo}: in memoria Lotto4, a video`, `«${stato.testo}» (valore ${JSON.stringify(stato.valore)})`);
-      registro.controlla(`${modulo}: Lotto4 non è selezionato, si riparte da «— nessun lotto —»`,
-        stato.valore === '' && /nessun lotto/.test(stato.testo));
+      // Dalla 0.37.9 la memoria non si legge proprio più, e il segnaposto
+      // dice la verità sul campo: «scegli il lotto» nelle foto, dove è
+      // obbligatorio; «nessun lotto» nelle bolle, dove è facoltativo.
+      const atteso = modulo === 'foto' ? /scegli il lotto/ : /nessun lotto/;
+      registro.controlla(`${modulo}: Lotto4 non è selezionato, si riparte dal segnaposto`,
+        stato.valore === '' && atteso.test(stato.testo), `«${stato.testo}»`);
     }
     // Nel modulo Foto la fase è obbligatoria: senza lotto Invia resta spento.
     // Nelle bolle no — è facoltativa per scelta di Francesco — quindi lì

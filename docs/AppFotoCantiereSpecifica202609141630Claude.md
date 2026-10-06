@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 18 del 05/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 19 del 06/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 19 — la fase non si preseleziona più (0.37.9).** Deciso da Francesco il 06/10/2026, per le bolle e per le foto, dopo 38 bolle partite di fila il 05/10 con la stessa fase sbagliata. Nelle foto ogni invio parte da «— scegli la fase —» con Invia spento; dopo un invio, all'apertura e al cambio di commessa il menù torna lì, e con la fase ripartono i livelli. La commessa invece si ripropone. Contratto invariato (§2, rilascio 0.37.9).
 >
 > **Rev. 18 — anagrafica riallineata al master (0.37.8).** Il master dell'anagrafica è cambiato due volte, il 04 e il 05/10/2026, e l'app no. Ora è la copia del master `202610050932`: il **Tetto** è un piano a sé in MAR, MNG e SNZ2.2, senza unità, in fondo ai menù dei piani; **SNU ha tre lotti**, `Lotto4` non c'è più. E da adesso l'allineamento si verifica: il collaudo confronta l'impronta del blocco con quella del master (§4.5). Contratto invariato.
 >
@@ -54,7 +56,7 @@ Cosa cambia in pratica: un campo in meno da scegliere prima di scattare, e ogni 
 Una sola schermata di lavoro, con la stessa impostazione di Bolle:
 
 1. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice.
-   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js` più «nessuna fase», lo stesso delle bolle, ultima scelta preselezionata. **Obbligatoria su ogni invio dalla 0.37.0** (§4.4): tutto va in archivio, e una foto d'archivio senza fase non saprebbe in quale cartella andare. Per una foto generica il percorso veloce è la fase `Cantiere`, che non pretende livelli. Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
+   **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js`, lo stesso delle bolle. **Dalla 0.37.9 non si preseleziona**: ogni invio parte da «— scegli la fase —» («— scegli il lotto —» per le urbanizzazioni), e così all'apertura del modulo e al cambio di commessa; con la fase ripartono anche i livelli. **Obbligatoria su ogni invio dalla 0.37.0** (§4.4): tutto va in archivio, e una foto d'archivio senza fase non saprebbe in quale cartella andare. Per una foto generica il percorso veloce è la fase `Cantiere`, che non pretende livelli. Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
    **Piano**, **Unità**, **Prospetto** — compaiono **solo dove la fase li pretende**, e dove compaiono sono obbligatori: non esistono livelli facoltativi (§4.5). Con l'unità il piano non si chiede — lo ricava l'app — ma si legge sotto il menù, perché l'operatore non l'ha scelto e vederlo è il solo modo che ha di accorgersi se non torna. **Nessuno dei tre è preselezionato:** un livello è il nome di una cartella sul server, e una scelta preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato senza fare rumore. Costa un tocco per invio, non per foto.
 2. **Scatta foto** — apre la **fotocamera dentro l'app** (`core/fotocamera.js`, la stessa del modulo Bolle): si scatta più volte di fila senza uscire, con rullino e contatore, poi *Fine*. Accanto restano **Usa la fotocamera del telefono** e **Scegli dalla galleria** (multi-foto). Anteprime rimovibili, ognuna col peso reale del file che partirà.
    Qui gli scatti di una sessione **non** vengono raggruppati: ogni foto è una foto. Il gesto però è identico a quello delle bolle, così chi usa l'app impara una sola cosa.
@@ -529,6 +531,35 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.37.9 — la fase non si preseleziona più
+
+**Niente da fare a valle**, contratto invariato. Quello che cambia è quanto spesso la fase è giusta: da adesso la sceglie qualcuno a ogni invio.
+
+**Il caso.** Il 05/10/2026, fra le 16:31 e le 16:37, dallo stesso telefono con la 0.37.6, sono partite 38 bolle consecutive di calcestruzzo — fase giusta `Interrato` — tutte con `FinituraPartiComuniInterne`. I meccanismi che potevano produrlo erano tre, e il collaudo `20-fase-senza-memoria.js` li ha visti tutti e tre sul codice della 0.37.8 (15 controlli rossi):
+
+1. **la memoria**: `ultimaFase` in `llitalia.bolle` e `llitalia.foto`, scritta a ogni invio e riletta all'apertura del modulo;
+2. **il menù che non tornava**: dopo Invia la pagina non si ricarica, e la bolla dopo partiva con la fase di quella prima senza che nessuno toccasse il menù — è il meccanismo più probabile per una sequenza di bolle mandate una per una;
+3. **la fase portata con sé al cambio di commessa**, se esisteva nell'elenco nuovo.
+
+E un quarto caso che la correzione **non** tocca, per decisione: **una scelta vale per un invio**. Se le 38 foto sono entrate nell'app insieme — scelta multipla dalla galleria, o una serie con la fotocamera interna — sono partite col primo Invia con una sola fase, e lo farebbero anche adesso. Quale dei due casi sia stato lo dice la colonna `DataInvio` della raccolta, che è l'istante in cui la foto **è entrata nell'app** (`aggiungiBozza`), non quello dell'invio: 38 valori entro un minuto o poco più = entrate insieme, un invio solo; 38 valori distribuiti fra le 16:31 e le 16:37 = una per volta, e allora è il meccanismo 2.
+
+Previsione scritta prima di correggere, confermata (collaudo `20`, 0 rossi dopo la correzione):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Apertura, con `Cantiere` in memoria e il modulo già sull'ultimo cantiere | bolle «— nessuna fase —», foto «— scegli la fase —» | ✓ |
+| Subito dopo Invia | il menù è tornato allo stato di partenza, nei due moduli | ✓ |
+| La bolla dopo, senza toccare il menù | parte con `fase: ""` | ✓ |
+| La foto dopo, senza toccare il menù | Invia spento | ✓ |
+| Dopo un invio con piano `P1`, rimessa la stessa fase | il piano riparte dal segnaposto | ✓ |
+| Cambio di commessa con una fase che esiste anche nella nuova | la fase riparte | ✓ |
+| Ricarica | stato di partenza | ✓ |
+| La memoria | non si legge e non si scrive più (il valore vecchio resta, inerte) | ✓ |
+| Tre bolle in un invio solo | stessa fase per le tre, tre `idBolla`; poi si riparte | ✓ |
+| Segnaposto per le urbanizzazioni | foto «— scegli il lotto —», bolle «— nessun lotto —» | ✓ |
+
+**Ognuno dei tre meccanismi è stato rimesso apposta, uno alla volta**, per vedere il collaudo diventare rosso: la memoria letta all'apertura (4 rossi), il menù che non torna (6 rossi), la fase portata al cambio di commessa (2 rossi). La prima stesura del controllo «all'apertura» restava verde col primo guasto: sceglieva il cantiere dopo l'apertura, e il cambio di commessa cancellava la fase in memoria prima che il controllo la guardasse. Corretta facendo aprire il modulo già sull'ultimo cantiere, come su un telefono vero.
 
 ### Rilascio 0.37.8 — anagrafica riallineata al master
 

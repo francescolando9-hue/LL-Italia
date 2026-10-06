@@ -7,13 +7,16 @@
 // fase, e senza fase non saprebbero dove andare. Per l'avanzamento e per le
 // bolle resta facoltativa. Qui si prova tutt'e due i comportamenti: dove è
 // facoltativa si invia col campo vuoto, dove è obbligatoria Invia resta
-// spento e l'app dice perché; e che scelta una volta si ripropone («nessuna»
-// compresa) e che al flow arriva con la grafia esatta. La barra:
+// spento e l'app dice perché; e che al flow arriva con la grafia esatta.
+// **Dalla 0.37.9 la fase NON si ripropone**: si sceglie a ogni invio (le 38
+// bolle del 05/10/2026, decisione di Francesco del 06/10). Qui se ne prova
+// l'effetto sul giro delle bolle; i tre meccanismi — memoria all'apertura,
+// menù che non torna dopo Invia, fase portata al cambio di commessa — li
+// prova uno per uno 20-fase-senza-memoria.js. La barra:
 // con dieci bolle da mandare si finiva a scorrere su e giù per ritrovare ora
 // Fotografa ora Invia — devono stare tutti e due sempre a portata di pollice.
 // Nota dalla 0.36.0: qui si usano fasi SENZA livelli (`ImpiantoAscensore`,
-// `ImpiantoFotovoltaico`), perché questo collaudo prova che la fase si ricorda
-// e non costa tocchi in più. `FinituraAlloggi` pretende l'unità e bloccherebbe
+// `ImpiantoFotovoltaico`), perché qui si prova la fase e non i livelli. `FinituraAlloggi` pretende l'unità e bloccherebbe
 // l'invio: i livelli hanno il loro collaudo (15-livelli.js), e provare due
 // regole nello stesso posto vuol dire non sapere quale ha fallito.
 const { nuovoTelefono, configura, materiale } = require('./aiuto');
@@ -123,34 +126,33 @@ module.exports = {
     registro.controlla('nessun avviso che chieda la fase',
       !/fase/i.test(await pagina.$eval('#avviso-cantiere', e => e.textContent)));
 
-    registro.titolo('Scelta una volta, la fase si ripropone; e «nessuna» è una scelta come le altre');
+    registro.titolo('La fase si sceglie a ogni bolla: dopo Invia si riparte da «nessuna»');
     await pagina.selectOption('#fase', 'ImpiantoAscensore');
     await mandaBolla('bolla2.jpg');
     await attendiRicevuti(2);
     registro.controlla('la fase arriva al flow col codice dell’elenco', flow.stato.ricevuti[1].fase === 'ImpiantoAscensore');
     registro.controlla('accanto a commessa e operatore, che non cambiano',
       flow.stato.ricevuti[1].commessa === 'MAR' && flow.stato.ricevuti[1].operatore === 'Paolo Sanzarello');
-    await pagina.reload();
-    await pagina.waitForSelector('#fase');
-    await attendiMenuFase(pagina, aiuto);
-    registro.controlla('dopo la ricarica la fase è già selezionata',
-      (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoAscensore');
+    registro.controlla('subito dopo Invia la fase è tornata a «— nessuna fase —»',
+      (await pagina.$eval('#fase', e => e.value)) === '',
+      'fino alla 0.37.8 restava: la bolla dopo partiva con la stessa fase senza che nessuno la guardasse');
     await mandaBolla('bolla.jpg');
     await attendiRicevuti(3);
-    registro.controlla('foto → Invia, senza altri tocchi: la terza bolla porta la stessa fase',
-      flow.stato.ricevuti[2].fase === 'ImpiantoAscensore');
-    await pagina.selectOption('#fase', '');
-    await mandaBolla('bolla2.jpg');
-    await attendiRicevuti(4);
-    registro.controlla('tornati a «nessuna», il campo parte di nuovo vuoto', flow.stato.ricevuti[3].fase === '');
+    registro.controlla('foto → Invia senza toccare il menù: la bolla parte SENZA fase',
+      flow.stato.ricevuti[2].fase === '',
+      'è il caso delle 38 bolle del 05/10: il vuoto dice che nessuno l’ha scelta, una fase ripetuta no');
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     await attendiMenuFase(pagina, aiuto);
-    registro.controlla('e «nessuna» si ricorda come le altre', (await pagina.$eval('#fase', e => e.value)) === '');
+    registro.controlla('e dopo una ricarica, ancora «— nessuna fase —»',
+      (await pagina.$eval('#fase', e => e.value)) === '');
+    await mandaBolla('bolla2.jpg');
+    await attendiRicevuti(4);
+    registro.controlla('una bolla senza fase resta una bolla valida', flow.stato.ricevuti[3].fase === '');
     const inCoda = await pagina.$$eval('#lista-coda .bolle-voce .riga', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
     registro.dice('righe della coda', inCoda);
     registro.controlla('la coda mostra l’ETICHETTA, non il codice',
-      inCoda.filter(t => /Impianto ascensore/.test(t)).length === 2
+      inCoda.filter(t => /Impianto ascensore/.test(t)).length === 1
       && !inCoda.some(t => /ImpiantoAscensore/.test(t)),
       'a video si legge la fase, non un codice da decifrare');
     registro.controlla('e dove la fase non c’è non lascia un separatore vuoto',
@@ -250,15 +252,19 @@ module.exports = {
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     await attendiMenuFase(pagina, aiuto);
-    registro.controlla('e si ripropone alla prossima apertura', (await pagina.$eval('#fase', e => e.value)) === 'ImpiantoFotovoltaico');
+    registro.controlla('e alla prossima apertura si riparte da «— scegli la fase —»',
+      (await pagina.$eval('#fase', e => e.value)) === ''
+      && /scegli la fase/.test(await pagina.$eval('#fase', e => e.options[e.selectedIndex].textContent)),
+      'dalla 0.37.9 la fase non si ricorda: si sceglie a ogni invio');
 
-    registro.titolo('Rimessa a «nessuna fase», l’invio si blocca di nuovo');
+    registro.titolo('Scelta e poi tolta, l’invio si blocca di nuovo');
     // La via d'uscita che c'era per l'avanzamento non esiste più: riportare il
     // menù a «nessuna fase» non fa passare niente.
     await accodaFoto();
+    await pagina.selectOption('#fase', 'ImpiantoFotovoltaico');
     await pagina.selectOption('#fase', '');
     await aiuto.attendi(pagina, () => document.querySelector('#invia').disabled, 'Invia spento', 10000);
-    registro.controlla('tornati a «nessuna fase», Invia si spegne',
+    registro.controlla('tornati a «— scegli la fase —», Invia si spegne',
       await pagina.$eval('#invia', e => e.disabled),
       'non c’è più una categoria che permetta di mandare una foto senza fase');
 
