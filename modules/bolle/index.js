@@ -1,11 +1,12 @@
 // Modulo Bolle: foto delle bolle di consegna verso il magazzino (capture-only).
-// Flusso felice in 3 tocchi: foto → cantiere (ultimo usato preselezionato) → Invia.
+// Flusso felice in 4 tocchi: foto → apri il menù del cantiere → scegli il cantiere → Invia.
+// Il cantiere non si preseleziona (dalla 0.38.0): si sceglie a ogni invio.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
 import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
-import { impostazioniBolle, salvaImpostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
+import { impostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, azzeraFase } from '../../core/anagrafica.js';
 import * as coda from './coda.js';
@@ -119,13 +120,16 @@ async function vista(el) {
   radice = el;
   await caricaConfigurazioneLocale();
   const impostazioni = impostazioniBolle();
-  // Ultimo cantiere preselezionato; al primo utilizzo la scelta è esplicita.
-  const noto = CANTIERI.some(c => c.codice === impostazioni.ultimoCantiere);
-  const segnaposto = noto ? '' : '<option value="" selected>— scegli il cantiere —</option>';
-  const opzioniCantiere = segnaposto + CANTIERI.map(c => {
-    const selezionato = c.codice === impostazioni.ultimoCantiere ? ' selected' : '';
-    return `<option value="${scappaHtml(c.codice)}"${selezionato}>${scappaHtml(c.etichetta)}</option>`;
-  }).join('');
+  // **Il cantiere non si preseleziona** (dalla 0.38.0, decisione di Francesco
+  // del 06/10/2026). Fino alla 0.37.9 l'ultimo cantiere usato si ricordava e
+  // si riproponeva, e con un cantiere in memoria il menù non aveva nemmeno il
+  // segnaposto: tornare a «nessuno» era impossibile. Il cantiere è il dato
+  // più pesante della bolla — il magazzino lo prende per certo — e nella
+  // stessa sessione si mandano bolle di cantieri diversi: uno rimasto
+  // dall'invio prima la porterebbe sulla commessa sbagliata senza rumore.
+  // Il giro passa da tre a quattro tocchi: uno in più per invio, non per bolla.
+  const opzioniCantiere = '<option value="" selected>— scegli il cantiere —</option>'
+    + CANTIERI.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('');
 
   const bannerMock = impostazioni.mock
     ? '<p class="avviso avviso-attenzione">Modalità mock attiva: invii simulati, nessun dato lascia il dispositivo.</p>'
@@ -313,13 +317,13 @@ async function invia() {
   const quante = await coda.confermaBozze(cantiere, impostazioniApp.autore, unaSolaBolla, fase);
   if (quante > 0) {
     coda.incrementaScattate(quante);
-    // Il cantiere si ripropone, la FASE NO (dalla 0.37.9, decisione di
-    // Francesco del 06/10/2026). Il 05/10 sono partite 38 bolle di fila con la
-    // stessa fase sbagliata: il menù restava com'era dopo Invia, e la bolla
-    // dopo partiva con la fase di quella prima senza che nessuno la guardasse.
-    // La fase scelta vale per QUESTO invio — anche se porta più foto — e
-    // quello dopo riparte da «— nessuna fase —».
-    salvaImpostazioniBolle({ ultimoCantiere: cantiere });
+    // Cantiere e fase valgono per QUESTO invio — anche se porta più foto — e
+    // quello dopo riparte da «— scegli il cantiere —» e «— nessuna fase —».
+    // Niente si ricorda sul telefono: né la fase (dalla 0.37.9, le 38 bolle del
+    // 05/10) né il cantiere (dalla 0.38.0). Il menù si riporta indietro qui
+    // perché dopo Invia la pagina non si ricarica, e un menù lasciato com'era
+    // è una preselezione che nessuno guarda.
+    selezione.value = '';
     azzeraFase(radice);
     // La bolla dopo è un'altra: la composizione si chiude qui, altrimenti
     // basterebbe distrarsi per unire due bolle diverse.

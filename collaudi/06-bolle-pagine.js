@@ -63,6 +63,8 @@ module.exports = {
     registro.dice('cosa dice', await testo('#stato-bolla'));
     registro.controlla('la foto dopo è di nuovo una bolla singola',
       (await testo('#invia')).includes('1 bolla') && !(await testo('#invia')).includes('pagine'));
+    // Dalla 0.38.0 il cantiere non si ricorda: si sceglie a ogni invio.
+    await pagina.selectOption('#cantiere', 'MAR');
     await pagina.click('#invia');
     await aiuto.attendi(pagina,
       () => document.querySelector('#bolle-contatori .bolle-chip:nth-child(2) .valore').textContent === '3',
@@ -87,6 +89,7 @@ module.exports = {
     registro.controlla('tornano due bolle distinte', String(dopoSeparazione).includes('2 bolle separate'));
     registro.controlla('le foto non sono state cancellate',
       (await pagina.$$eval('.bolle-anteprima', e => e.length)) === 2);
+    await pagina.selectOption('#cantiere', 'MAR');
     await pagina.click('#invia');
     await aiuto.attendi(pagina,
       () => document.querySelector('#bolle-contatori .bolle-chip:nth-child(2) .valore').textContent === '5',

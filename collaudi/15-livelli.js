@@ -307,6 +307,13 @@ module.exports = {
     // perché possa fallire: con una fase che `P-1` non ce l'ha, il valore
     // cadrebbe da sé e la prova non proverebbe niente.
     registro.titolo('Il piano scelto dall’app non si porta dietro come scelta');
+    // Dentro UNA composizione, senza invii in mezzo: dalla 0.38.0 dopo Invia
+    // cantiere e fase tornano vuoti, quindi la trappola si ricostruisce da
+    // capo — SNZ2.2, Interrato (l'app sceglie P-1), poi Strutture.
+    await scegliCommessa('#commessa', 'SNZ2.2');
+    await scegliFase('Interrato');
+    registro.controlla('di nuovo su Interrato, P-1 lo sceglie l’app',
+      (await pagina.$eval('#piano', e => e.value)) === 'P-1' && await visibile('#unico-piano'));
     await scegliFase('Strutture');
     const pianiStrutture = await voci('#piano');
     registro.dice('SNZ2.2, Strutture: piani offerti', pianiStrutture.join(' '));

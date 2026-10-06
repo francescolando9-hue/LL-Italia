@@ -244,19 +244,28 @@ function riquadroCorrezione(riga) {
       <p class="titolo">Cantiere sbagliato?</p>
       <p class="tenue">Rimanda la stessa foto sul cantiere giusto.</p>
       <select id="cantiere-corretto">
+        <option value="" selected>— scegli il cantiere —</option>
         ${altri.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('')}
       </select>
-      <button id="rimanda" class="btn btn-secondario btn-piccolo">Rimanda</button>
+      <button id="rimanda" class="btn btn-secondario btn-piccolo" disabled>Rimanda</button>
       <p id="esito-correzione" class="tenue"></p>
     </div>
   `;
 }
 
+// Il menù parte da «— scegli il cantiere —» e «Rimanda» resta spento finché
+// non si sceglie (dalla 0.38.0). Prima il menù non aveva segnaposto e partiva
+// dal primo degli altri cantieri: «Rimanda» mandava la bolla lì anche se
+// nessuno l'aveva scelto, e la conferma che segue si impara a dare senza
+// leggerla.
 function collegaCorrezione(record, riga) {
   const pulsante = radice.querySelector('#rimanda');
   if (!pulsante) return;
+  const menu = radice.querySelector('#cantiere-corretto');
+  menu.addEventListener('change', () => { pulsante.disabled = !menu.value; });
   pulsante.addEventListener('click', async () => {
-    const scelto = radice.querySelector('#cantiere-corretto').value;
+    const scelto = menu.value;
+    if (!scelto) return;
     const esito = radice.querySelector('#esito-correzione');
     const conferma = window.confirm(
       `Rimandare questa bolla su ${scelto}?\n\n`

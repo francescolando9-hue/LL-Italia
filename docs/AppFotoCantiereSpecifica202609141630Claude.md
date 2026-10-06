@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 19 del 06/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 20 del 06/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 20 — il cantiere non si preseleziona più, e al cambio di fase ripartono i livelli (0.38.0).** Deciso da Francesco il 06/10/2026, per le bolle e per le foto. All'apertura e dopo ogni invio il cantiere parte da «— scegli il cantiere —», con Invia spento: l'ultima commessa non si ricorda più sul telefono (`ultimaCommessa`). Al cambio di fase piano, unità e prospetto ripartono dal segnaposto, anche dentro lo stesso invio e anche se la fase nuova chiede lo stesso livello. Una fase scelta prima del cantiere si conserva quando lo si sceglie. Contratto invariato (§2, rilascio 0.38.0).
 >
 > **Rev. 19 — la fase non si preseleziona più (0.37.9).** Deciso da Francesco il 06/10/2026, per le bolle e per le foto, dopo 38 bolle partite di fila il 05/10 con la stessa fase sbagliata. Nelle foto ogni invio parte da «— scegli la fase —» con Invia spento; dopo un invio, all'apertura e al cambio di commessa il menù torna lì, e con la fase ripartono i livelli. La commessa invece si ripropone. Contratto invariato (§2, rilascio 0.37.9).
 >
@@ -55,9 +57,9 @@ Cosa cambia in pratica: un campo in meno da scegliere prima di scattare, e ogni 
 
 Una sola schermata di lavoro, con la stessa impostazione di Bolle:
 
-1. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice.
+1. **Cantiere** (obbligatorio) — stessa anagrafica del modulo Bolle, che vive in `core/cantieri.js`: **un solo elenco per tutta l'app**, perché due elenchi separati potrebbero divergere e una commessa presente in un modulo e assente nell'altro è un dato sbagliato che arriva a destinazione senza far rumore. **Sette commesse dal 16/09/2026** — `BRU`, `MAR`, `MNG`, `MRS`, `SNU`, `SNZ2.1`, `SNZ2.2` — in ordine alfabetico di codice. **Dalla 0.38.0 non si preseleziona**: all'apertura e dopo ogni invio si parte da «— scegli il cantiere —», con Invia spento. Non c'è un caso a voce unica: l'elenco è lo stesso per ogni operatore e per i due moduli.
    **Fase di lavoro** — elenco chiuso di gruppo in `core/fasi.js`, lo stesso delle bolle. **Dalla 0.37.9 non si preseleziona**: ogni invio parte da «— scegli la fase —» («— scegli il lotto —» per le urbanizzazioni), e così all'apertura del modulo e al cambio di commessa; con la fase ripartono anche i livelli. **Obbligatoria su ogni invio dalla 0.37.0** (§4.4): tutto va in archivio, e una foto d'archivio senza fase non saprebbe in quale cartella andare. Per una foto generica il percorso veloce è la fase `Cantiere`, che non pretende livelli. Per un'urbanizzazione il campo si chiama **Lotto** e mostra i lotti di quella commessa al posto delle fasi (§4.5). Una commessa senza piani interrati non vede la fase `Interrato`.
-   **Piano**, **Unità**, **Prospetto** — compaiono **solo dove la fase li pretende**, e dove compaiono sono obbligatori: non esistono livelli facoltativi (§4.5). Con l'unità il piano non si chiede — lo ricava l'app — ma si legge sotto il menù, perché l'operatore non l'ha scelto e vederlo è il solo modo che ha di accorgersi se non torna. **Nessuno dei tre è preselezionato:** un livello è il nome di una cartella sul server, e una scelta preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato senza fare rumore. Costa un tocco per invio, non per foto.
+   **Piano**, **Unità**, **Prospetto** — compaiono **solo dove la fase li pretende**, e dove compaiono sono obbligatori: non esistono livelli facoltativi (§4.5). Con l'unità il piano non si chiede — lo ricava l'app — ma si legge sotto il menù, perché l'operatore non l'ha scelto e vederlo è il solo modo che ha di accorgersi se non torna. **Nessuno dei tre è preselezionato:** un livello è il nome di una cartella sul server, e una scelta preselezionata che nessuno guarda archivia la foto nell'appartamento sbagliato senza fare rumore. Costa un tocco per invio, non per foto. **Al cambio di fase ripartono tutti e tre** (dalla 0.38.0), anche dentro lo stesso invio: è la fase a decidere quali livelli servono, e un piano scelto per un'altra fase è fuori contesto.
 2. **Scatta foto** — apre la **fotocamera dentro l'app** (`core/fotocamera.js`, la stessa del modulo Bolle): si scatta più volte di fila senza uscire, con rullino e contatore, poi *Fine*. Accanto restano **Usa la fotocamera del telefono** e **Scegli dalla galleria** (multi-foto). Anteprime rimovibili, ognuna col peso reale del file che partirà.
    Qui gli scatti di una sessione **non** vengono raggruppati: ogni foto è una foto. Il gesto però è identico a quello delle bolle, così chi usa l'app impara una sola cosa.
 3. **Nota** (facoltativa, max 255 caratteri) — vale per tutte le foto di quell'invio. Si svuota dopo l'invio, perché la nota successiva è un'altra cosa.
@@ -317,7 +319,7 @@ Il campo arriva **vuoto** solo per le bolle e per le foto accodate prima della 0
 | `ImpiantoTermicoAlloggi` | Impianto termico alloggi |
 | `ImpiantoTermicoCondominiale` | Impianto termico condominiale | `CMC 128` era nell'elenco d'origine ed è stata **tolta** lo stesso giorno su decisione di Francesco (codice di commessa, non fase); `Impianto SEFCC` era in rosso nell'elenco d'origine e resta finché non decide lui.
 
-**Nell'app** è un menù a tendina accanto al cantiere, **facoltativo**: la prima voce è «— nessuna fase —», sempre selezionabile, e con quella si invia lo stesso. L'ultima scelta si ripropone al prossimo invio, «nessuna» compresa, come il cantiere: non aggiunge tocchi al giro. Vale per tutte le foto di uno stesso invio, come commessa e nota.
+**Nell'app** è un menù a tendina accanto al cantiere, **facoltativo**: la prima voce è «— nessuna fase —», sempre selezionabile, e con quella si invia lo stesso. ~~L'ultima scelta si ripropone al prossimo invio, «nessuna» compresa, come il cantiere: non aggiunge tocchi al giro.~~ Superato: dalla 0.37.9 la fase non si ripropone, dalla 0.38.0 nemmeno il cantiere (rilasci 0.37.9 e 0.38.0, §5). Vale per tutte le foto di uno stesso invio, come commessa e nota.
 
 **Lato raccolta serve la colonna `Fase`** (riga di testo singola), mappata sul campo omonimo. Finché non c'è, il flow ignora il campo e le foto atterrano lo stesso: il rilascio è indipendente. Dalla 0.37.0 una foto in arrivo dall'app **non ha mai la fase vuota**: se la colonna risulta vuota, o è una foto di una versione precedente, o la colonna non è mappata.
 
@@ -531,6 +533,43 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.38.0 — il cantiere non si preseleziona più, e i livelli ripartono al cambio di fase
+
+**Niente da fare a valle**, contratto invariato: stessi campi, stessi codici di commessa e di fase. Un elemento già in coda parte col cantiere e la fase che aveva. Cambia quanto spesso il cantiere è giusto: da adesso lo sceglie qualcuno a ogni invio.
+
+**Come si ricordava il cantiere fino alla 0.37.9** (letto nel codice prima di toccarlo). I meccanismi erano quattro:
+
+1. **la memoria**: `ultimoCantiere` in `llitalia.bolle` e `ultimaCommessa` in `llitalia.foto`, scritti a ogni invio e riletti all'apertura del modulo per preselezionare;
+2. **il segnaposto che spariva**: con un cantiere in memoria il menù non aveva nemmeno «— scegli il cantiere —», quindi tornare a «nessuno» era impossibile;
+3. **il menù che non tornava** dopo Invia: la pagina non si ricarica, e la bolla dopo partiva col cantiere di quella prima;
+4. **«Cantiere sbagliato?» nello storico delle bolle**: il menù non aveva segnaposto e partiva dal primo degli altri cantieri, quindi «Rimanda» mandava la bolla lì senza che nessuno l'avesse scelto.
+
+Restano come sono, perché non sono preselezioni: i riquadri di **Rimanda** partono dal cantiere del record da correggere (è il dato da rivedere, non un suggerimento), e il filtro «Tutti i cantieri» dello storico è un filtro di vista. Senza cantiere Invia era già spento.
+
+**Il caso a voce unica non esiste oggi.** `core/cantieri.js` ha sette voci, lo stesso elenco per tutti gli operatori e per i due moduli, senza filtri: il cantiere si chiede sempre. Il collaudo lo controlla (sette voci in tutti e due i moduli), così il giorno che un elenco diventasse di una voce sola il collaudo lo direbbe invece di farlo passare.
+
+**Una scelta di costruzione da conoscere.** Il cantiere ora parte sempre vuoto, e capita di toccare prima la fase. Scegliere il cantiere la prima volta **completa** il contesto, non lo cambia: la fase scelta prima si conserva. Da un cantiere a un altro, invece, la fase riparte come dalla 0.37.9. Senza questa eccezione una fase appena scelta sparirebbe in silenzio, e la bolla partirebbe senza.
+
+**I livelli al cambio di fase.** La fase è entrata nella chiave dei tre menù dei livelli, e il valore di prima non si porta dietro. Prima il menù dell'unità non veniva nemmeno rifatto passando fra due fasi che la chiedono entrambe (per esempio da `FinituraAlloggi` a `ImpiantoElettricoAlloggi`).
+
+Previsione scritta prima di correggere, confermata (collaudo `21-cantiere-senza-memoria.js`: **17 rossi sul codice della 0.37.9, 0 dopo**):
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| Apertura, con un cantiere vecchio in memoria (`BRU`) | «— scegli il cantiere —», segnaposto fra le voci, nei due moduli | ✓ |
+| Una bolla pronta e nessun cantiere | Invia spento | ✓ |
+| Due bolle di fila di due cantieri diversi (MNG, poi SNZ2.2) | dopo la prima il menù torna a «scegli», la seconda non parte finché non si sceglie, e parte su SNZ2.2 | ✓ |
+| Fase scelta prima del cantiere | si conserva; da un cantiere a un altro riparte | ✓ |
+| Ricarica | «— scegli il cantiere —» | ✓ |
+| «Cantiere sbagliato?» nello storico | parte da «scegli», Rimanda spento finché non si sceglie | ✓ |
+| Foto: piano `P1` con `Strutture`, poi `Murature` | il piano riparte, anche se `P1` c'è | ✓ |
+| Foto: unità `1A` con `FinituraAlloggi`, poi `ImpiantoElettricoAlloggi` | l'unità riparte | ✓ |
+| Foto dopo un invio, con la fase scelta | non parte senza cantiere | ✓ |
+| La memoria | non si legge e non si scrive più (il valore vecchio resta, inerte) | ✓ |
+| Elenco dei cantieri | sette voci nei due moduli: nessun caso a voce unica | ✓ |
+
+**Ogni meccanismo è stato rimesso apposta, uno alla volta**, per vedere i collaudi diventare rossi: la memoria del cantiere letta e scritta (8 rossi nel collaudo 21, e il 20 si ferma alla ricarica), il menù che non torna dopo Invia (5), il piano portato al cambio di fase (1), la chiave dell'unità senza la fase (1), la correzione nello storico senza segnaposto (2), la fase persa al primo cantiere (1). Il collaudo 20 della fase è stato riscritto: apriva il modulo già sull'ultimo cantiere, che non esiste più, e ora guarda la fase all'apertura **prima** di toccare il cantiere; rimettendo la memoria della fase fa 6 rossi. Una misura da conoscere: togliere **solo** l'azzeramento della fase dopo Invia non fa più rosso niente, perché il cantiere che riparte rifà da sé il menù della fase. L'azzeramento resta come seconda difesa: togliendo insieme quello e il ritorno del cantiere i rossi sono 11 (6 nel 20, 5 nel 21).
 
 ### Rilascio 0.37.9 — la fase non si preseleziona più
 
