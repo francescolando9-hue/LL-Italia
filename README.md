@@ -233,7 +233,7 @@ docs/                 7 documenti, tutti correnti:
                                                         degli altri, per chi legge da fuori
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
-                      AppBolleContinuitaRunbook….md     documento unico per il lavoro a valle
+                      AppBolleContinuita….md            documento unico per il lavoro a valle
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
                       AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 5
                       FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale

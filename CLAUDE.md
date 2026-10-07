@@ -9,7 +9,7 @@ Con due o più moduli la home mostra le tessere; con un solo modulo attivo aprir
 Fonte di verità (per il modulo Bolle)
 docs/AppBolleSpecificaFunzionale….md — specifica ufficiale, rev. 2: prevale su tutto.
 docs/AppBolleFlowRicezione….md — il flow di ricezione e la raccolta BolleInArrivo (struttura, procedure, esiti dei collaudi).
-docs/AppBolleContinuitaRunbook….md — documento unico per il lavoro a valle, dalla raccolta in poi.
+docs/AppBolleContinuita….md — documento unico per il lavoro a valle, dalla raccolta in poi.
 docs/AppFotoCantiereSpecifica….md — specifica del modulo Foto cantiere e requisiti del suo flow.
 Il runbook del venerdì del modulo Foto (AppFotoCantiereRunbookVenerdi….md) NON sta in questo repo: vive su L:, accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e il repo è pubblicato integralmente su GitHub Pages. Si esegue in Cowork. Se serve modificarlo, si lavora sulla copia su L: — non se ne fa una seconda qui.
 docs/FotoCantiereBriefingRicevente.md — stato reale di raccolta e flow, misurato sul tenant dopo il collaudo del 10/09/2026. Dove divergono, questo prevale sulla specifica del modulo Foto: lì c'è ciò che è stato misurato, non ciò che era previsto.
