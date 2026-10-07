@@ -75,7 +75,7 @@ Separatamente, **ogni richiesta ha un tetto di otto minuti**: passato quello va 
 
 Dalla 0.36.0, sotto **ogni** elemento inviato — foto e bolle — c'è **Rimanda**, per qualunque motivo: foto venuta male, dato sbagliato, o il dubbio che non sia arrivata. Si apre un riquadro coi campi già compilati, e il pulsante dice **quale delle due cose** sta per fare, perché in raccolta sono due cose diverse:
 
-- **Rimanda la stessa** (niente modificato) — riusa lo **stesso identificativo**. Il flow riconosce il duplicato, non crea un doppione e l'app scrive *«Era già in raccolta»*. Non conta fra le inviate di oggi: in raccolta non è arrivato niente di nuovo, e quel numero serve a essere confrontato coi file atterrati.
+- **Rimanda la stessa** (niente modificato) — riusa lo **stesso identificativo**. Il flow riconosce il duplicato e non crea un doppione — per le bolle provato sul telefono il 07/10/2026 — e l'app scrive *«Era già in raccolta»* se la risposta del flow lo dice (`gia_presente`; per il flow delle bolle non è misurato, vedi la specifica Bolle rev. 9). Non conta fra le inviate di oggi: in raccolta non è arrivato niente di nuovo, e quel numero serve a essere confrontato coi file atterrati.
 - **Rimanda corretta** (cantiere, fase, livelli o nota cambiati; su una bolla solo cantiere e fase, che sono i campi che una bolla ha) — è un **invio nuovo**, con identificativo e numero progressivo nuovi. Quella già mandata resta in raccolta e **va annullata dall'ufficio**: il telefono non può sapere se è già stata lavorata. L'ora dello scatto resta quella della foto — rimandarla non la riscatta. Per una pagina di una bolla di più fogli l'`idBolla` resta quello dell'originale, così la correzione non spezza la bolla in due.
 
 Serve che la foto sia ancora sul telefono: rimandare una miniatura al posto dell'originale consegnerebbe all'ufficio una foto peggiore.
@@ -84,7 +84,7 @@ Serve che la foto sia ancora sul telefono: rimandare una miniatura al posto dell
 
 Nello storico, aprendo una bolla si può **rimandarla su un altro cantiere** — capitava di inviare col picker rimasto sull'ultimo cantiere usato, e capita ancora di sceglierne uno sbagliato. Il menù del cantiere giusto parte da «— scegli il cantiere —» e *Rimanda* resta spento finché non lo si sceglie (dalla 0.38.0: prima partiva dal primo degli altri cantieri). Possibile solo se la foto originale è ancora sul dispositivo: rimandare la miniatura significherebbe consegnare al magazzino una bolla meno leggibile.
 
-La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va annullata dall'ufficio. È un limite della scelta capture-only, non un difetto.
+**È una bolla nuova con la stessa foto**: identificativo e progressivo nuovi, file identico byte per byte (l'app non ricodifica: manda la foto conservata così com'era), stessa bolla (`idBolla`, pagina) e stessa fase dell'invio originale. Provato il 07/10/2026. La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va annullata dall'ufficio; a valle la correzione si riconosce dallo stesso file, senza cambiare il contratto. È un limite della scelta capture-only, non un difetto.
 
 ## Informazioni e aggiornamenti
 
@@ -233,7 +233,7 @@ docs/                 7 documenti, tutti correnti:
                                                         degli altri, per chi legge da fuori
                       AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
-                      AppBolleContinuita….md            documento unico per il lavoro a valle
+                      AppBolleContinuita….md            cosa arriva dall'app e con quali garanzie
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
                       AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 5
                       FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale
@@ -302,7 +302,7 @@ Content-Type: application/json
                                            //   prospetto) NON sono qui: sono solo
                                            //   nel modulo Foto
   "operatore": "Paolo Sanzarello",
-  "idClient": "fe7e5c81-…",                // GUID della bolla, per la deduplica futura
+  "idClient": "fe7e5c81-…",                // GUID dell'invio: chiave della deduplica
   "idDispositivo": "9b2c7f10-…",           // GUID dell'installazione: titolare della sequenza
   "progressivo": 137,                      // intero: sequenza di quel dispositivo
   "idBolla": "4c1a8e02-…",                 // GUID della bolla: uguale per ogni sua pagina

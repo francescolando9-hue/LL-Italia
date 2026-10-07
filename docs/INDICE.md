@@ -18,7 +18,7 @@ Indirizzo da cui leggerli: `https://francescolando9-hue.github.io/LL-Italia/docs
 |---|---|
 | `AppBolleSpecificaFunzionale202609011935Claude.md` | **Specifica funzionale — prevale su tutto** per il modulo Bolle: schermate, giro dell'operatore, contratto di invio, progressivo e identità del dispositivo, bolla su più pagine, «Rimanda». Le decisioni recenti stanno nelle revisioni in testa (fra cui: livelli fuori dal contratto delle bolle, fase e cantiere che non si preselezionano). |
 | `AppBolleFlowRicezione202609031937Claude.md` | Il flow `BolleInArrivoRicevitore` e la raccolta `BolleInArrivo`: struttura delle azioni, colonne, procedure di modifica, esiti dei collaudi. Vale come **modello per gli altri flow** del gruppo. |
-| `AppBolleContinuita202610070939Claude.md` | Documento unico e **autosufficiente** per il lavoro a valle, dalla raccolta in poi: cosa arriva certo dall'app e cosa no, controllo di continuità, buchi nella sequenza, eccezioni. È quello da caricare in Cowork per riprendere il tratto magazzino. |
+| `AppBolleContinuita202610070939Claude.md` | **Solo lato app**: cosa manda l'app, con quali garanzie (commessa, fase, `idClient`, progressivi, pagine, «Rimanda» e «Cantiere sbagliato?», errori e nuovi tentativi) e cosa a valle si può dare per certo. Lo stato di raccolta, flow e runbook del magazzino non sta qui: è nella conoscenza del progetto AutomazioneMagazzinoCantiere. |
 | `AppBolleLeggibilita202609031500Claude.md` | Metodo e taratura del controllo di leggibilità delle foto: perché avvisa senza bloccare, e su quali misure sono state fissate le soglie. |
 
 ## Modulo Foto cantiere
