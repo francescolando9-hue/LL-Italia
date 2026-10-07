@@ -1,0 +1,27 @@
+# Controllo di riservatezza: nessun percorso del server e nessun dato vero
+# (partite IVA, codici fiscali, IBAN) nel repository, che è pubblico.
+# È lo stesso scanner dell'hook prima del commit (collaudi/riservatezza.js):
+# qui gira su ogni push e su ogni pull request, anche per i commit fatti da un
+# clone senza l'hook attivo. Per essere OBBLIGATORIO prima di unire su main va
+# richiesto nelle regole del repository (vedi README, «Controllo di
+# riservatezza»). Nei log scrive tipo, file e riga, MAI il valore trovato: i
+# log di un repository pubblico sono pubblici.
+name: Riservatezza
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  riservatezza:
+    name: riservatezza
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node collaudi/riservatezza.js
