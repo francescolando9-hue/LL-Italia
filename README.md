@@ -197,9 +197,26 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Ventuno collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, sette commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria** e **cantiere senza memoria**.
+Ventidue collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, sette commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria**, **cantiere senza memoria** e **riservatezza**.
 
 A parte, e **dopo** un rilascio: `node collaudi/pubblicato.js` legge `sw.js` e `core/versione.js` **dal sito pubblicato** e li confronta fra loro e col repo. Gli altri collaudi girano su un server locale che serve il repo: provano che il codice è coerente, non che sia arrivato in linea — fra «unito su main» e «lo prendono i telefoni» ci sono una build di Pages e qualche minuto. In `collaudi/LEGGIMI.md` c'è cosa prova ciascuno, **le trappole già pagate** (a partire da `page.waitForFunction` con predicato `async`, che non aspetta niente) e — soprattutto — **cosa questi collaudi non dimostrano**: il telefono vero, il flow vero, i video, il caricamento a blocchi.
+
+## Controllo di riservatezza
+
+Il repository è **pubblico**: niente percorsi del server e niente dati veri, nemmeno nei commenti o nei dati di prova (regola di gruppo, estratto in `CLAUDE.md`). Dal 07/10/2026 lo controlla una macchina, in tre posti e con lo stesso codice (`collaudi/riservatezza.js`, senza dipendenze):
+
+- **prima del commit**, con l'hook `.githooks/pre-commit`, sui file in stage — quello che il commit conterrà davvero. Si attiva **una volta per clone**:
+  ```
+  git config core.hooksPath .githooks
+  ```
+- **su GitHub**, con il controllo `riservatezza` (`.github/workflows/riservatezza.yml`), su ogni push e ogni pull request, su tutto il repository: vale anche per i commit fatti da un clone senza l'hook;
+- **nei collaudi**, col collaudo 22, che prova anche che l'hook blocca davvero.
+
+Cosa blocca: i **percorsi UNC** (due barre rovesciate seguite da un nome di macchina, qualunque sia), i **percorsi sulle unità L: e A:** seguite dalla barra rovesciata, e **partite IVA, codici fiscali e IBAN**, riconosciuti dalla **cifra di controllo** — un numero di undici cifre qualsiasi non basta: per la partita IVA conta anche il codice dell'ufficio. Quello che trova lo scrive come tipo, file e riga, **mai il valore**: i log di GitHub di un repository pubblico sono pubblici. Nel controllo non c'è nessun nome di macchina né di condivisione, e i casi di prova sono inventati e composti a runtime.
+
+**Perché sia obbligatorio prima di unire su `main`** serve un'impostazione del repository, che fa Francesco: *Settings → Rules → Rulesets → New ruleset → New branch ruleset*, bersaglio il ramo predefinito, regola **Require status checks to pass** con il controllo `riservatezza` (compare nell'elenco dopo la sua prima esecuzione), *Enforcement status* **Active**.
+
+Se blocca, si toglie il dato dal file: il percorso vive nella configurazione sul server, il dato di prova si inventa. Saltare l'hook (`git commit --no-verify`) non serve a pubblicarlo: lo stesso controllo, su GitHub, non lascia unire.
 
 ## Struttura del repo
 
@@ -228,6 +245,9 @@ core/versione.js      versione in uso, letta dalla cache attiva del service work
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
 collaudi/             prove automatiche su browser vero (node collaudi/esegui.js)
+collaudi/riservatezza.js  controllo di riservatezza (vedi sopra), senza browser
+.githooks/pre-commit  lo stesso controllo prima del commit (git config core.hooksPath .githooks)
+.github/workflows/    pubblicazione su Pages, e il controllo riservatezza su ogni push e PR
 docs/                 7 documenti, tutti correnti:
                       INDICE.md                         indice a nome stabile: i nomi completi
                                                         degli altri, per chi legge da fuori

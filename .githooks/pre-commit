@@ -1,0 +1,18 @@
+#!/bin/sh
+# Controllo di riservatezza prima del commit: niente percorsi del server e
+# niente dati veri (partite IVA, codici fiscali, IBAN) nei file in stage.
+# Il repository è pubblico. Lo scanner è collaudi/riservatezza.js.
+#
+# Si attiva una volta per clone:
+#   git config core.hooksPath .githooks
+#
+# Se blocca, si toglie il dato dal file. Saltarlo (git commit --no-verify)
+# non serve a pubblicarlo: lo stesso controllo gira su GitHub e, con la regola
+# del repository attiva, non lascia unire su main.
+radice=$(git rev-parse --show-toplevel) || exit 1
+if ! command -v node >/dev/null 2>&1; then
+  echo "Controllo di riservatezza: node non trovato, commit bloccato." >&2
+  echo "Serve Node.js per eseguire collaudi/riservatezza.js." >&2
+  exit 1
+fi
+exec node "$radice/collaudi/riservatezza.js" --in-stage
