@@ -18,7 +18,28 @@
 //
 // Fra il 04 e il 05/10/2026 il master è cambiato due volte (il Tetto come
 // piano a sé in MAR, MNG e SNZ2.2; Lotto4 tolto da SNU) e l'app no: la 0.37.8
-// l'ha riallineata, e da allora l'impronta lo avrebbe detto subito.
+// l'ha riallineata, e da allora l'impronta lo avrebbe detto subito. Il master
+// 202610092114 (decisioni di Francesco del 09/10/2026) l'ha portato la 0.38.1:
+// le scale e la commessa TN1, qui sotto.
+//
+// **Le scale** (dal master 202610092114). Il campo `scale` c'è solo nelle
+// commesse con più di una scala — oggi MAR (tre scale da 5, 6 e 4 alloggi) e
+// TN1 (le palazzine 4–7). Ogni voce ha `codice` (testo), `piani` e `unita`;
+// dove il campo manca la commessa ha una scala sola, «1». Un piano che non sta
+// in nessuna scala è comune alla commessa: il Tetto di MAR, il P-1 di TN1
+// (l'autorimessa delle quattro palazzine). **La logica dell'app non le usa**:
+// nessun selettore, niente nel payload, `livelliRichiesti` non le guarda.
+// Stanno qui perché il blocco è la copia esatta del master, e l'impronta lo
+// pretende. Il menù dei piani legge `piani`, non le scale: il Tetto di TN1,
+// che tutte e quattro le palazzine citano, compare una volta sola.
+//
+// **TN1 è in anagrafica ma non nel menù.** Non è in `core/cantieri.js` — il
+// menù resta a sette commesse, e il collaudo 14 lo controlla — e l'anagrafica
+// si interroga solo col codice scelto dal menù (`datiCommessa`): qui TN1 è un
+// dato inerte, che nessun invio può raggiungere. Entrerà nei menù dopo il
+// livello palazzina nell'archivio, che è un lavoro a parte; a quel punto
+// conterà anche che il P-1 è il suo unico piano sotto quota (voce unica in
+// `Interrato`) e che i prospetti sono vuoti (Finitura facciata non li chiede).
 //
 // A cosa serve. Dal 18/09/2026 l'archivio di commessa sul server ha UN LIVELLO
 // sotto la fase, e dove quel livello è obbligatorio **sostituisce la cartella
@@ -41,7 +62,8 @@
 // foto in una cartella che esiste. Si legge dalla mappa, sempre.
 //
 // Commesse senza anagrafica. SNZ2.1 e MRS sono concluse, e una commessa nuova
-// non ce l'ha ancora: per loro non c'è nessun livello da offrire, le fasi
+// non ce l'ha ancora (TN1 è il caso opposto: l'anagrafica c'è, il menù no —
+// vedi sopra). Per loro non c'è nessun livello da offrire, le fasi
 // restano tutte disponibili e i tre campi non viaggiano. A valle la foto
 // finisce nella cartella del mese con un'anomalia — voluto: non blocca chi sta
 // scattando in cantiere per un dato che manca in ufficio.
@@ -49,7 +71,7 @@
 import { FASI, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202610050932',
+  versione: '202610092114',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -101,6 +123,14 @@ export const ANAGRAFICA = {
         P2:    ['2.01', '2.02', '2.03', '2.04'],
         Tetto: [],
       },
+      scale: [
+        { codice: '1', piani: ['P0', 'P1', 'P2'],
+          unita: ['0.01', '0.02', '1.01', '1.02', '2.01'] },
+        { codice: '2', piani: ['P0', 'P1', 'P2'],
+          unita: ['0.03', '0.04', '1.03', '1.04', '2.02', '2.03'] },
+        { codice: '3', piani: ['P0', 'P1', 'P2'],
+          unita: ['0.05', '1.05', '1.06', '2.04'] },
+      ],
       etichetteUnita: {},
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
@@ -192,6 +222,37 @@ export const ANAGRAFICA = {
       },
       etichetteUnita: {},
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
+    },
+    TN1: {
+      tipo: 'edificio',
+      piani: [
+        { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
+        { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',           ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo',         ordine: 2 },
+        { codice: 'P3',    etichetta: 'Piano terzo',           ordine: 3 },
+        { codice: 'Tetto', etichetta: 'Tetto',                 ordine: 4 },
+      ],
+      unita: {
+        'P-1': [],
+        P0:    ['401', '402', '403', '404', '501', '502', '503', '504', '601', '602', '603', '604', '701', '702', '703', '704'],
+        P1:    ['411', '412', '413', '414', '511', '512', '513', '514', '611', '612', '613', '614', '711', '712', '713', '714'],
+        P2:    ['421', '422', '423', '424', '521', '522', '523', '524', '621', '622', '623', '624', '721', '722', '723', '724'],
+        P3:    ['431', '432', '433', '434', '531', '532', '533', '534', '631', '632', '633', '634', '731', '732', '733', '734'],
+        Tetto: [],
+      },
+      scale: [
+        { codice: '4', piani: ['P0', 'P1', 'P2', 'P3', 'Tetto'],
+          unita: ['401', '402', '403', '404', '411', '412', '413', '414', '421', '422', '423', '424', '431', '432', '433', '434'] },
+        { codice: '5', piani: ['P0', 'P1', 'P2', 'P3', 'Tetto'],
+          unita: ['501', '502', '503', '504', '511', '512', '513', '514', '521', '522', '523', '524', '531', '532', '533', '534'] },
+        { codice: '6', piani: ['P0', 'P1', 'P2', 'P3', 'Tetto'],
+          unita: ['601', '602', '603', '604', '611', '612', '613', '614', '621', '622', '623', '624', '631', '632', '633', '634'] },
+        { codice: '7', piani: ['P0', 'P1', 'P2', 'P3', 'Tetto'],
+          unita: ['701', '702', '703', '704', '711', '712', '713', '714', '721', '722', '723', '724', '731', '732', '733', '734'] },
+      ],
+      etichetteUnita: {},
+      prospetti: [],
     },
     SNU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },
     BRU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },

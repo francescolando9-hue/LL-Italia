@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 20 del 06/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 21 del 09/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 21 — anagrafica dei livelli al master 202610092114 (0.38.1).** Decisioni di Francesco del 09/10/2026: il campo **`scale`** nelle commesse con più di una scala (MAR, tre scale da 5, 6 e 4 alloggi, Tetto fuori dalle scale) e la commessa **TN1** in anagrafica (palazzine 4–7 come scale, P-1 autorimessa comune, 64 alloggi, prospetti vuoti). **TN1 non entra nel menù** e la logica non usa le scale: per chi scatta non cambia niente. Contratto invariato (§5, rilascio 0.38.1).
 >
 > **Rev. 20 — il cantiere non si preseleziona più, e al cambio di fase ripartono i livelli (0.38.0).** Deciso da Francesco il 06/10/2026, per le bolle e per le foto. All'apertura e dopo ogni invio il cantiere parte da «— scegli il cantiere —», con Invia spento: l'ultima commessa non si ricorda più sul telefono (`ultimaCommessa`). Al cambio di fase piano, unità e prospetto ripartono dal segnaposto, anche dentro lo stesso invio e anche se la fase nuova chiede lo stesso livello. Una fase scelta prima del cantiere si conserva quando lo si sceglie. Contratto invariato (§2, rilascio 0.38.0).
 >
@@ -351,7 +353,7 @@ Lotto2\202609\<file>                    urbanizzazioni: il lotto fa da fase
 
 **Il filtro sui piani.** Per la fase `Interrato` l'app offre **solo i piani con ordine negativo**: «Interrato, piano terzo» è una scelta che non vuol dire niente, e in cartella diventerebbe un percorso che nessuno cerca. Il Tetto, che ha ordine positivo, ne resta fuori da sé.
 
-**L'anagrafica dell'app è la copia esatta del master, e lo si verifica** (dalla 0.37.8). Il blocco di `core/anagrafica.js` si rigenera per intero dal JSON del master, non si ritocca voce per voce, e il collaudo `15-livelli.js` confronta l'**impronta SHA-256** della sua forma canonica con quella del master della versione dichiarata. La forma canonica è il JSON con le chiavi ordinate, senza spazi, in UTF-8 — in Python `json.dumps(dati, sort_keys=True, ensure_ascii=False, separators=(',', ':'))` — quindi l'impronta si può rifare dal file su `L:` senza aprire il repo. Per il master `202610050932` è `0e736ea7f4c00ae5b597047695048b788df6aa75687713178fe35fe66022f3e6` (5133 byte). Il motivo: fra il 04 e il 05/10/2026 il master è cambiato due volte e l'app no, e nessuno se n'è accorto per giorni; con l'impronta lo si vede confrontando due numeri.
+**L'anagrafica dell'app è la copia esatta del master, e lo si verifica** (dalla 0.37.8). Il blocco di `core/anagrafica.js` si rigenera per intero dal JSON del master, non si ritocca voce per voce, e il collaudo `15-livelli.js` confronta l'**impronta SHA-256** della sua forma canonica con quella del master della versione dichiarata. La forma canonica è il JSON con le chiavi ordinate, senza spazi, in UTF-8 — in Python `json.dumps(dati, sort_keys=True, ensure_ascii=False, separators=(',', ':'))` — quindi l'impronta si può rifare dal file su `L:` senza aprire il repo. Per il master `202610050932` era `0e736ea7f4c00ae5b597047695048b788df6aa75687713178fe35fe66022f3e6` (5133 byte); **per il master `202610092114`, dalla 0.38.1, è `3829c27bb9959f592815583a7173706674cd4f4535de66ff15d8391a0ebdd7fa` (6886 byte)**, rifatta in Python e in JavaScript dal JSON consegnato e poi dal blocco rigenerato. Il motivo: fra il 04 e il 05/10/2026 il master è cambiato due volte e l'app no, e nessuno se n'è accorto per giorni; con l'impronta lo si vede confrontando due numeri.
 
 **Una voce sola: non si chiede, la sceglie l'app** (dalla 0.37.7). Se per quella commessa e quella fase un livello obbligatorio ha **una sola voce possibile**, il menù non compare: al suo posto si legge il valore che parte e il perché — *«P-1 — Primo piano interrato · è l'unico piano interrato di questa commessa: lo sceglie l'app»* — e il valore viaggia nel payload come se l'operatore l'avesse scelto. Il caso che l'ha fatto notare: SNZ2.2 in fase `Interrato` apriva un menù con «— scegli il piano —» e `P-1` come unica voce, cioè un tocco obbligatorio per una scelta che non c'era. Con l'anagrafica di oggi è **l'unico caso** in cui la regola scatta (misurato su tutte le commesse e tutte le fasi), ma vale per tutti e tre i livelli: un prospetto unico o un'unità unica seguono la stessa strada.
 
@@ -359,11 +361,11 @@ Non contraddice la regola «nessuna preselezione» dei menù dei livelli: ne è 
 
 **`null`, mai stringa vuota.** Dove il livello non si applica il campo arriva `null` e non `''`. Vale la regola già registrata dei campi vuoti: una colonna con `''` somiglia a un dato e non lo è, e sui campi numerici una stringa vuota è già costata venti foto entrate senza colonne il 10/09. I tre campi **viaggiano sempre**, anche quando valgono `null`: un campo assente e un campo nullo si comportano diversamente in un flow, e meglio uno solo dei due casi.
 
-**Commesse senza anagrafica.** `SNZ2.1` e `MRS` sono concluse e in anagrafica non ci sono; una commessa nuova non ce l'ha ancora. Per loro non c'è nessun livello da offrire: le fasi restano tutte disponibili e i tre campi arrivano `null`. A valle la foto finisce nella cartella del mese con un'anomalia — **voluto**: non si blocca chi sta scattando in cantiere per un dato che manca in ufficio.
+**Commesse senza anagrafica.** `SNZ2.1` e `MRS` sono concluse e in anagrafica non ci sono; una commessa nuova non ce l'ha ancora. **TN1 è il caso opposto** (dalla 0.38.1): l'anagrafica c'è, ma la commessa non è nel menù — non è in `core/cantieri.js` — quindi nessun invio la raggiunge; entrerà nei menù dopo il livello palazzina nell'archivio, lavoro a parte. Per loro non c'è nessun livello da offrire: le fasi restano tutte disponibili e i tre campi arrivano `null`. A valle la foto finisce nella cartella del mese con un'anomalia — **voluto**: non si blocca chi sta scattando in cantiere per un dato che manca in ufficio.
 
 **Dove vive l'elenco delle fasi: due posti, e uno solo li tiene insieme.** Dentro l'app le fasi stanno in `core/fasi.js` — quali sono, con codice ed etichetta — e in `core/anagrafica.js`, nella tabella `livelliPerFase` — cosa ognuna pretende. Non sono due copie della stessa lista: sono **due fatti diversi** sulla stessa lista, e per questo stanno separati. Ma le chiavi devono combaciare, e una divergenza **non farebbe rumore**: una fase presente in `fasi.js` e assente in `livelliPerFase` risulta «senza livelli», quindi si può scegliere, la foto parte, e finisce nella cartella del mese invece che in quella del piano. Dal 18/09/2026 la coerenza fra i due è **collaudata** (`15-livelli.js`): ogni fase ha la sua riga, l'anagrafica non ha righe per fasi che non esistono, e l'ordine è alfabetico. Chi aggiunge una fase tocca quindi **due file**, e se ne dimentica uno il collaudo lo dice.
 
-**Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, e la tabella `livelliPerFase`. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (`202609181330`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
+**Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, la tabella `livelliPerFase` e, dalla 0.38.1, le **scale** delle commesse che ne hanno più di una (codice, piani, unità; un piano che non sta in nessuna scala è comune alla commessa). **Le scale sono dato e basta**: nessun selettore le usa e non viaggiano nel payload. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (dalla 0.38.1 `202610092114`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
 
 ### 4-ter. Invii interrotti: «in corso» vale solo per la sessione che l'ha avviato
 
@@ -533,6 +535,31 @@ Provato in locale coi collaudi automatici del repo (`15-livelli.js`, `16-rimanda
 | Copia di galleria senza EXIF, data del file ad agosto | fermata con avviso; mandata comunque, `dataScatto` di **agosto** e non di oggi | ✓ |
 
 **Cosa questo NON dimostra:** niente di quello che succede dopo l'endpoint. Il flow qui è finto, e la sua guardia sui duplicati è una simulazione di quella vera. Resta da verificare sul tenant, sui numeri: che le tre colonne si popolino, che `1.01` e `P-2` arrivino intatti, e che il runbook costruisca il percorso giusto. La prova è quella solita — si manda una foto e si guarda cosa atterra.
+
+### Rilascio 0.38.1 — anagrafica al master 202610092114: le scale e TN1
+
+**Niente da fare a valle**, contratto invariato. Per chi scatta non cambia niente: i menù sono gli stessi, i livelli si chiedono come prima.
+
+**Cosa è cambiato, misurato prima di toccare l'app.** Il JSON consegnato è stato confrontato campo per campo con la copia della 0.38.0: le differenze sono **esattamente tre** — la versione, il campo `scale` di MAR, la commessa TN1. MNG, SNZ2.2, SNU, BRU, `livelliPerFase` e `prospettiStandard` sono identici. L'impronta della forma canonica è `3829c27b…` (6886 byte), uguale a quella dichiarata, calcolata in Python e in JavaScript. Il blocco di `core/anagrafica.js` è stato **rigenerato per intero** da uno script, nello stesso stile di prima: il diff è di 40 righe aggiunte e una cambiata (la versione), cioè le parti invariate sono uscite identiche carattere per carattere.
+
+**Controlli di struttura, prima di scrivere:**
+
+| Caso | Atteso | Esito |
+|---|---|---|
+| MAR: scale | tre, «1» «2» «3», da 5, 6 e 4 alloggi | ✓ |
+| MAR: ogni alloggio in una scala sola | i 15 alloggi ripartiti senza buchi né doppioni | ✓ |
+| MAR: nessuna scala uguale a un piano | i conteggi coincidono con quelli dei piani (5/6/4), le composizioni no (scala 1 = `0.01`, `0.02`, `1.01`, `1.02`, `2.01`) | ✓ |
+| MAR: Tetto | in nessuna scala, comune alla commessa | ✓ |
+| MAR: `piani` e `unita` per piano | invariati: la logica continua a leggere quelli | ✓ |
+| TN1: scale | palazzine «4»–«7», 16 alloggi ciascuna, ripartizione completa | ✓ |
+| TN1: P-1 | in nessuna scala: l'autorimessa comune | ✓ |
+| TN1: piani | `P-1` … `P3` più il Tetto, il Tetto **una volta sola** in `piani` | ✓ |
+| TN1: alloggi e prospetti | 64 alloggi, nessuno sul Tetto, prospetti vuoti | ✓ |
+| Controllo di riservatezza sul JSON | nessun ritrovamento | ✓ |
+
+**Il collaudo `15-livelli.js`** ha la versione e l'impronta del master nuovo e i numeri delle scale e di TN1, compreso che **TN1 è in anagrafica ma non nel menù**. Visto fallire con ogni guasto rimesso apposta: l'anagrafica della 0.38.0 (10 rossi, che dicono cosa manca), un alloggio di TN1 ritoccato a mano (2), le scale di MAR copiate dai piani (3), TN1 aggiunto al menù (2 nel collaudo 14, 1 nel 15), un secondo Tetto in TN1 (2).
+
+**Per quando TN1 entrerà nei menù** (lavoro a parte, dopo il livello palazzina): il P-1 è il suo unico piano sotto quota, quindi TN1 · `Interrato` sarà una voce unica; e con i prospetti vuoti `FinituraFacciata` su TN1 non chiederà il prospetto. I quattro tetti delle palazzine si affrontano col livello palazzina.
 
 ### Rilascio 0.38.0 — il cantiere non si preseleziona più, e i livelli ripartono al cambio di fase
 

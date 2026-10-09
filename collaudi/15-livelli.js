@@ -139,8 +139,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202610050932';
-    const IMPRONTA_MASTER = '0e736ea7f4c00ae5b597047695048b788df6aa75687713178fe35fe66022f3e6';
+    const VERSIONE_MASTER = '202610092114';
+    const IMPRONTA_MASTER = '3829c27bb9959f592815583a7173706674cd4f4535de66ff15d8391a0ebdd7fa';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -193,6 +193,42 @@ module.exports = {
       }
       out.combinazioni = combinazioni;
       out.uniche = uniche;
+      // Le scale (dal master 202610092114): solo dove le scale sono più di
+      // una. Si contano qui perché la logica non le usa, e quindi nessun
+      // altro controllo se ne accorgerebbe se cambiassero.
+      const scale = c => {
+        // Una commessa che manca non fa esplodere il conto: si legge come
+        // «zero scale», e il controllo che la aspetta lo dice.
+        const dati = a.ANAGRAFICA.commesse[c] || {};
+        const tutte = a.unitaDi(c).map(u => u.codice);
+        const elenco = Array.isArray(dati.scale) ? dati.scale : [];
+        const assegnate = elenco.flatMap(s => s.unita);
+        return {
+          quante: elenco.length,
+          codici: elenco.map(s => s.codice),
+          alloggi: elenco.map(s => s.unita.length),
+          partizione: assegnate.length === tutte.length && new Set(assegnate).size === tutte.length
+            && assegnate.every(u => tutte.includes(u)),
+          ugualeAUnPiano: elenco.filter(s => a.pianiDi(c).some(p => {
+            const delPiano = ((dati.unita || {})[p.codice] || []).slice().sort().join(',');
+            return delPiano === s.unita.slice().sort().join(',');
+          })).map(s => s.codice),
+          comuni: a.pianiDi(c).map(p => p.codice).filter(p => !elenco.some(s => s.piani.includes(p))),
+        };
+      };
+      out.scale = { MAR: scale('MAR'), MNG: scale('MNG'), 'SNZ2.2': scale('SNZ2.2'), TN1: scale('TN1') };
+      const pTN1 = a.pianiDi('TN1');
+      out.TN1 = {
+        piani: pTN1.map(p => p.codice).join(','),
+        tetti: pTN1.filter(p => p.codice === 'Tetto').length,
+        crescente: pTN1.every((x, i) => i === 0 || Number(x.ordine) > Number(pTN1[i - 1].ordine)),
+        unita: a.unitaDi('TN1').length,
+        unitaSulTetto: a.unitaDi('TN1').filter(u => u.piano === 'Tetto').length,
+        prospetti: a.prospettiDi('TN1').length,
+      };
+      const { CANTIERI } = await import('./core/cantieri.js');
+      out.TN1nelMenu = CANTIERI.some(c => c.codice === 'TN1');
+      out.TN1inAnagrafica = a.anagraficaNota('TN1');
       return out;
     });
     registro.dice('numeri dell’anagrafica', numeri);
@@ -215,6 +251,35 @@ module.exports = {
     registro.controlla('voce unica: una sola combinazione su 45, SNZ2.2 · Interrato · P-1',
       numeri.combinazioni === 45 && numeri.uniche.length === 1 && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1',
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
+
+    registro.titolo('Le scale e TN1 (master 202610092114)');
+    const sm = numeri.scale.MAR;
+    registro.controlla('MAR: tre scale, «1» «2» «3», da 5, 6 e 4 alloggi',
+      sm.quante === 3 && sm.codici.join(',') === '1,2,3' && sm.alloggi.join(',') === '5,6,4',
+      `${sm.quante} scale: ${sm.codici.join(' ')} · alloggi ${sm.alloggi.join('/')}`);
+    registro.controlla('ogni alloggio di MAR sta in una scala e in una sola', sm.partizione,
+      'una scala dentro l’altra, o un alloggio senza scala, vorrebbe dire una copia guasta');
+    registro.controlla('e nessuna scala è un piano copiato', sm.ugualeAUnPiano.length === 0,
+      `i conteggi coincidono con quelli dei piani (5/6/4), le composizioni no${sm.ugualeAUnPiano.length ? `: uguali ${sm.ugualeAUnPiano.join(' ')}` : ''}`);
+    registro.controlla('il Tetto di MAR resta fuori dalle scale: è comune alla commessa',
+      sm.comuni.join(',') === 'Tetto', sm.comuni.join(' ') || 'nessuno');
+    registro.controlla('MNG e SNZ2.2 hanno una scala sola: niente campo «scale»',
+      numeri.scale.MNG.quante === 0 && numeri.scale['SNZ2.2'].quante === 0);
+    const st = numeri.scale.TN1;
+    registro.controlla('TN1: le palazzine 4–7 come scale, 16 alloggi ciascuna',
+      st.quante === 4 && st.codici.join(',') === '4,5,6,7' && st.alloggi.every(n => n === 16) && st.partizione,
+      `${st.codici.join(' ')} · alloggi ${st.alloggi.join('/')}`);
+    registro.controlla('il P-1 di TN1 è comune alle quattro palazzine: l’autorimessa',
+      st.comuni.join(',') === 'P-1', st.comuni.join(' ') || 'nessuno');
+    registro.controlla('TN1: P-1…P3 più il Tetto, in ordine, e il Tetto una volta sola',
+      numeri.TN1.piani === 'P-1,P0,P1,P2,P3,Tetto' && numeri.TN1.tetti === 1 && numeri.TN1.crescente,
+      `${numeri.TN1.piani} — il menù dei piani legge «piani», non le scale che il Tetto lo citano tutte`);
+    registro.controlla('TN1: 64 alloggi, nessuno sul Tetto, prospetti vuoti',
+      numeri.TN1.unita === 64 && numeri.TN1.unitaSulTetto === 0 && numeri.TN1.prospetti === 0,
+      `${numeri.TN1.unita} alloggi · ${numeri.TN1.prospetti} prospetti`);
+    registro.controlla('TN1 è in anagrafica ma NON nel menù',
+      numeri.TN1inAnagrafica && !numeri.TN1nelMenu,
+      'entrerà nei menù dopo il livello palazzina nell’archivio: fino ad allora è un dato che nessun invio raggiunge');
 
     registro.titolo('Urbanizzazioni: al posto delle fasi, i lotti');
     await scegliCommessa('#commessa', 'SNU');
