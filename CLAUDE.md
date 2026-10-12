@@ -33,19 +33,21 @@ README aggiornato a ogni feature: cosa fa, come si prova da telefono.
 Definition of done: provata su mobile (o emulazione), funziona offline dove pertinente, nessun errore console, README aggiornato, gli altri moduli e la shell non regrediscono. I collaudi automatici stanno in collaudi/ (node collaudi/esegui.js): vanno eseguiti prima di ogni rilascio e ampliati quando si aggiunge una funzione. In collaudi/aiuto.js, in cima, ci sono le trappole gia' pagate — la prima: page.waitForFunction con un predicato async NON aspetta niente, perche' una Promise e' sempre vera.
 Modello di collaborazione: proporre, non decidere — le scelte di prodotto spettano a Francesco; in dubbio, opzioni con pro/contro e chiedere.
 
-# Regole di condotta (estratto dalla skill organizzativa ll-italia v2.7 del 14/09/2026)
+# Regole di condotta (estratto dalla skill organizzativa ll-italia v2.36 del 10/10/2026)
 
 Stanno qui perché una sessione di Claude Code non carica la skill organizzativa del gruppo e non vede il server aziendale. Riportate come sono state consegnate.
 
 ## Passaggio di consegne fra ambienti
 
-Il lavoro attraversa due ambienti. In **chat e Cowork** si prendono le decisioni, si ragiona sull'impostazione, si scrivono relazioni e documenti di conoscenza, si aggiornano le cartelle di progetto sul server aziendale e si fanno le letture di riscontro sui sistemi. In **Claude Code** si scrive e si mantiene il codice. Nessuno dei due fa il mestiere dell'altro.
+Il lavoro attraversa due ambienti. In **chat e Cowork** si prendono le decisioni, si definisce l'impostazione, si scrivono relazioni e documenti di conoscenza, si aggiornano le cartelle di progetto sul server aziendale e si fanno le letture di riscontro sui sistemi. In **Claude Code** si scrive e si mantiene il codice. Nessuno dei due fa il mestiere dell'altro.
 
-**Chi arriva al punto in cui la parte successiva tocca all'altro chiude il turno scrivendo il prompt da incollare nell'altro ambiente.** Vale nei due versi e si ripete a ogni passaggio, non una volta per progetto. Da Claude Code verso Cowork: quando il codice è a un punto fermo, esaurite le domande all'utente, e restano documenti di conoscenza, relazioni, segnalazioni o verifiche sui sistemi.
+**Chi arriva al punto in cui la parte successiva tocca all'altro chiude il turno scrivendo il passaggio per l'altro ambiente.** Vale nei due versi e si ripete a ogni passaggio, non una volta per progetto.
 
-Contenuto minimo del prompt di consegna, in quest'ordine: **cosa si è pensato** (il ragionamento e le alternative scartate, non solo l'esito); **cosa si è deciso** (decisioni esecutive e vincoli, in forma affermativa); **cosa c'è da fare** (elenco puntuale, nell'ordine); **cosa non si deve fare** (limiti espliciti); **dove stanno i documenti** (nomi senza data); **come si collauda** (i numeri attesi). Se non c'è niente da consegnare si scrive «niente da passare a Cowork»: una chiusura vuota è valida, un prompt inventato no.
+**Da Cowork arriva una specifica:** un file e, in chat, messaggi brevi un passo alla volta che vi rimandano. Contiene solo requisiti, in quest'ordine: dati in ingresso, modifiche, collaudo con la tabella dei casi e i numeri attesi, cosa resta fuori perimetro, ordine di lavoro con i punti di arresto, cosa riportare nel ritorno. La fonte delle regole è il master che la specifica indica: specifica, master e codice bastano per lavorare. **Due punti di arresto:** una differenza fra specifica e master, o un caso che la specifica non copre, si chiede all'utente **prima di modificare**, senza decidere da soli; prima della distribuzione o del rilascio ci si ferma e si danno all'utente commit, numeri del collaudo e ingressi che cambiano comportamento.
 
-**Il prompt non è una fonte**, è un messaggio: chi lo riceve rilegge i documenti indicati invece di fidarsi del riassunto.
+**Il ritorno a Cowork è un file nel repository**, `Documentazione\RitornoCowork[AAAAMMGGHHMM]Claude.md` (data-ora di creazione, nome stabile), committato e caricato; prima del commit si verifica che il nome non ricada nel `.gitignore`. Cowork lo legge direttamente: in chat non resta un testo separato. Si scrive quando il codice è a un punto fermo, esaurite le domande all'utente, e restano documenti di conoscenza, relazioni, segnalazioni o verifiche sui sistemi. È fatto di **soli dati**, quelli che la specifica chiede, di norma: commit e file modificati; numeri del collaudo; ingressi che cambiano comportamento rispetto al commit di partenza; commit e impronta in esercizio, se c'è stata una distribuzione; esito della prima esecuzione; punti aperti, compresi i casi trovati fuori dalla specifica. Se non c'è niente da consegnare si scrive «niente da passare a Cowork»: una chiusura vuota è valida, un passaggio inventato no.
+
+**Il passaggio non è una fonte**, è un messaggio: le regole stanno nel master, e Cowork riscontra il ritorno sul codice, sui commit e sui registri prima di registrarlo.
 
 ## Riservatezza nei repository
 
@@ -61,20 +63,28 @@ I documenti aziendali portati in un repository sono **copie depurate**, con una 
 
 **Collaudo sui numeri, mai sull'esito formale.** Un'esecuzione riuscita non è un risultato corretto: si collauda contando, e si dichiarano i numeri. Un «fatto» senza numeri non dimostra niente. Una prova va scelta sul caso che può fallire: provare un caso in cui il funzionamento e il guasto danno lo stesso risultato non prova niente.
 
-**Revisione critica dell'impostazione.** Davanti a un'impostazione nuova, prima di eseguire: esplicitare almeno un'alternativa credibile con pro e contro, dichiarare quale si sceglierebbe e perché anche se diversa da quella proposta, elencare i punti deboli di quella proposta. L'accordo senza analisi non è un output valido; se un'alternativa seria non esiste, dirlo invece di inventarne una di facciata.
+**Revisione critica dell'impostazione.** Davanti a un'impostazione nuova, prima di eseguire: indicare almeno un'alternativa credibile con pro e contro, quale si sceglierebbe e perché anche se diversa da quella proposta, e i punti deboli di quella proposta. L'accordo senza analisi non è un output valido; se un'alternativa seria non esiste, dirlo invece di inventarne una di facciata.
 
 **Non si presume: si chiede.** Un dato mancante — una colonna, un percorso, una mappatura, un comportamento non documentato — si chiede all'utente e non si deduce. Un dato che non si può verificare non si scrive come certo.
 
 **Un'automazione non è attiva perché è stata creata: è attiva quando la si rilegge e risulta configurata.**
 
-## Nomenclatura dei file
+**Si riscontra il prodotto pubblicato, non la propria dichiarazione — e la lettura del pubblicato è un indizio, non una misura.** Si legge ciò che il sistema serve davvero — il file pubblicato, la riga scritta, l'elemento in raccolta — sapendo che una lettura dice cosa è stato servito in quel momento, non cosa c'è nel sorgente: fra il sistema e chi legge ci sono cache, e lo strumento di lettura ne ha una sua. Una divergenza si misura dal client che conta (il telefono, lo stato del deploy) prima di attribuirla, e l'attribuzione a un commit si fa leggendo il commit. **Una previsione ricavata dal codice non è un'osservazione**: si scrive come previsione finché non la si è vista succedere. E un riscontro che confronta **due copie derivate dalla stessa operazione** non dimostra niente: concordano anche quando manca tutto. Si parte dal sistema di registrazione e si chiede «ogni elemento registrato ha ancora il suo file?».
 
-PascalCase senza spazi, underscore o trattini, con suffisso data-ora `AAAAMMGGHHMM`. I documenti generati da Claude aggiungono `Claude` in coda prima dell'estensione; le revisioni fatte da una persona aggiungono `Rev` più l'iniziale.
+**Quando lo stesso dato vive in più di un file, la coerenza si collauda, non si raccomanda**, e il collaudo si scrive insieme alla seconda copia. Se un collaudo automatico non è possibile, la seconda copia non si crea: si legge dalla prima. Il **numero di versione** è il caso più delicato, perché può decidere se un rilascio arriva: se vive in più posti — per esempio nel codice e nel service worker — il collaudo che li confronta è obbligatorio, e un rilascio correttivo porta **tutte** le copie a un numero **nuovo**, mai a uno già usato.
 
-Due eccezioni che riguardano il codice. **Documenti in un repository versionato:** la storia del repository fa da archivio, quindi il nome porta la data-ora della **creazione** e resta stabile; niente copie datate e niente rinomina a ogni revisione; nome nuovo con data odierna solo al cambio di natura o perimetro, in un commit dedicato. **File prodotti da una procedura automatica** (resoconti di esecuzione, registri, log): niente suffisso `Claude`, perché non sono documenti scritti da Claude; i registri periodici portano il periodo coperto (`AAAAMM`) e non la data-ora di creazione.
+**Una procedura una tantum deve essere rieseguibile.** Se si interrompe a metà e non si può rilanciare, costringe a ricostruire a mano cosa era già stato fatto. Un elemento già lavorato non è un errore: si riconosce e si salta.
 
-## Dove sta il resto
+**Il materiale di collaudo si ripulisce per file, mai per ramo.** Una cartella creata durante una prova può aver ricevuto nel frattempo materiale vero: si cancellano i file elencati nel registro del giro di prova, uno per uno, e la cartella si toglie solo se è rimasta vuota. Ne discende che un collaudo che scrive in una cartella di produzione **tiene traccia di ciò che ha scritto**.
 
-Questo è un estratto. Gli standard di gruppo completi — identità, commesse, regole contabili, convenzioni, registro degli standard — vivono nella skill organizzativa `ll-italia`, il cui master sta sul server aziendale e **non** in questo repository. Quando serve una regola che qui non c'è, **non la si deduce**: la si chiede a Francesco, che la legge dal master.
+**I codici si scrivono come testo, in ogni destinazione.** Se su un valore non ha senso fare una somma, è un codice — timestamp, codici di unità (`1.01`), di piano, di lotto, numeri di fattura, partite IVA — e va consegnato dichiarandone il tipo: una colonna in formato Generale trasforma `1.01` in un numero o in un orario, e un modulo destinato a essere compilato si consegna con la colonna già formattata come testo. Il collaudo si fa **sul tipo della cella**, non sull'aspetto. Un codice che diventa nome di cartella non si converte mai lungo la strada.
 
-Se emerge una regola che vale per tutto il gruppo, non si scrive nel repository: si segnala a Cowork nel prompt di consegna, che la registra come segnalazione alla skill.
+## PowerShell — tre trappole del linguaggio
+
+**I nomi di variabile sono insensibili alle maiuscole.** Dentro una funzione con parametri tipizzati, una variabile locale che porta il nome di un parametro — anche con maiuscole diverse, `$percorso` contro `$Percorso` — **non è una variabile nuova: è lo stesso contenitore**, quindi lo sovrascrive e ne eredita la conversione di tipo. Non è un errore, è un valore cambiato in silenzio che si manifesta molto più avanti. Convenzione: parametri in `PascalCase`, locali in `camelCase` con un nome che non coincida mai.
+
+**Una funzione che può restituire un solo elemento va trattata come collezione** da chi la chiama — `@(…)` attorno alla chiamata, oppure si restituisce esplicitamente un array. Senza, un risultato singolo arriva come scalare e `.Count`, l'indicizzazione e i cicli si comportano in modo diverso dal caso a più elementi: un collaudo su più elementi non lo scopre.
+
+**`Set-StrictMode -Version Latest` in ogni script.** Un guasto rumoroso al momento giusto vale più di un valore sbagliato che viaggia.
+
+**Gli script del gruppo girano su PowerShell 7 (`pwsh`), non su Windows PowerShell 5.1.** I moduli si installano e si verificano con lo stesso eseguibile con cui gira lo script: le cartelle dei moduli utente dei due sono diverse e non
