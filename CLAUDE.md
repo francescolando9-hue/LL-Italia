@@ -87,4 +87,28 @@ I documenti aziendali portati in un repository sono **copie depurate**, con una 
 
 **`Set-StrictMode -Version Latest` in ogni script.** Un guasto rumoroso al momento giusto vale più di un valore sbagliato che viaggia.
 
-**Gli script del gruppo girano su PowerShell 7 (`pwsh`), non su Windows PowerShell 5.1.** I moduli si installano e si verificano con lo stesso eseguibile con cui gira lo script: le cartelle dei moduli utente dei due sono diverse e non
+**Gli script del gruppo girano su PowerShell 7 (`pwsh`), non su Windows PowerShell 5.1.** I moduli si installano e si verificano con lo stesso eseguibile con cui gira lo script: le cartelle dei moduli utente dei due sono diverse e non comunicano. Prima di dichiarare che un modulo o un certificato manca, si controlla **in quale contenitore si sta guardando**. Nei `README` il comando di verifica si scrive per esteso (`pwsh -NoProfile -Command …`).
+
+## Errori, file, dati veri
+
+**Un messaggio d'errore dice il caso preciso.** Una frase per ogni caso, in italiano semplice, e fra parentesi il motivo tecnico e i fatti misurati; mai una frase unica per cause diverse, e mai una causa che il programma non può sapere (se sa solo che manca la data, dice che manca la data). **La corrispondenza fra casi e frasi si collauda**: un caso nuovo senza la sua frase fa fallire il collaudo. Quando i casi sono più d'uno si raggruppano per caso, ognuno con la sua frase in testa.
+
+**Il tipo di un file si stabilisce dai suoi byte**, non dal tipo dichiarato, dall'estensione o dal nome (per un JPEG la firma `FF D8 FF`). La firma sta **in una funzione sola**, che tutti i punti del codice interrogano; quando il tipo va dichiarato a un altro sistema — un payload, un nome di file — si dichiara quello deciso dai byte.
+
+**Il controllo dei dati veri prima del commit blocca, non avvisa.** È un **hook** prima del commit, non un'istruzione in questo file — un'istruzione è contesto, non vincolo. Ferma il commit se contiene partite IVA, codici fiscali, IBAN, nomi di clienti o importi presi dall'archivio; deve confrontare con i valori veri, non bloccare qualunque numero, e l'elenco dei valori veri non sta nel repository. I collaudi usano solo dati costruiti. Se un dato vero arriva comunque sul remoto, **lo si toglie subito dall'ultima versione** e lo si scrive nel resoconto. Per la **storia** si distingue: un **dato di cliente**, oppure un repository **non privato**, → si ripulisce la storia prima di ogni altro lavoro; **ogni altro dato vero** (importi e dati di fornitori, percorsi interni) in un repository **privato** → la storia non si riscrive e non si fa push forzato: nel ritorno a Cowork si elencano commit, file e tipo di dato, **mai il valore**, e Cowork li registra nella conoscenza del progetto; la loro ripulitura diventa condizione obbligatoria prima di un passaggio a pubblico o di una condivisione. In ogni caso la ripulitura limita il danno, non lo cancella: per questo il controllo deve bloccare prima.
+
+**Linguaggio degli script:** PowerShell 7 dove basta l'ambiente Windows dell'ufficio, Python dove servono librerie che PowerShell non ha; la scelta è scritta nella conoscenza del progetto.
+
+**Quando questo estratto cambia** si aggiorna nel repository con un commit dedicato. Una sessione già aperta non se ne accorge — il `CLAUDE.md` si legge all'avvio — e si aggiorna con `/compact` solo se le regole nuove toccano il lavoro in corso.
+
+## Nomenclatura dei file
+
+PascalCase senza spazi, underscore o trattini, con suffisso data-ora `AAAAMMGGHHMM`. I documenti generati da Claude aggiungono `Claude` in coda prima dell'estensione; le revisioni fatte da una persona aggiungono `Rev` più l'iniziale.
+
+Due eccezioni che riguardano il codice. **Documenti in un repository versionato:** la storia del repository fa da archivio, quindi il nome porta la data-ora della **creazione** e resta stabile; niente copie datate e niente rinomina a ogni revisione; nome nuovo con data odierna solo al cambio di natura o perimetro, in un commit dedicato. **File prodotti da una procedura automatica** (resoconti di esecuzione, registri, log): niente suffisso `Claude`, perché non sono documenti scritti da Claude; i registri periodici portano il periodo coperto (`AAAAMM`) e non la data-ora di creazione.
+
+## Dove sta il resto
+
+Questo è un estratto. Gli standard di gruppo completi — identità, commesse, regole contabili, convenzioni, registro degli standard — vivono nella skill organizzativa `ll-italia`, il cui master sta sul server aziendale e **non** in questo repository. Quando serve una regola che qui non c'è, **non la si deduce**: la si chiede a Francesco, che la legge dal master.
+
+Se emerge una regola che vale per tutto il gruppo, non si scrive nel repository: si segnala a Cowork nel ritorno, che la registra come segnalazione alla skill.
