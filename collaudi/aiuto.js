@@ -45,6 +45,14 @@
 //    (`ricevuti.find(r => 'tipo' in r)`), non per posizione. Trappola pagata
 //    il 30/09/2026: 2 controlli su 373, solo nella suite completa, dove tutto
 //    è più lento — esattamente il rosso che si archivierebbe come «flake».
+// 7. **Una riga VIDEO in coda fa sbordare la pagina in orizzontale** (layout
+//    viewport 482 px invece di 390, misurato il 13/10/2026 anche sul commit
+//    0.38.1: preesiste alla 0.39.0), e la barra fissa «Invia» finisce fuori
+//    dallo schermo: un `page.click('#invia')` fallisce con «intercepts pointer
+//    events», anche se il pulsante è acceso. Con foto non succede, e per questo
+//    nei collaudi che le inviano si è visto solo quando un caso ha mandato un
+//    video. Chi manda un video in un collaudo parte, nei casi dopo, da una coda
+//    vuota (23-palazzina-parti-comuni.js azzera il database delle foto).
 // 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
 //    lo controlla come script CommonJS e lascia passare errori che in un
 //    modulo ES sono fatali. Il controllo giusto è
