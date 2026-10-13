@@ -20,7 +20,10 @@
 // piano a sé in MAR, MNG e SNZ2.2; Lotto4 tolto da SNU) e l'app no: la 0.37.8
 // l'ha riallineata, e da allora l'impronta lo avrebbe detto subito. Il master
 // 202610092114 (decisioni di Francesco del 09/10/2026) l'ha portato la 0.38.1:
-// le scale e la commessa TN1, qui sotto.
+// le scale e la commessa TN1, qui sotto. Il master 202610101049 l'ha portato la
+// 0.39.0: `corpiDistinti` su TN1 (le palazzine 4–7 sono edifici distinti, a
+// differenza delle tre scale di MAR), i quattro prospetti di TN1 e il blocco
+// `partiComuni`.
 //
 // **Le scale** (dal master 202610092114). Il campo `scale` c'è solo nelle
 // commesse con più di una scala — oggi MAR (tre scale da 5, 6 e 4 alloggi) e
@@ -71,7 +74,7 @@
 import { FASI, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202610092114',
+  versione: '202610101049',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -107,6 +110,19 @@ export const ANAGRAFICA = {
     Lotto1:                       { piano: '-', unita: '-', prospetto: '-' },
     Lotto2:                       { piano: '-', unita: '-', prospetto: '-' },
     Lotto3:                       { piano: '-', unita: '-', prospetto: '-' },
+  },
+  // Le parti comuni nelle fasi per unità (dal master 202610101049): nelle fasi di
+  // `fasi` il menù delle unità ha una voce in più, in fondo; nelle fasi gemelle
+  // la voce non c’è e l’app rimanda alla fase delle parti comuni.
+  partiComuni: {
+    codice: 'PartiComuni',
+    etichetta: 'Parti comuni',
+    fasi: ['ImpiantoIdrosanitario'],
+    fasiGemelle: {
+      FinituraAlloggi: 'FinituraPartiComuniInterne',
+      ImpiantoElettricoAlloggi: 'ImpiantoElettricoPartiComuni',
+      ImpiantoTermicoAlloggi: 'ImpiantoTermicoCondominiale',
+    },
   },
   commesse: {
     MAR: {
@@ -166,7 +182,6 @@ export const ANAGRAFICA = {
       },
       etichetteUnita: {
         '0A': 'Trilocale con giardino esterno',
-        '8B': 'Attico (superficie di quadrilocale più cinquelocali)',
         '1A': 'Quadrilocale',
         '1B': 'Cinquelocali',
         '2A': 'Quadrilocale',
@@ -181,6 +196,7 @@ export const ANAGRAFICA = {
         '6B': 'Cinquelocali',
         '7A': 'Quadrilocale',
         '7B': 'Cinquelocali',
+        '8B': 'Attico (superficie di quadrilocale più cinquelocali)',
       },
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
@@ -225,6 +241,7 @@ export const ANAGRAFICA = {
     },
     TN1: {
       tipo: 'edificio',
+      corpiDistinti: true,
       piani: [
         { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
         { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
@@ -252,7 +269,7 @@ export const ANAGRAFICA = {
           unita: ['701', '702', '703', '704', '711', '712', '713', '714', '721', '722', '723', '724', '731', '732', '733', '734'] },
       ],
       etichetteUnita: {},
-      prospetti: [],
+      prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
     SNU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },
     BRU: { tipo: 'urbanizzazione', lotti: ['Lotto1', 'Lotto2', 'Lotto3'] },

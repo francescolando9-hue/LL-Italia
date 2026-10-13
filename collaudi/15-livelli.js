@@ -139,8 +139,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202610092114';
-    const IMPRONTA_MASTER = '3829c27bb9959f592815583a7173706674cd4f4535de66ff15d8391a0ebdd7fa';
+    const VERSIONE_MASTER = '202610101049';
+    const IMPRONTA_MASTER = 'df5dd3f6ecb6075ee74d70b7efd2de30be70f2d471b05617a725d680141495a8';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -229,6 +229,12 @@ module.exports = {
       const { CANTIERI } = await import('./core/cantieri.js');
       out.TN1nelMenu = CANTIERI.some(c => c.codice === 'TN1');
       out.TN1inAnagrafica = a.anagraficaNota('TN1');
+      // Dal master 202610101049: quali commesse hanno corpi distinti, e le
+      // parti comuni. Sono dato, come le scale: l'impronta dice SE cambiano,
+      // questi dicono COSA.
+      out.corpiDistinti = Object.keys(a.ANAGRAFICA.commesse)
+        .filter(c => a.ANAGRAFICA.commesse[c].corpiDistinti === true);
+      out.partiComuni = a.ANAGRAFICA.partiComuni;
       return out;
     });
     registro.dice('numeri dell’anagrafica', numeri);
@@ -252,7 +258,7 @@ module.exports = {
       numeri.combinazioni === 45 && numeri.uniche.length === 1 && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1',
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
 
-    registro.titolo('Le scale e TN1 (master 202610092114)');
+    registro.titolo('Le scale, TN1 e le parti comuni (master 202610101049)');
     const sm = numeri.scale.MAR;
     registro.controlla('MAR: tre scale, «1» «2» «3», da 5, 6 e 4 alloggi',
       sm.quante === 3 && sm.codici.join(',') === '1,2,3' && sm.alloggi.join(',') === '5,6,4',
@@ -274,9 +280,22 @@ module.exports = {
     registro.controlla('TN1: P-1…P3 più il Tetto, in ordine, e il Tetto una volta sola',
       numeri.TN1.piani === 'P-1,P0,P1,P2,P3,Tetto' && numeri.TN1.tetti === 1 && numeri.TN1.crescente,
       `${numeri.TN1.piani} — il menù dei piani legge «piani», non le scale che il Tetto lo citano tutte`);
-    registro.controlla('TN1: 64 alloggi, nessuno sul Tetto, prospetti vuoti',
-      numeri.TN1.unita === 64 && numeri.TN1.unitaSulTetto === 0 && numeri.TN1.prospetti === 0,
+    registro.controlla('TN1: 64 alloggi, nessuno sul Tetto, i quattro prospetti',
+      numeri.TN1.unita === 64 && numeri.TN1.unitaSulTetto === 0 && numeri.TN1.prospetti === 4,
       `${numeri.TN1.unita} alloggi · ${numeri.TN1.prospetti} prospetti`);
+    registro.controlla('i corpi distinti sono solo quelli di TN1',
+      numeri.corpiDistinti.join(',') === 'TN1', numeri.corpiDistinti.join(' ') || 'nessuno',
+      'MAR ha tre scale ma è un edificio solo: la palazzina non c’entra');
+    const pc = numeri.partiComuni || {};
+    registro.controlla('parti comuni: voce «Parti comuni», codice PartiComuni, solo in ImpiantoIdrosanitario',
+      pc.codice === 'PartiComuni' && pc.etichetta === 'Parti comuni' && (pc.fasi || []).join(',') === 'ImpiantoIdrosanitario',
+      `${pc.codice} · «${pc.etichetta}» · ${(pc.fasi || []).join(' ')}`);
+    registro.controlla('e le tre fasi gemelle rimandano alle fasi delle parti comuni',
+      JSON.stringify(pc.fasiGemelle) === JSON.stringify({
+        FinituraAlloggi: 'FinituraPartiComuniInterne',
+        ImpiantoElettricoAlloggi: 'ImpiantoElettricoPartiComuni',
+        ImpiantoTermicoAlloggi: 'ImpiantoTermicoCondominiale',
+      }), JSON.stringify(pc.fasiGemelle));
     registro.controlla('TN1 è in anagrafica ma NON nel menù',
       numeri.TN1inAnagrafica && !numeri.TN1nelMenu,
       'entrerà nei menù dopo il livello palazzina nell’archivio: fino ad allora è un dato che nessun invio raggiunge');
