@@ -6,8 +6,10 @@
 // in codice, non modificabile dal dispositivo, perché un codice errato
 // arriverebbe a destinazione come commessa inesistente.
 //
-// Sette commesse dal 16/09/2026, erano tre. L'elenco lo dà Francesco: non si
-// aggiunge né si corregge una commessa di propria iniziativa.
+// Sette commesse dal 16/09/2026, erano tre; otto con la 0.39.0, che porta
+// TN1 (San Maurizio Canavese) nei menù di foto e bolle. L'elenco lo dà
+// Francesco: non si aggiunge né si corregge una commessa di propria
+// iniziativa.
 //
 // **L'ordine del menù non dipende dall'ordine di questo elenco.** È il
 // `sort()` qui sotto a metterlo in ordine alfabetico di codice, una volta al
@@ -24,6 +26,7 @@ export const CANTIERI = [
   { codice: 'MRS', etichetta: 'MRS - via Marsigli 11-13-15' },
   { codice: 'SNU', etichetta: 'SNU - urbanizzazioni Settimo Torinese' },
   { codice: 'SNZ2.1', etichetta: 'SNZ2.1 - via Eva Mameli Calvino 7' },
+  { codice: 'TN1', etichetta: 'TN1 - San Maurizio Canavese' },
 ].sort((a, b) => a.codice.localeCompare(b.codice, 'it'));
 
 export function etichettaCantiere(codice) {

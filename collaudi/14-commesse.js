@@ -1,4 +1,5 @@
-// Le commesse selezionabili: sette dal 16/09/2026, erano tre.
+// Le commesse selezionabili: sette dal 16/09/2026, erano tre; otto con la
+// 0.39.0, che porta TN1 nei menù.
 //
 // Due cose da provare, e nessuna delle due si vede «a occhio».
 //
@@ -26,10 +27,11 @@ const ATTESE = [
   ['SNU', 'SNU - urbanizzazioni Settimo Torinese'],
   ['SNZ2.1', 'SNZ2.1 - via Eva Mameli Calvino 7'],
   ['SNZ2.2', 'SNZ2.2 - Settimo Torinese'],
+  ['TN1', 'TN1 - San Maurizio Canavese'],
 ];
 
 module.exports = {
-  nome: 'Commesse: sette, in ordine alfabetico, e nel payload il codice',
+  nome: 'Commesse: otto, in ordine alfabetico, e nel payload il codice',
 
   async esegui({ browser, app, flow, registro, aiuto }) {
     const { contesto, pagina, errori } = await nuovoTelefono(browser);
@@ -41,17 +43,17 @@ module.exports = {
     const leggiMenu = async selettore => pagina.$$eval(`${selettore} option`,
       o => o.filter(e => e.value).map(e => ({ codice: e.value, etichetta: e.textContent.trim() })));
 
-    registro.titolo('Bolle: le sette commesse, con codice ed etichetta');
+    registro.titolo('Bolle: le otto commesse, con codice ed etichetta');
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#cantiere');
     const inBolle = await leggiMenu('#cantiere');
     registro.dice('commesse a video', inBolle.map(c => c.codice).join(' · '));
-    registro.controlla('sono sette', inBolle.length === 7, String(inBolle.length));
+    registro.controlla('sono otto', inBolle.length === 8, String(inBolle.length));
     registro.controlla('sono quelle concordate, codice ed etichetta',
       inBolle.every((c, i) => c.codice === ATTESE[i][0] && c.etichetta === ATTESE[i][1]),
       inBolle.map((c, i) => c.codice === ATTESE[i][0] && c.etichetta === ATTESE[i][1] ? '' : `${c.codice} = «${c.etichetta}»`).filter(Boolean).join(' · ') || 'tutte');
-    registro.controlla('le tre di prima non sono cambiate',
-      ['MAR', 'MNG', 'SNZ2.2'].every(codice => {
+    registro.controlla('le sette di prima non sono cambiate',
+      ATTESE.filter(a => a[0] !== 'TN1').every(([codice]) => {
         const voce = inBolle.find(c => c.codice === codice);
         return voce && voce.etichetta === ATTESE.find(a => a[0] === codice)[1];
       }));
@@ -70,7 +72,7 @@ module.exports = {
       return [...testo.matchAll(/codice: '([^']+)'/g)].map(m => m[1]);
     });
     registro.dice('ordine nel file', nelFile.join(' '));
-    registro.controlla('l’elenco nel file contiene le stesse sette',
+    registro.controlla('l’elenco nel file contiene le stesse otto',
       [...nelFile].sort().join(',') === [...aVideo].sort().join(','));
     registro.controlla('e NON è già in ordine: a ordinarlo è il codice, non la mano',
       nelFile.join(',') !== ordinato.join(','),
@@ -129,6 +131,45 @@ module.exports = {
     registro.dice('riga della coda', inCoda[0]);
     registro.controlla('la coda mostra l’etichetta estesa',
       /SNZ2\.1 - via Eva Mameli Calvino 7/.test(inCoda[0]), inCoda[0]);
+
+    // TN1, la commessa nuova: nel payload deve arrivare il codice, in foto e in
+    // bolle. I payload si cercano per CONTENUTO e non per posizione (trappola 6
+    // di aiuto.js). `Cantiere` è una fase che non pretende livelli: qui si
+    // prova la commessa, i livelli di TN1 hanno il loro collaudo.
+    registro.titolo('TN1: nel payload il codice, in foto e in bolle');
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.waitForSelector('#commessa');
+    await pagina.selectOption('#commessa', 'TN1');
+    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('TN1|'),
+      'menù della fase rifatto per TN1', 10000);
+    await pagina.selectOption('#fase', 'Cantiere');
+    await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    await pagina.click('#invia');
+    const fine3 = Date.now() + 60000;
+    while (!flow.stato.ricevuti.some(r => r.commessa === 'TN1' && 'tipo' in r) && Date.now() < fine3) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const fotoTN1 = flow.stato.ricevuti.find(r => r.commessa === 'TN1' && 'tipo' in r) || {};
+    registro.dice('payload della foto', `commessa: ${JSON.stringify(fotoTN1.commessa)} · fase: ${JSON.stringify(fotoTN1.fase)}`);
+    registro.controlla('la foto di TN1 porta il codice TN1', fotoTN1.commessa === 'TN1',
+      'in colonna deve arrivare TN1, non «TN1 - San Maurizio Canavese»');
+
+    await pagina.goto(app.indirizzo + '/index.html#/bolle');
+    await pagina.waitForSelector('#cantiere');
+    await pagina.selectOption('#cantiere', 'TN1');
+    await pagina.setInputFiles('#input-galleria', [materiale('bolla2.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    await pagina.click('#invia');
+    const fine4 = Date.now() + 60000;
+    while (!flow.stato.ricevuti.some(r => r.commessa === 'TN1' && !('tipo' in r)) && Date.now() < fine4) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const bollaTN1 = flow.stato.ricevuti.find(r => r.commessa === 'TN1' && !('tipo' in r)) || {};
+    registro.dice('payload della bolla', `commessa: ${JSON.stringify(bollaTN1.commessa)}`);
+    registro.controlla('la bolla di TN1 porta il codice TN1', bollaTN1.commessa === 'TN1');
 
     registro.controllaConsole(errori);
     await contesto.close();

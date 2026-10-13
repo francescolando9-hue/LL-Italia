@@ -164,8 +164,18 @@ module.exports = {
     const numeri = await pagina.evaluate(async () => {
       const a = await import('./core/anagrafica.js');
       const { FASI } = await import('./core/fasi.js');
-      const edifici = ['MAR', 'MNG', 'SNZ2.2'];
-      const out = { voci: Object.keys(a.ANAGRAFICA.livelliPerFase).length, edifici: {}, lotti: {} };
+      const { CANTIERI } = await import('./core/cantieri.js');
+      // L'elenco delle commesse su cui si contano le voci uniche si RICAVA:
+      // sono quelle del menù (`core/cantieri.js`) che in anagrafica hanno
+      // `tipo: 'edificio'`. Scritto a mano diventava un terzo posto dove una
+      // commessa nuova va aggiunta, e dimenticarla non faceva rumore. Oggi dà
+      // MAR, MNG, SNZ2.2 e TN1; una commessa nuova entra nel conteggio da sola.
+      const edifici = CANTIERI.map(c => c.codice)
+        .filter(c => (a.datiCommessa(c) || {}).tipo === 'edificio');
+      const out = {
+        voci: Object.keys(a.ANAGRAFICA.livelliPerFase).length,
+        edificiElenco: edifici, edifici: {}, lotti: {},
+      };
       for (const c of edifici) {
         const p = a.pianiDi(c);
         out.edifici[c] = {
@@ -180,6 +190,7 @@ module.exports = {
       for (const c of ['SNU', 'BRU']) out.lotti[c] = a.lottiDi(c).map(l => l.codice || l);
       let combinazioni = 0;
       const uniche = [];
+      const senzaVoci = [];
       for (const c of edifici) {
         for (const f of FASI.map(x => x.codice)) {
           const regola = a.ANAGRAFICA.livelliPerFase[f];
@@ -188,11 +199,13 @@ module.exports = {
             if (regola[liv] !== 'O') continue;
             combinazioni += 1;
             if (unici[liv]) uniche.push(`${c} · ${f} · ${unici[liv].codice}`);
+            else if (!a.livelliRichiesti(c, f)[liv]) senzaVoci.push(`${c} · ${f} · ${liv}`);
           }
         }
       }
       out.combinazioni = combinazioni;
       out.uniche = uniche;
+      out.senzaVoci = senzaVoci;
       // Le scale (dal master 202610092114): solo dove le scale sono più di
       // una. Si contano qui perché la logica non le usa, e quindi nessun
       // altro controllo se ne accorgerebbe se cambiassero.
@@ -226,7 +239,6 @@ module.exports = {
         unitaSulTetto: a.unitaDi('TN1').filter(u => u.piano === 'Tetto').length,
         prospetti: a.prospettiDi('TN1').length,
       };
-      const { CANTIERI } = await import('./core/cantieri.js');
       out.TN1nelMenu = CANTIERI.some(c => c.codice === 'TN1');
       out.TN1inAnagrafica = a.anagraficaNota('TN1');
       // Dal master 202610101049: quali commesse hanno corpi distinti, e le
@@ -241,7 +253,7 @@ module.exports = {
     registro.controlla('30 voci per fase: 27 fasi e 3 lotti', numeri.voci === 30, String(numeri.voci));
     registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
       numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
-    registro.controlla('in tutti e tre il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
+    registro.controlla('in tutte le commesse edificio il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
       Object.values(numeri.edifici).every(e => e.ultimo === 'Tetto' && e.crescente),
       'i piani stanno nel loro ordine proprio, non in ordine alfabetico: «P10» prima di «P2» non vuol dire niente');
     registro.controlla('nessuna unità sul Tetto',
@@ -254,9 +266,16 @@ module.exports = {
       'ordine positivo: «Interrato, Tetto» non è una cartella che qualcuno cerchi');
     registro.controlla('lotti: SNU 3, BRU 3',
       numeri.lotti.SNU.join(',') === 'Lotto1,Lotto2,Lotto3' && numeri.lotti.BRU.join(',') === 'Lotto1,Lotto2,Lotto3');
-    registro.controlla('voce unica: una sola combinazione su 45, SNZ2.2 · Interrato · P-1',
-      numeri.combinazioni === 45 && numeri.uniche.length === 1 && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1',
+    registro.controlla('le commesse del conteggio sono quelle del menù che hanno un edificio: MAR, MNG, SNZ2.2, TN1',
+      numeri.edificiElenco.join(',') === 'MAR,MNG,SNZ2.2,TN1', numeri.edificiElenco.join(' '),
+      'l’elenco si ricava da core/cantieri.js e dall’anagrafica, non si scrive a mano');
+    registro.controlla('voce unica: due combinazioni su 60, SNZ2.2 · Interrato · P-1 e TN1 · Interrato · P-1',
+      numeri.combinazioni === 60 && numeri.uniche.length === 2
+        && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1' && numeri.uniche[1] === 'TN1 · Interrato · P-1',
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
+    registro.controlla('e una sola senza voci: MAR · Interrato, la fase che MAR non mostra',
+      numeri.senzaVoci.length === 1 && numeri.senzaVoci[0] === 'MAR · Interrato · piano',
+      numeri.senzaVoci.join(' ; ') || 'nessuna');
 
     registro.titolo('Le scale, TN1 e le parti comuni (master 202610101049)');
     const sm = numeri.scale.MAR;
@@ -296,9 +315,9 @@ module.exports = {
         ImpiantoElettricoAlloggi: 'ImpiantoElettricoPartiComuni',
         ImpiantoTermicoAlloggi: 'ImpiantoTermicoCondominiale',
       }), JSON.stringify(pc.fasiGemelle));
-    registro.controlla('TN1 è in anagrafica ma NON nel menù',
-      numeri.TN1inAnagrafica && !numeri.TN1nelMenu,
-      'entrerà nei menù dopo il livello palazzina nell’archivio: fino ad allora è un dato che nessun invio raggiunge');
+    registro.controlla('TN1 è in anagrafica e nel menù',
+      numeri.TN1inAnagrafica && numeri.TN1nelMenu,
+      'dalla 0.39.0 TN1 si sceglie nei due moduli, con il livello palazzina: i suoi casi sono nel collaudo 23');
 
     registro.titolo('Urbanizzazioni: al posto delle fasi, i lotti');
     await scegliCommessa('#commessa', 'SNU');
