@@ -19,6 +19,9 @@ const CAMPI_ATTESI = [
   // quando la fase non li prevede — in quel caso valgono `null`, che in
   // raccolta è «non si applica», mentre una stringa vuota somiglia a un dato.
   'piano', 'unita', 'prospetto',
+  // Dalla 0.39.0: la palazzina (il «Lotto» di TN1), codice come testo oppure
+  // `null`. Viaggia SEMPRE come i tre livelli, anche fuori da TN1.
+  'scala',
   'versioneApp', 'nomeFile', 'contenutoBase64',
 ];
 
@@ -92,6 +95,9 @@ module.exports = {
     registro.controlla('nessun campo in più non dichiarato',
       Object.keys(archivio).every(c => CAMPI_ATTESI.includes(c)),
       Object.keys(archivio).filter(c => !CAMPI_ATTESI.includes(c)).join(', ') || 'nessuno');
+    registro.controlla('scala c’è e vale null: MAR non ha corpi distinti, e mai ""',
+      'scala' in archivio && archivio.scala === null, JSON.stringify(archivio.scala),
+      'una stringa vuota in colonna somiglia a un dato e non lo è');
     registro.controlla('progressivo e durataSecondi sono numeri',
       typeof archivio.progressivo === 'number' && typeof archivio.durataSecondi === 'number',
       'una stringa vuota fa fallire la scrittura delle colonne e il file atterra senza dati');

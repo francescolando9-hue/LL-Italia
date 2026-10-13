@@ -584,20 +584,20 @@ module.exports = {
     registro.dice('payload della bolla', `fase: ${JSON.stringify(bolla.fase)} · campi livello presenti: ${
       ['piano', 'unita', 'prospetto'].filter(c => c in bolla).join(', ') || 'nessuno'}`);
     registro.controlla('la fase (qui FinituraAlloggi) arriva', bolla.fase === 'FinituraAlloggi');
-    registro.controlla('e i tre campi dei livelli NON sono nel payload',
-      !('piano' in bolla) && !('unita' in bolla) && !('prospetto' in bolla),
+    registro.controlla('e i campi dei livelli NON sono nel payload, nemmeno la palazzina',
+      !('piano' in bolla) && !('unita' in bolla) && !('prospetto' in bolla) && !('scala' in bolla),
       'mandarli sapendo che vengono scartati è il difetto che questa modifica evita');
 
     registro.titolo('Nessuna stringa vuota, in nessun invio di foto');
     // Solo i payload del modulo Foto: `tipo` c'è lì e non nelle bolle.
     const tutti = flow.stato.ricevuti.filter(r => 'tipo' in r);
-    const vuoti = tutti.flatMap(r => ['piano', 'unita', 'prospetto']
+    const vuoti = tutti.flatMap(r => ['piano', 'unita', 'prospetto', 'scala']
       .filter(c => r[c] === '').map(c => `${c} di ${r.idClient}`));
     registro.dice('invii di foto esaminati', String(tutti.length));
-    registro.controlla('i tre campi sono un codice oppure null, mai ""',
+    registro.controlla('i quattro campi (piano, unità, prospetto, scala) sono un codice oppure null, mai ""',
       vuoti.length === 0, vuoti.join(' · ') || 'nessuno');
     registro.controlla('e viaggiano sempre, anche quando valgono null',
-      tutti.every(r => 'piano' in r && 'unita' in r && 'prospetto' in r),
+      tutti.every(r => 'piano' in r && 'unita' in r && 'prospetto' in r && 'scala' in r),
       'un campo assente e un campo null si comportano diversamente in un flow: meglio uno solo dei due');
 
     // Il Tetto a video, nei due posti dove il master lo vuole e nel posto

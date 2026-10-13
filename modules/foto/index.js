@@ -17,6 +17,7 @@ import { fileInMemoria, eLetturaNegata, descriviLettura } from '../../core/byte.
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
   sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA, azzeraFase,
+  etichettaScala, codicePartiComuni,
 } from '../../core/anagrafica.js';
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima } from './immagini.js';
@@ -45,7 +46,7 @@ let urlAperti = [];
 // I livelli scelti (o derivati) all'ultimo ridisegno: `invia()` li prende da
 // qui invece di rileggere i menù, così il valore che parte è esattamente
 // quello su cui il ridisegno ha deciso di sbloccare il pulsante.
-let livelliCorrenti = { piano: null, unita: null, prospetto: null, mancanti: [] };
+let livelliCorrenti = { piano: null, unita: null, prospetto: null, scala: null, mancanti: [] };
 
 // I file scelti dalla galleria che NON hanno l'ora dello scatto: restano qui,
 // fuori dalla coda, finché l'operatore non decide. Sono quasi sempre copie
@@ -191,7 +192,8 @@ function portaInVista(elemento) {
 // server, e leggerli è il solo modo che ha l'operatore di accorgersi di un
 // piano sbagliato prima che l'archivio se lo porti dietro.
 function scritturaLivelli(record) {
-  const pezzi = [record.piano, record.unita, record.prospetto].filter(Boolean);
+  const pezzi = [record.scala ? etichettaScala(record.scala) : '', record.piano, record.unita, record.prospetto]
+    .filter(Boolean);
   return pezzi.length > 0 ? ` \u00b7 ${pezzi.join(' \u00b7 ')}` : '';
 }
 
@@ -264,7 +266,7 @@ async function vista(el) {
 
   el.querySelector('#commessa').addEventListener('change', () => { ridisegna(); });
   el.querySelector('#fase').addEventListener('change', () => { ridisegna(); });
-  for (const id of ['#piano', '#unita', '#prospetto']) {
+  for (const id of ['#piano', '#unita', '#scala', '#prospetto']) {
     el.querySelector(id).addEventListener('change', () => { ridisegna(); });
   }
   const pulsanteScatto = el.querySelector('#apri-fotocamera');
@@ -528,6 +530,7 @@ async function invia() {
     piano: livelliCorrenti.piano,
     unita: livelliCorrenti.unita,
     prospetto: livelliCorrenti.prospetto,
+    scala: livelliCorrenti.scala,
   });
   if (quante > 0) {
     coda.incrementaScattate(quante);
@@ -795,11 +798,18 @@ async function ridisegna() {
 // l'altra.
 function lettureRimando(riquadro, record) {
   const commessa = riquadro.querySelector('#r-commessa').value;
+  // Di un'unità il piano e il lotto sono ricavati, non scelti: non sono il
+  // punto di partenza del riquadro. Passando poi a «Parti comuni» il menù del
+  // piano partirebbe già con il piano dell'unità di prima, cioè con una
+  // preselezione che nessuno ha fatto. Dove l'unità è «Parti comuni» il piano è
+  // una scelta vera, e il record lo porta.
+  const daUnita = Boolean(record.unita) && record.unita !== codicePartiComuni();
   const livelli = sincronizzaLivelli(riquadro, commessa, scappaHtml, 'r-', {
     fase: record.fase || '',
-    piano: record.piano || '',
+    piano: daUnita ? '' : record.piano || '',
     unita: record.unita || '',
     prospetto: record.prospetto || '',
+    scala: daUnita ? '' : record.scala || '',
   }, true, { faseObbligatoria: true });
   const nota = riquadro.querySelector('#r-nota').value.trim();
   const uguale = (a, b) => (a || '') === (b || '');
@@ -808,6 +818,7 @@ function lettureRimando(riquadro, record) {
     || !uguale(livelli.piano, record.piano)
     || !uguale(livelli.unita, record.unita)
     || !uguale(livelli.prospetto, record.prospetto)
+    || !uguale(livelli.scala, record.scala)
     || !uguale(nota, record.nota);
   const mancanti = [!commessa && 'il cantiere', ...livelli.mancanti].filter(Boolean);
   return { commessa, livelli, nota, cambiato, mancanti };
@@ -849,7 +860,7 @@ function disegnaRimando(tutti) {
         <p id="r-esito" class="tenue"></p>
       </div>`;
     riquadro.querySelector('#r-commessa').addEventListener('change', () => { ridisegna(); });
-    for (const id of ['#r-fase', '#r-piano', '#r-unita', '#r-prospetto']) {
+    for (const id of ['#r-fase', '#r-piano', '#r-unita', '#r-scala', '#r-prospetto']) {
       riquadro.querySelector(id).addEventListener('change', () => { ridisegna(); });
     }
     riquadro.querySelector('#r-nota').addEventListener('input', () => { ridisegna(); });
@@ -887,6 +898,7 @@ async function eseguiRimando(id) {
         piano: letture.livelli.piano,
         unita: letture.livelli.unita,
         prospetto: letture.livelli.prospetto,
+        scala: letture.livelli.scala,
         nota: letture.nota,
         autore: impostazioniApp.autore || record.autore,
       });
