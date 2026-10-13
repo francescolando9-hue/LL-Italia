@@ -82,6 +82,12 @@ export function corpoInvio(record, impostazioni, contenutoBase64, dispositivo = 
     piano: record.piano || null,
     unita: record.unita || null,
     prospetto: record.prospetto || null,
+    // La palazzina (dalla 0.39.0): il codice della scala come testo (`"4"`),
+    // `null` fuori dalle commesse a corpi distinti. Mai stringa vuota, e
+    // viaggia sempre, anche quando vale `null`: il prefisso `S` per la cartella
+    // lo aggiunge il ricevente. Il ricevente alza l'anomalia «livello mancante»
+    // per la palazzina solo da `versioneApp` 0.39.0 in su.
+    scala: record.scala || null,
     operatore: record.autore,
     nota: record.nota || '',
     genere: record.genere || 'foto',

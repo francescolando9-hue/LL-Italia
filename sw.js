@@ -2,7 +2,7 @@
 // Da cambiare a ogni rilascio INSIEME a VERSIONE_CODICE in core/versione.js:
 // quella dice cosa sta girando, questa cosa è installato, e l'app avvisa
 // quando non coincidono.
-const VERSIONE = '0.38.1';
+const VERSIONE = '0.39.0';
 const CACHE = `llitalia-${VERSIONE}`;
 const RISORSE = [
   './',

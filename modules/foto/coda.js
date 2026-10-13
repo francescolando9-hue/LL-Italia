@@ -98,6 +98,9 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     piano: null,
     unita: null,
     prospetto: null,
+    // La palazzina (dalla 0.39.0), solo nelle commesse a corpi distinti: il
+    // codice della scala, come testo, oppure `null`. Come i livelli, mai ''.
+    scala: null,
     autore: '',
     nota: '',
     foto: fotoBlob,
@@ -208,6 +211,7 @@ export async function confermaBozze(commessa, autore, nota, fase = '', livelli =
     record.piano = livelli.piano || null;
     record.unita = livelli.unita || null;
     record.prospetto = livelli.prospetto || null;
+    record.scala = livelli.scala || null;
     record.autore = autore;
     record.nota = nota;
     record.progressivo = progressivo;
@@ -319,6 +323,7 @@ export async function rimandaCorretta(id, dati) {
   nuovo.piano = dati.piano || null;
   nuovo.unita = dati.unita || null;
   nuovo.prospetto = dati.prospetto || null;
+  nuovo.scala = dati.scala || null;
   nuovo.autore = dati.autore || originale.autore;
   nuovo.nota = dati.nota || '';
   nuovo.progressivo = await riservaProgressivi(1);

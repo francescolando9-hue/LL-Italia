@@ -75,7 +75,7 @@ module.exports = {
       stato.segnaposto,
       'con un cantiere in memoria il menù non l’aveva nemmeno: tornare a «nessuno» era impossibile');
     registro.controlla('il cantiere ha sempre più di una voce: nessun caso a voce unica',
-      stato.voci === 7, `${stato.voci} voci — lo stesso elenco per ogni operatore e per i due moduli`);
+      stato.voci === 8, `${stato.voci} voci — lo stesso elenco per ogni operatore e per i due moduli`);
 
     registro.titolo('Bolle: due bolle di fila di due cantieri diversi');
     await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
@@ -151,7 +151,7 @@ module.exports = {
     stato = await statoMenu('#commessa');
     registro.controlla('si parte da «— scegli il cantiere —»',
       stato.valore === '' && /scegli il cantiere/.test(stato.testo) && stato.segnaposto, `«${stato.testo}»`);
-    registro.controlla('anche qui sette voci: nessun caso a voce unica', stato.voci === 7, String(stato.voci));
+    registro.controlla('anche qui otto voci: nessun caso a voce unica', stato.voci === 8, String(stato.voci));
 
     registro.titolo('Foto: al cambio di fase ripartono i livelli, anche nello stesso invio');
     await pagina.selectOption('#commessa', 'MAR');

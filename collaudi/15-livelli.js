@@ -139,8 +139,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202610092114';
-    const IMPRONTA_MASTER = '3829c27bb9959f592815583a7173706674cd4f4535de66ff15d8391a0ebdd7fa';
+    const VERSIONE_MASTER = '202610101049';
+    const IMPRONTA_MASTER = 'df5dd3f6ecb6075ee74d70b7efd2de30be70f2d471b05617a725d680141495a8';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -164,8 +164,18 @@ module.exports = {
     const numeri = await pagina.evaluate(async () => {
       const a = await import('./core/anagrafica.js');
       const { FASI } = await import('./core/fasi.js');
-      const edifici = ['MAR', 'MNG', 'SNZ2.2'];
-      const out = { voci: Object.keys(a.ANAGRAFICA.livelliPerFase).length, edifici: {}, lotti: {} };
+      const { CANTIERI } = await import('./core/cantieri.js');
+      // L'elenco delle commesse su cui si contano le voci uniche si RICAVA:
+      // sono quelle del menù (`core/cantieri.js`) che in anagrafica hanno
+      // `tipo: 'edificio'`. Scritto a mano diventava un terzo posto dove una
+      // commessa nuova va aggiunta, e dimenticarla non faceva rumore. Oggi dà
+      // MAR, MNG, SNZ2.2 e TN1; una commessa nuova entra nel conteggio da sola.
+      const edifici = CANTIERI.map(c => c.codice)
+        .filter(c => (a.datiCommessa(c) || {}).tipo === 'edificio');
+      const out = {
+        voci: Object.keys(a.ANAGRAFICA.livelliPerFase).length,
+        edificiElenco: edifici, edifici: {}, lotti: {},
+      };
       for (const c of edifici) {
         const p = a.pianiDi(c);
         out.edifici[c] = {
@@ -180,6 +190,7 @@ module.exports = {
       for (const c of ['SNU', 'BRU']) out.lotti[c] = a.lottiDi(c).map(l => l.codice || l);
       let combinazioni = 0;
       const uniche = [];
+      const senzaVoci = [];
       for (const c of edifici) {
         for (const f of FASI.map(x => x.codice)) {
           const regola = a.ANAGRAFICA.livelliPerFase[f];
@@ -188,11 +199,13 @@ module.exports = {
             if (regola[liv] !== 'O') continue;
             combinazioni += 1;
             if (unici[liv]) uniche.push(`${c} · ${f} · ${unici[liv].codice}`);
+            else if (!a.livelliRichiesti(c, f)[liv]) senzaVoci.push(`${c} · ${f} · ${liv}`);
           }
         }
       }
       out.combinazioni = combinazioni;
       out.uniche = uniche;
+      out.senzaVoci = senzaVoci;
       // Le scale (dal master 202610092114): solo dove le scale sono più di
       // una. Si contano qui perché la logica non le usa, e quindi nessun
       // altro controllo se ne accorgerebbe se cambiassero.
@@ -226,16 +239,21 @@ module.exports = {
         unitaSulTetto: a.unitaDi('TN1').filter(u => u.piano === 'Tetto').length,
         prospetti: a.prospettiDi('TN1').length,
       };
-      const { CANTIERI } = await import('./core/cantieri.js');
       out.TN1nelMenu = CANTIERI.some(c => c.codice === 'TN1');
       out.TN1inAnagrafica = a.anagraficaNota('TN1');
+      // Dal master 202610101049: quali commesse hanno corpi distinti, e le
+      // parti comuni. Sono dato, come le scale: l'impronta dice SE cambiano,
+      // questi dicono COSA.
+      out.corpiDistinti = Object.keys(a.ANAGRAFICA.commesse)
+        .filter(c => a.ANAGRAFICA.commesse[c].corpiDistinti === true);
+      out.partiComuni = a.ANAGRAFICA.partiComuni;
       return out;
     });
     registro.dice('numeri dell’anagrafica', numeri);
     registro.controlla('30 voci per fase: 27 fasi e 3 lotti', numeri.voci === 30, String(numeri.voci));
     registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
       numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
-    registro.controlla('in tutti e tre il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
+    registro.controlla('in tutte le commesse edificio il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
       Object.values(numeri.edifici).every(e => e.ultimo === 'Tetto' && e.crescente),
       'i piani stanno nel loro ordine proprio, non in ordine alfabetico: «P10» prima di «P2» non vuol dire niente');
     registro.controlla('nessuna unità sul Tetto',
@@ -248,11 +266,18 @@ module.exports = {
       'ordine positivo: «Interrato, Tetto» non è una cartella che qualcuno cerchi');
     registro.controlla('lotti: SNU 3, BRU 3',
       numeri.lotti.SNU.join(',') === 'Lotto1,Lotto2,Lotto3' && numeri.lotti.BRU.join(',') === 'Lotto1,Lotto2,Lotto3');
-    registro.controlla('voce unica: una sola combinazione su 45, SNZ2.2 · Interrato · P-1',
-      numeri.combinazioni === 45 && numeri.uniche.length === 1 && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1',
+    registro.controlla('le commesse del conteggio sono quelle del menù che hanno un edificio: MAR, MNG, SNZ2.2, TN1',
+      numeri.edificiElenco.join(',') === 'MAR,MNG,SNZ2.2,TN1', numeri.edificiElenco.join(' '),
+      'l’elenco si ricava da core/cantieri.js e dall’anagrafica, non si scrive a mano');
+    registro.controlla('voce unica: due combinazioni su 60, SNZ2.2 · Interrato · P-1 e TN1 · Interrato · P-1',
+      numeri.combinazioni === 60 && numeri.uniche.length === 2
+        && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1' && numeri.uniche[1] === 'TN1 · Interrato · P-1',
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
+    registro.controlla('e una sola senza voci: MAR · Interrato, la fase che MAR non mostra',
+      numeri.senzaVoci.length === 1 && numeri.senzaVoci[0] === 'MAR · Interrato · piano',
+      numeri.senzaVoci.join(' ; ') || 'nessuna');
 
-    registro.titolo('Le scale e TN1 (master 202610092114)');
+    registro.titolo('Le scale, TN1 e le parti comuni (master 202610101049)');
     const sm = numeri.scale.MAR;
     registro.controlla('MAR: tre scale, «1» «2» «3», da 5, 6 e 4 alloggi',
       sm.quante === 3 && sm.codici.join(',') === '1,2,3' && sm.alloggi.join(',') === '5,6,4',
@@ -274,12 +299,25 @@ module.exports = {
     registro.controlla('TN1: P-1…P3 più il Tetto, in ordine, e il Tetto una volta sola',
       numeri.TN1.piani === 'P-1,P0,P1,P2,P3,Tetto' && numeri.TN1.tetti === 1 && numeri.TN1.crescente,
       `${numeri.TN1.piani} — il menù dei piani legge «piani», non le scale che il Tetto lo citano tutte`);
-    registro.controlla('TN1: 64 alloggi, nessuno sul Tetto, prospetti vuoti',
-      numeri.TN1.unita === 64 && numeri.TN1.unitaSulTetto === 0 && numeri.TN1.prospetti === 0,
+    registro.controlla('TN1: 64 alloggi, nessuno sul Tetto, i quattro prospetti',
+      numeri.TN1.unita === 64 && numeri.TN1.unitaSulTetto === 0 && numeri.TN1.prospetti === 4,
       `${numeri.TN1.unita} alloggi · ${numeri.TN1.prospetti} prospetti`);
-    registro.controlla('TN1 è in anagrafica ma NON nel menù',
-      numeri.TN1inAnagrafica && !numeri.TN1nelMenu,
-      'entrerà nei menù dopo il livello palazzina nell’archivio: fino ad allora è un dato che nessun invio raggiunge');
+    registro.controlla('i corpi distinti sono solo quelli di TN1',
+      numeri.corpiDistinti.join(',') === 'TN1', numeri.corpiDistinti.join(' ') || 'nessuno',
+      'MAR ha tre scale ma è un edificio solo: la palazzina non c’entra');
+    const pc = numeri.partiComuni || {};
+    registro.controlla('parti comuni: voce «Parti comuni», codice PartiComuni, solo in ImpiantoIdrosanitario',
+      pc.codice === 'PartiComuni' && pc.etichetta === 'Parti comuni' && (pc.fasi || []).join(',') === 'ImpiantoIdrosanitario',
+      `${pc.codice} · «${pc.etichetta}» · ${(pc.fasi || []).join(' ')}`);
+    registro.controlla('e le tre fasi gemelle rimandano alle fasi delle parti comuni',
+      JSON.stringify(pc.fasiGemelle) === JSON.stringify({
+        FinituraAlloggi: 'FinituraPartiComuniInterne',
+        ImpiantoElettricoAlloggi: 'ImpiantoElettricoPartiComuni',
+        ImpiantoTermicoAlloggi: 'ImpiantoTermicoCondominiale',
+      }), JSON.stringify(pc.fasiGemelle));
+    registro.controlla('TN1 è in anagrafica e nel menù',
+      numeri.TN1inAnagrafica && numeri.TN1nelMenu,
+      'dalla 0.39.0 TN1 si sceglie nei due moduli, con il livello palazzina: i suoi casi sono nel collaudo 23');
 
     registro.titolo('Urbanizzazioni: al posto delle fasi, i lotti');
     await scegliCommessa('#commessa', 'SNU');
@@ -546,20 +584,20 @@ module.exports = {
     registro.dice('payload della bolla', `fase: ${JSON.stringify(bolla.fase)} · campi livello presenti: ${
       ['piano', 'unita', 'prospetto'].filter(c => c in bolla).join(', ') || 'nessuno'}`);
     registro.controlla('la fase (qui FinituraAlloggi) arriva', bolla.fase === 'FinituraAlloggi');
-    registro.controlla('e i tre campi dei livelli NON sono nel payload',
-      !('piano' in bolla) && !('unita' in bolla) && !('prospetto' in bolla),
+    registro.controlla('e i campi dei livelli NON sono nel payload, nemmeno la palazzina',
+      !('piano' in bolla) && !('unita' in bolla) && !('prospetto' in bolla) && !('scala' in bolla),
       'mandarli sapendo che vengono scartati è il difetto che questa modifica evita');
 
     registro.titolo('Nessuna stringa vuota, in nessun invio di foto');
     // Solo i payload del modulo Foto: `tipo` c'è lì e non nelle bolle.
     const tutti = flow.stato.ricevuti.filter(r => 'tipo' in r);
-    const vuoti = tutti.flatMap(r => ['piano', 'unita', 'prospetto']
+    const vuoti = tutti.flatMap(r => ['piano', 'unita', 'prospetto', 'scala']
       .filter(c => r[c] === '').map(c => `${c} di ${r.idClient}`));
     registro.dice('invii di foto esaminati', String(tutti.length));
-    registro.controlla('i tre campi sono un codice oppure null, mai ""',
+    registro.controlla('i quattro campi (piano, unità, prospetto, scala) sono un codice oppure null, mai ""',
       vuoti.length === 0, vuoti.join(' · ') || 'nessuno');
     registro.controlla('e viaggiano sempre, anche quando valgono null',
-      tutti.every(r => 'piano' in r && 'unita' in r && 'prospetto' in r),
+      tutti.every(r => 'piano' in r && 'unita' in r && 'prospetto' in r && 'scala' in r),
       'un campo assente e un campo null si comportano diversamente in un flow: meglio uno solo dei due');
 
     // Il Tetto a video, nei due posti dove il master lo vuole e nel posto

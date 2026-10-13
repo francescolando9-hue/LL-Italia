@@ -1,6 +1,8 @@
 # App LL Italia — Modulo «Foto cantiere»: specifica e requisiti a valle
 
-> **Rev. 21 del 09/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+> **Rev. 22 del 13/10/2026.** Secondo modulo della PWA di gruppo, accanto a Bolle. Capture-only: raccoglie e invia **foto e video**, non legge nulla del contenuto. Nessun segreto qui: token e URL firmato vivono solo nel flow e nelle impostazioni dei dispositivi.
+>
+> **Rev. 22 — la palazzina («Lotto») e le parti comuni, TN1 nei menù (0.39.0).** Anagrafica al master `202610101049`. **Contratto: un campo nuovo, `scala`** (§4, §4.5): il codice della palazzina come testo (`"4"`) o `null`, mai stringa vuota, in ogni invio di foto e video, non nelle bolle. Si chiede solo nelle commesse a corpi distinti (`corpiDistinti`, oggi TN1): dopo il piano, se il piano sta in almeno una scala, e prima del prospetto nella facciata; nelle fasi per unità si ricava dall'unità. A video si legge «Lotto 4»; **non è il lotto delle urbanizzazioni**, che resta una fase. Il lotto **riparte al cambio del piano** (decisione di Francesco del 13/10/2026). **`unita` può valere `PartiComuni`** in `ImpiantoIdrosanitario`: allora il piano lo sceglie l'operatore fra tutti i piani. Le tre fasi gemelle (`FinituraAlloggi`, `ImpiantoElettricoAlloggi`, `ImpiantoTermicoAlloggi`) non hanno la voce e rimandano alla fase delle parti comuni. **TN1 entra nel menù** di foto e bolle: otto commesse. Il ricevente alza l'anomalia «livello mancante» per la palazzina solo da `versioneApp` 0.39.0 in su.
 >
 > **Rev. 21 — anagrafica dei livelli al master 202610092114 (0.38.1).** Decisioni di Francesco del 09/10/2026: il campo **`scale`** nelle commesse con più di una scala (MAR, tre scale da 5, 6 e 4 alloggi, Tetto fuori dalle scale) e la commessa **TN1** in anagrafica (palazzine 4–7 come scale, P-1 autorimessa comune, 64 alloggi, prospetti vuoti). **TN1 non entra nel menù** e la logica non usa le scale: per chi scatta non cambia niente. Contratto invariato (§5, rilascio 0.38.1).
 >
@@ -131,12 +133,13 @@ POST JSON al **proprio** flow — diverso da quello delle bolle — un file per 
 { "token": "…",
   "tipo": "ARCHIVIO",                 // sempre, dalla 0.37.0: la scelta non c'è più,
                                       //   ma IL CAMPO RESTA e non è mai vuoto
-  "commessa": "MAR",                  // solo il codice; sette commesse dal 16/09/2026
+  "commessa": "MAR",                  // solo il codice; otto commesse (TN1 dalla 0.39.0)
   "fase": "FinituraAlloggi",          // CODICE della fase senza spazi (§4.4);
                                       //   per SNU e BRU qui c'è il LOTTO: "Lotto2" (§4.5)
   "piano": "P1",                      // livelli dell'archivio (§4.5), codici senza spazi.
   "unita": "1A",                      //   null dove il livello non si applica,
   "prospetto": null,                  //   MAI stringa vuota
+  "scala": null,                      // la palazzina di TN1 (§4.5): "4"…"7", testo; null altrove
   "operatore": "Paolo Sanzarello",
   "nota": "Getto solaio piano 3 completato",   // può essere vuota
   "genere": "foto",                   // oppure "video"
@@ -365,7 +368,7 @@ Non contraddice la regola «nessuna preselezione» dei menù dei livelli: ne è 
 
 **Dove vive l'elenco delle fasi: due posti, e uno solo li tiene insieme.** Dentro l'app le fasi stanno in `core/fasi.js` — quali sono, con codice ed etichetta — e in `core/anagrafica.js`, nella tabella `livelliPerFase` — cosa ognuna pretende. Non sono due copie della stessa lista: sono **due fatti diversi** sulla stessa lista, e per questo stanno separati. Ma le chiavi devono combaciare, e una divergenza **non farebbe rumore**: una fase presente in `fasi.js` e assente in `livelliPerFase` risulta «senza livelli», quindi si può scegliere, la foto parte, e finisce nella cartella del mese invece che in quella del piano. Dal 18/09/2026 la coerenza fra i due è **collaudata** (`15-livelli.js`): ogni fase ha la sua riga, l'anagrafica non ha righe per fasi che non esistono, e l'ordine è alfabetico. Chi aggiunge una fase tocca quindi **due file**, e se ne dimentica uno il collaudo lo dice.
 
-**Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, la tabella `livelliPerFase` e, dalla 0.38.1, le **scale** delle commesse che ne hanno più di una (codice, piani, unità; un piano che non sta in nessuna scala è comune alla commessa). **Le scale sono dato e basta**: nessun selettore le usa e non viaggiano nel payload. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (dalla 0.38.1 `202610092114`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
+**Dove sta l'anagrafica.** In `core/anagrafica.js`, accanto a `cantieri.js` e `fasi.js`: piani con etichetta e ordine, unità per piano con le loro etichette, prospetti, lotti, la tabella `livelliPerFase` e, dalla 0.38.1, le **scale** delle commesse che ne hanno più di una (codice, piani, unità; un piano che non sta in nessuna scala è comune alla commessa) e, dalla 0.39.0, il blocco `partiComuni`. **Le scale le usa la logica solo dove la commessa ha `corpiDistinti`** — TN1, dove ogni scala è una palazzina e il suo codice viaggia nel campo `scala` —; a MAR, che è un edificio solo, restano dato e basta. **È dato, non logica**, ed è la copia di un master che vive su `L:`: si sostituisce in blocco quando cambia, non si corregge una voce a mano. Il campo `versione` (dalla 0.39.0 `202610101049`) compare nella pagina **Informazioni**: quando l'ufficio dice «ho aggiornato piani e unità», quel numero è la risposta.
 
 ### 4-ter. Invii interrotti: «in corso» vale solo per la sessione che l'ha avviato
 
