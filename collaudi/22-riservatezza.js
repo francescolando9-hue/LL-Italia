@@ -114,7 +114,54 @@ const NON_DEVE_TROVARE = [
 
 function esegui(comando, argomenti, cwd) {
   const r = spawnSync(comando, argomenti, { cwd, encoding: 'utf8' });
-  return { stato: r.status, uscita: `${r.stdout || ''}${r.stderr || ''}` };
+  return { stato: r.status, uscita: `${r.stdout || ''}${r.stderr || ''}`, stdout: r.stdout || '' };
+}
+
+// --- Il modo dell'hook, dall'indice di git ---------------------------------------
+//
+// Il modo si legge dall'INDICE di git (`git ls-files -s`), non dal file su
+// disco. Su Windows il file system non ha il bit di esecuzione: Node riporta
+// 100666 per qualunque file, e un controllo sul disco è rosso anche quando
+// l'hook è a posto (misurato il 26/10/2026: `.githooks/pre-commit` e `sw.js`,
+// entrambi 100666). Quello che conta è il modo registrato nel repository,
+// perché è quello che riceve chi clona: su Linux e macOS git non esegue un hook
+// senza il bit, e lo salta con un avviso. Decisione di Francesco del 26/10/2026.
+//
+// Una frase per ogni caso, e ognuno dice soltanto ciò che si è misurato.
+const HOOK = '.githooks/pre-commit';
+const MODO_ATTESO = '100755';
+
+function modoDellHook(radice) {
+  const primaRiga = testo => testo.trim().split('\n')[0];
+  const cima = esegui('git', ['rev-parse', '--show-prefix'], radice);
+  if (cima.stato === null) {
+    return { esito: false, dettaglio: 'git non si può eseguire su questo computer: senza git il modo dell’hook non si legge (git non trovato fra i programmi)' };
+  }
+  if (cima.stato !== 0) {
+    if (!fs.existsSync(path.join(radice, '.git'))) {
+      return { esito: false, dettaglio: `la cartella non è un clone git: il modo dell’hook si legge dall’indice di git, e qui l’indice non c’è (${primaRiga(cima.uscita)})` };
+    }
+    return { esito: false, dettaglio: `la cartella ha un .git, ma git non riesce a leggerlo (${primaRiga(cima.uscita)})` };
+  }
+  const prefisso = cima.stdout.trim();
+  if (prefisso !== '') {
+    return { esito: false, dettaglio: `la cartella non è la radice di un clone git: sta dentro un altro repository, e l’indice che si leggerebbe è il suo (prefisso ${prefisso})` };
+  }
+  if (!fs.existsSync(path.join(radice, ...HOOK.split('/')))) {
+    return { esito: false, dettaglio: `l’hook non c’è nella copia di lavoro (${HOOK})` };
+  }
+  const voce = esegui('git', ['ls-files', '-s', '--', HOOK], radice);
+  if (voce.stato !== 0) {
+    return { esito: false, dettaglio: `git non ha letto l’indice (${primaRiga(voce.uscita)})` };
+  }
+  const modo = voce.stdout.trim().split(/\s+/)[0] || '';
+  if (modo === '') {
+    return { esito: false, dettaglio: `l’hook c’è su disco ma non è nell’indice di git: non è mai stato aggiunto (${HOOK})` };
+  }
+  if (modo !== MODO_ATTESO) {
+    return { esito: false, dettaglio: `nell’indice di git l’hook ha modo ${modo}, atteso ${MODO_ATTESO}: chi clona su Linux o macOS riceve un hook che git non esegue` };
+  }
+  return { esito: true, dettaglio: `modo ${modo} nell’indice di git` };
 }
 
 function preparaRepositoryDiProva() {
@@ -135,6 +182,11 @@ function preparaRepositoryDiProva() {
 
 module.exports = {
   nome: 'Riservatezza: niente percorsi del server né dati veri, e l’hook li blocca',
+
+  // Esportata per provarla anche dove il resto del collaudo non arriva: in una
+  // cartella che non è un clone git lo scanner si ferma prima, sul primo
+  // `git ls-files`, e il controllo dell'hook non verrebbe mai letto.
+  modoDellHook,
 
   async esegui({ registro }) {
     registro.titolo('Il repository di oggi è pulito');
@@ -204,9 +256,8 @@ module.exports = {
     }
 
     registro.titolo('Hook e controllo su GitHub sono al loro posto');
-    const hook = path.join(RADICE, '.githooks', 'pre-commit');
-    registro.controlla('l’hook esiste ed è eseguibile',
-      fs.existsSync(hook) && (fs.statSync(hook).mode & 0o111) !== 0);
+    const modo = modoDellHook(RADICE);
+    registro.controlla('l’hook esiste ed è eseguibile nell’indice di git', modo.esito, modo.dettaglio);
     const flusso = fs.readFileSync(path.join(RADICE, '.github', 'workflows', 'riservatezza.yml'), 'utf8');
     registro.controlla('il controllo su GitHub gira su ogni push e su ogni pull request',
       /^\s*push:/m.test(flusso) && /^\s*pull_request:/m.test(flusso));
