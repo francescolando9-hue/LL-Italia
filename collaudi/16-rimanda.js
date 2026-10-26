@@ -376,6 +376,37 @@ module.exports = {
     registro.controlla('e a video si legge il codice',
       /ImpiantiDiReteCondominiali/.test(await pagina.$eval('#lista-coda', e => e.textContent)));
 
+    // --- Caso 24 della specifica del 26/10/2026 sera (0.41.0): una foto in
+    // coda salvata prima con `Marketing`, una delle tre fasi che le app non
+    // offrono più. Niente è retroattivo: parte com'è, e a video si legge
+    // l'etichetta, che `etichettaFase` dà ancora.
+    registro.titolo('Foto: un elemento in coda con una fase esclusa dalle app parte com’è');
+    // Regola 1: la bolla del caso 13 deve risultare Inviata prima di ricaricare.
+    await attendiNienteInViaggio(1, 'bolla del caso 13 dichiarata Inviata');
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.waitForSelector('#commessa');
+    await pagina.waitForTimeout(500);
+    const prima24 = flow.stato.ricevuti.length;
+    await iniettaRecord('llitalia-foto', 2, {
+      stato: 'in_coda', tipo: 'ARCHIVIO', genere: 'foto', estensione: 'jpg', mime: 'image/jpeg', durata: 0,
+      commessa: 'MNG', fase: 'Marketing', piano: null, unita: null, prospetto: null, scala: null,
+      autore: 'Paolo Sanzarello', nota: '', anteprima: true, nome: 'marketing.jpg',
+      dataScatto: '2026-10-26T10:00:00+01:00', scattoStimato: 'NO',
+      timestampDispositivo: '2026-10-26T10:00:00+01:00', creatoIl: ora - 300, tentativi: 0, ultimoErrore: '',
+      inviatoIl: null, progressivo: 50, urlCaricamento: '', byteInviati: 0, byteCaricati: false,
+    });
+    await pagina.reload();
+    await pagina.waitForSelector('#commessa');
+    const fotoMarketing = await nuovoDopo(prima24, true, 'foto in coda con Marketing');
+    registro.dice('foto in coda con Marketing: payload', `fase ${JSON.stringify(fotoMarketing.fase)} · commessa ${JSON.stringify(fotoMarketing.commessa)}`);
+    registro.controlla('caso 24 · parte com’è, con fase «Marketing»',
+      fotoMarketing.fase === 'Marketing' && fotoMarketing.commessa === 'MNG',
+      'le fasi escluse non si offrono, ma quello che era già in coda non si blocca e non si riscrive');
+    await aiuto.attendi(pagina, () => [...document.querySelectorAll('#lista-coda li')]
+      .some(li => /Marketing/.test(li.textContent) && li.querySelector('.badge-inviata')), 'riga Marketing inviata', 30000);
+    registro.controlla('caso 24 · e a video si legge «Marketing»',
+      /Marketing/.test(await pagina.$eval('#lista-coda', e => e.textContent)));
+
     registro.controllaConsole(errori);
     await contesto.close();
   },
