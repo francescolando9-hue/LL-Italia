@@ -317,6 +317,15 @@ module.exports = {
     registro.controlla('nessuna foto è mai partita senza fase',
       flow.stato.ricevuti.filter(r => 'tipo' in r).every(r => r.fase),
       'è la garanzia su cui si regge lo smistamento per cartella sul server');
+    // Prima di ricaricare si aspetta «Inviata», non l'arrivo al flow (trappola 6
+    // di aiuto.js). Fino al 26/10/2026 qui si ricaricava subito: con la pagina
+    // lenta il record era ancora su «invio», al caricamento ripartiva da solo
+    // (è giusto: il flow vero risponde `gia_presente`) e al flow arrivava la
+    // stessa foto due volte. Quella richiesta in più faceva passare in anticipo
+    // l'attesa della bolla `FognaturaNera`, in fondo, e il controllo leggeva la
+    // bolla di prima: rosso 3 giri su 3 a CPU ×4, 2 su 2 nella suite di Cowork.
+    await aiuto.attendi(pagina, () => document.querySelectorAll('#lista-coda .badge-inviata').length >= 1,
+      'foto dichiarata Inviata', 60000);
     await pagina.reload();
     await pagina.waitForSelector('#fase');
     await attendiMenuFase(pagina, aiuto);
@@ -364,9 +373,20 @@ module.exports = {
     await pagina.setInputFiles('#input-galleria', [materiale('bolla.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 1, 'anteprima', 60000);
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    // La bolla si cerca fra le richieste arrivate DOPO il tocco, per contenuto
+    // (le bolle non portano `tipo`) e con un `idClient` mai visto prima: non
+    // «la sesta richiesta» né «l'ultima bolla». Un invio ripreso da solo dopo
+    // una ricarica è una richiesta in più, e con un conteggio fisso il collaudo
+    // leggeva la bolla di prima (`fase: ""`) mentre questa era ancora in viaggio.
+    const primaDellaBolla = flow.stato.ricevuti.length;
+    const giaVisti = new Set(flow.stato.ricevuti.map(r => r && r.idClient));
+    const bollaNuova = () => flow.stato.ricevuti.slice(primaDellaBolla)
+      .find(r => r && !('tipo' in r) && !giaVisti.has(r.idClient));
     await pagina.click('#invia');
-    await attendiRicevuti(6);
-    const bollaNera = flow.stato.ricevuti.filter(r => r && !('tipo' in r)).pop();
+    const fineAttesa = Date.now() + 60000;
+    while (!bollaNuova() && Date.now() < fineAttesa) await new Promise(r => setTimeout(r, 300));
+    const bollaNera = bollaNuova();
+    if (!bollaNera) throw new Error('la bolla FognaturaNera non è arrivata al flow in 60 secondi');
     registro.dice('payload della bolla', `fase: ${JSON.stringify(bollaNera.fase)} · campi livello: ${
       ['piano', 'unita', 'prospetto', 'scala'].filter(c => c in bollaNera).join(', ') || 'nessuno'}`);
     registro.controlla('la bolla parte con fase FognaturaNera, senza livelli',

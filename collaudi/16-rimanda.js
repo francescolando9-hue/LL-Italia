@@ -38,6 +38,28 @@ module.exports = {
       if (flow.stato.ricevuti.length < quanti) throw new Error(`arrivati ${flow.stato.ricevuti.length} invii su ${quanti}`);
     };
     const ultimo = () => flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    // Le due regole della trappola 6 di aiuto.js, per la parte che RICARICA la
+    // pagina (gli elementi di prima dell'aggiornamento, in fondo).
+    // 1. Prima di ricaricare, niente «In coda» né «Invio in corso» nella coda a
+    //    video, e almeno `quante` inviate: una ricarica con un invio a metà lo
+    //    fa ripartire da solo, e al flow arriva una richiesta in più.
+    const attendiNienteInViaggio = (quante, descrizione) => aiuto.attendi(pagina, n =>
+      document.querySelectorAll('#lista-coda .badge-coda, #lista-coda .badge-invio').length === 0
+        && document.querySelectorAll('#lista-coda .badge-inviata').length >= n,
+    descrizione, 90000, quante);
+    // 2. Il payload si cerca per CONTENUTO fra le richieste arrivate dopo
+    //    `prima`, con un `idClient` mai visto: non «l'ultima richiesta». Un
+    //    invio ripreso da solo ha un idClient già visto, e non può prenderne il
+    //    posto.
+    const nuovoDopo = async (prima, foto, descrizione) => {
+      const visti = new Set(flow.stato.ricevuti.slice(0, prima).map(r => r && r.idClient));
+      const cerca = () => flow.stato.ricevuti.slice(prima)
+        .find(r => r && ('tipo' in r) === foto && !visti.has(r.idClient));
+      const fine = Date.now() + 90000;
+      while (!cerca() && Date.now() < fine) await new Promise(r => setTimeout(r, 200));
+      if (!cerca()) throw new Error(`${descrizione}: nessuna richiesta nuova in 90 secondi`);
+      return cerca();
+    };
     const scegliCommessa = async (selettore, codice) => {
       await pagina.selectOption(selettore, codice);
       await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${codice}|`),
@@ -185,6 +207,12 @@ module.exports = {
       'una pagina corretta resta la stessa pagina della stessa bolla: altrimenti la correzione spezza in due una bolla di più pagine');
     registro.controlla('e resta la stessa pagina',
       bollaCorretta.pagina === bolla.pagina && bollaCorretta.pagine === bolla.pagine);
+    // Regola 1: la parte che segue ricarica la pagina. Fino al 26/10/2026 qui
+    // non si aspettava: con le letture lente la bolla rimandata era ancora su
+    // «invio», ripartiva da sola dopo la ricarica del caso 12 e arrivava al
+    // flow durante il caso 13, che la leggeva al posto della sua (`fase ""`,
+    // SNZ2.2): rosso 3 giri su 3 con `--ritardo-letture=300`.
+    await attendiNienteInViaggio(2, 'bolla rimandata dichiarata Inviata');
 
     registro.titolo('I conti alla fine');
     registro.dice('richieste al flow', String(flow.stato.ricevuti.length));
@@ -255,8 +283,7 @@ module.exports = {
     });
     await pagina.reload();
     await pagina.waitForSelector('#commessa');
-    await attendiRicevuti(prima12 + 1);
-    const vecchiaFoto = ultimo();
+    const vecchiaFoto = await nuovoDopo(prima12, true, 'foto in coda con Interrato');
     registro.dice('foto in coda con Interrato: payload', `fase ${JSON.stringify(vecchiaFoto.fase)} · piano ${JSON.stringify(vecchiaFoto.piano)} · commessa ${JSON.stringify(vecchiaFoto.commessa)}`);
     registro.controlla('caso 12 · parte senza blocco, col suo codice: fase «Interrato», piano «P-1»',
       vecchiaFoto.fase === 'Interrato' && vecchiaFoto.piano === 'P-1' && vecchiaFoto.commessa === 'MNG',
@@ -300,17 +327,28 @@ module.exports = {
       `${aperto.pulsante} · ${aperto.spiegazione}`);
     const prima14 = flow.stato.ricevuti.length;
     await pagina.selectOption('#r-fase', 'Cantiere');
-    await aiuto.attendi(pagina, () => document.querySelector('#r-manda').textContent.trim() === 'Rimanda corretta',
-      'il pulsante cambia da sé', 10000);
+    // Si aspetta il ridisegno che la SCELTA produce: il marcatore del riquadro
+    // diventa `MNG|Cantiere`. Fino al 26/10/2026 si aspettava il testo
+    // «Rimanda corretta», che però c'è già all'apertura (la fase vuota è diversa
+    // da `Interrato`, e il pulsante è spento): l'attesa non aspettava niente e
+    // il controllo leggeva il disegno di prima della scelta. Rosso 1 giro su 2
+    // nella suite di Cowork, 3 su 3 con `--ritardo-letture=300`; l'app intanto
+    // si assestava da sola e la foto partiva con `Cantiere`.
+    await aiuto.attendiMarcatore(pagina, m => m === 'MNG|Cantiere', 'riquadro ridisegnato dopo la scelta',
+      { prefisso: 'r-' });
+    const dopoLaScelta = await statoRimanda();
     registro.controlla('scelta una fase, il pulsante dice «Rimanda corretta» e si accende',
-      (await statoRimanda()).spento === false);
+      dopoLaScelta.pulsante === 'Rimanda corretta' && dopoLaScelta.spento === false,
+      `${dopoLaScelta.pulsante} · ${dopoLaScelta.spento ? 'spento' : 'acceso'}`);
     await pagina.click('#r-manda');
-    await attendiRicevuti(prima14 + 1);
-    const corretta14 = ultimo();
+    const corretta14 = await nuovoDopo(prima14, true, 'foto rimandata con la fase nuova');
     registro.dice('foto rimandata', `idClient ${corretta14.idClient} · fase ${JSON.stringify(corretta14.fase)} · piano ${JSON.stringify(corretta14.piano)}`);
     registro.controlla('parte con la fase nuova e un idClient nuovo',
       corretta14.fase === 'Cantiere' && corretta14.idClient !== vecchiaFoto.idClient,
       'in raccolta deve comparire una riga diversa, non sovrascrivere quella di prima');
+    // Regola 1: il caso 13 ricarica la pagina; la foto rimandata deve risultare
+    // Inviata prima (con quella del caso 12 fanno due).
+    await attendiNienteInViaggio(2, 'foto rimandata dichiarata Inviata');
 
     // --- Caso 13: Bolla in coda con `ImpiantiDiReteCondominiali`.
     registro.titolo('Bolle: un elemento in coda con la fase sciolta parte com’è');
@@ -327,8 +365,7 @@ module.exports = {
     });
     await pagina.reload();
     await pagina.waitForSelector('#cantiere');
-    await attendiRicevuti(prima13 + 1);
-    const vecchiaBolla = ultimo();
+    const vecchiaBolla = await nuovoDopo(prima13, false, 'bolla in coda con ImpiantiDiReteCondominiali');
     registro.dice('bolla in coda con ImpiantiDiReteCondominiali: payload', `fase ${JSON.stringify(vecchiaBolla.fase)} · commessa ${JSON.stringify(vecchiaBolla.commessa)}`);
     registro.controlla('caso 13 · parte com’è, col suo codice',
       vecchiaBolla.fase === 'ImpiantiDiReteCondominiali' && vecchiaBolla.commessa === 'MNG'

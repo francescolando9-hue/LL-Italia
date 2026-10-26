@@ -35,6 +35,12 @@
 //    e lo si legge SOLO con `leggiMarcatore` / `attendiMarcatore` (più sotto):
 //    finché non c'è, il menù non è pronto — leggerlo a mano con
 //    `.dataset.livelli.startsWith(…)` esplode proprio in quella finestra.
+//    E l'attesa deve riguardare il ridisegno che l'AZIONE produce: una
+//    condizione che era già vera prima del tocco non aspetta niente. Il
+//    pulsante di «Rimanda» dice «Rimanda corretta» già all'apertura, quando la
+//    fase dell'invio è stata tolta dall'elenco: aspettare quel testo dopo la
+//    scelta leggeva il disegno di prima (collaudo 16, pagata il 26/10/2026).
+//    Si aspetta il marcatore con la coppia nuova.
 // 6. **«Arrivata al flow» non vuol dire «invio finito».** Il flow riceve la
 //    richiesta prima che la pagina abbia registrato la risposta, e in quella
 //    finestra il record è ancora su `invio`. Chi RICARICA la pagina lì dentro
