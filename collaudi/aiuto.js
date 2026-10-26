@@ -189,11 +189,51 @@ async function apriBrowser() {
 // `opzioni` si passa a Playwright così com'è: serve per esempio a fissare il
 // fuso del telefono (`timezoneId`), senza il quale un collaudo sulle ore
 // darebbe risultati diversi a seconda di dove gira.
+//
+// **CPU rallentata** (dal 26/10/2026): `node collaudi/esegui.js --cpu=4` fa
+// girare ogni telefono con la CPU del browser rallentata quattro volte (CDP,
+// `Emulation.setCPUThrottlingRate`). Serve a riprodurre i rossi che compaiono
+// solo quando tutto è più lento — la suite completa, un PC carico — invece di
+// aspettare che capitino: un collaudo che legge il risultato prima che sia
+// assestato diventa rosso qui in modo ripetibile. Senza l'argomento non cambia
+// niente.
+//
+// **Letture della coda ritardate**: `--ritardo-letture=300` fa arrivare
+// all'app con 300 ms di ritardo il risultato di ogni lettura da IndexedDB
+// (transazioni `readonly`: è così che `elenca()` delle due code legge). La CPU
+// rallentata non basta per questo tipo di rosso: la lettura la fa il processo
+// del browser, non la pagina, e il ritardo che conta — fra un tocco e il
+// ridisegno che lo riflette, che passa da `elenca()` — resta di pochi
+// millisecondi anche a ×20. È la leva con cui si è provata la causa del rosso
+// del collaudo 16 il 26/10/2026. Il codice dell'app non si tocca: cambia solo
+// QUANDO le arriva la risposta, come su un telefono lento.
+const argomento = (nome, predefinito) =>
+  Number((process.argv.find(a => a.startsWith(`--${nome}=`)) || '').split('=')[1]) || predefinito;
+const RALLENTAMENTO_CPU = argomento('cpu', 1);
+const RITARDO_LETTURE_MS = argomento('ritardo-letture', 0);
+
 async function nuovoTelefono(browser, opzioni = {}) {
   const contesto = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opzioni,
   });
+  if (RITARDO_LETTURE_MS > 0) {
+    await contesto.addInitScript(ms => {
+      const originale = Object.getOwnPropertyDescriptor(IDBTransaction.prototype, 'oncomplete');
+      Object.defineProperty(IDBTransaction.prototype, 'oncomplete', {
+        configurable: true,
+        get() { return originale.get.call(this); },
+        set(funzione) {
+          const ritarda = funzione && this.mode === 'readonly';
+          originale.set.call(this, ritarda ? evento => setTimeout(() => funzione.call(this, evento), ms) : funzione);
+        },
+      });
+    }, RITARDO_LETTURE_MS);
+  }
   const pagina = await contesto.newPage();
+  if (RALLENTAMENTO_CPU > 1) {
+    const cdp = await contesto.newCDPSession(pagina);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: RALLENTAMENTO_CPU });
+  }
   const errori = [];
   pagina.on('console', m => { if (m.type() === 'error') errori.push(m.text()); });
   pagina.on('pageerror', e => errori.push('pageerror: ' + e.message));
