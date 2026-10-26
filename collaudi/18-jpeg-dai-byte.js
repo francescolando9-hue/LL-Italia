@@ -45,8 +45,8 @@ module.exports = {
 
     const scegli = async () => {
       await pagina.selectOption('#commessa', 'MAR');
-      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MAR|'),
-        'menù della fase pronto', 10000);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith('MAR|'),
+        'menù della fase pronto');
       await pagina.selectOption('#fase', 'Cantiere');
     };
 

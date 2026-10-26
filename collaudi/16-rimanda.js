@@ -40,9 +40,8 @@ module.exports = {
     const ultimo = () => flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
     const scegliCommessa = async (selettore, codice) => {
       await pagina.selectOption(selettore, codice);
-      await aiuto.attendi(pagina, cod =>
-        document.querySelector('#fase').dataset.livelli.startsWith(`${cod}|`),
-        `menù rifatto per ${codice}`, 10000, codice);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${codice}|`),
+        `menù rifatto per ${codice}`);
     };
 
     // Scegliere la FASE e aspettare che i menù dei livelli si siano rifatti:
@@ -50,9 +49,8 @@ module.exports = {
     // costruiti, e finché non combacia si stanno leggendo quelli di prima.
     const scegliFase = async codice => {
       await pagina.selectOption('#fase', codice);
-      await aiuto.attendi(pagina, cod =>
-        document.querySelector('#fase').dataset.livelli.endsWith(`|${cod}`),
-        `livelli rifatti per ${codice}`, 10000, codice);
+      await aiuto.attendiMarcatore(pagina, m => m.endsWith(`|${codice}`),
+        `livelli rifatti per ${codice}`);
     };
 
     registro.titolo('Foto: una da archiviare, inviata');

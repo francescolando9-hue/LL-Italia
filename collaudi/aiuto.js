@@ -31,7 +31,10 @@
 //    lettura delle voci può dare un elenco vuoto. Costa un fallimento ogni
 //    cinque o sei giri, cioè il tipo di rosso che si archivia come «flake» e
 //    non si guarda più. Si aspetta il marcatore `data-livelli`, che
-//    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto.
+//    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto,
+//    e lo si legge SOLO con `leggiMarcatore` / `attendiMarcatore` (più sotto):
+//    finché non c'è, il menù non è pronto — leggerlo a mano con
+//    `.dataset.livelli.startsWith(…)` esplode proprio in quella finestra.
 // 6. **«Arrivata al flow» non vuol dire «invio finito».** Il flow riceve la
 //    richiesta prima che la pagina abbia registrato la risposta, e in quella
 //    finestra il record è ancora su `invio`. Chi RICARICA la pagina lì dentro
@@ -297,11 +300,39 @@ async function configura(pagina, indirizzoApp, impostazioni = {}) {
 // si invia. `Bonifica` non pretende livelli: è il percorso più corto, e i
 // livelli hanno il loro collaudo (15-livelli.js).
 async function scegliFase(pagina, fase = 'Bonifica', limite = 10000) {
-  await attendi(pagina, () => {
-    const menu = document.querySelector('#fase');
-    return Boolean(menu && menu.dataset.livelli !== undefined && menu.querySelectorAll('option').length > 1);
-  }, 'menù della fase pronto', limite);
+  await attendiMarcatore(pagina, () => true, 'menù della fase pronto', { limite });
   await pagina.selectOption('#fase', fase);
+}
+
+// --- Il marcatore dei menù (trappola 4ter) ----------------------------------
+// `data-livelli` sul menù della fase dice per quale coppia `commessa|fase` la
+// shell ha costruito i menù; lo scrive per ULTIMO, quando sono a posto. Si
+// legge SOLO da qui, in tutti i collaudi: fino al 26/10/2026 c'erano 21 letture
+// scritte a mano come `….dataset.livelli.startsWith(…)`, e con il marcatore non
+// ancora scritto davano un TypeError che fermava tutto il collaudo (visto sul 16
+// a CPU ×10 e con le letture ritardate). **Assente vuol dire «non ancora
+// pronto»**, non un errore: si aspetta ancora. `prefisso` è quello dei menù del
+// riquadro «Rimanda» (`r-`).
+function leggiMarcatore(pagina, prefisso = '') {
+  return pagina.evaluate(p => {
+    const menu = document.querySelector(`#${p}fase`);
+    if (!menu || menu.dataset.livelli === undefined || menu.querySelectorAll('option').length < 2) return null;
+    return menu.dataset.livelli;
+  }, prefisso);
+}
+
+// Aspetta che il marcatore ci sia e soddisfi `condizione`, che si scrive in
+// Node e riceve la stringa: `m => m.startsWith('MNG|')`, `m => m === 'MNG|Cantiere'`,
+// `() => true` per «pronto, comunque sia».
+async function attendiMarcatore(pagina, condizione, descrizione, { prefisso = '', limite = 10000 } = {}) {
+  const fine = Date.now() + limite;
+  let ultimo = null;
+  while (Date.now() < fine) {
+    ultimo = await leggiMarcatore(pagina, prefisso);
+    if (ultimo !== null && condizione(ultimo)) return ultimo;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error(`Attesa scaduta (${descrizione}; marcatore ${ultimo === null ? 'assente' : `«${ultimo}»`})`);
 }
 
 // Riparte pulito: contatori del giorno e code svuotati (trappola 4).
@@ -354,5 +385,6 @@ function materiale(nome) {
 module.exports = {
   RADICE, MATERIALE, PORTA_APP, PORTA_FLOW,
   avviaStatico, avviaFlow, apriBrowser, nuovoTelefono,
-  attendi, attendiInstallazione, configura, scegliFase, puliscine, creaRegistro, materiale,
+  attendi, attendiInstallazione, configura, scegliFase, leggiMarcatore, attendiMarcatore,
+  puliscine, creaRegistro, materiale,
 };

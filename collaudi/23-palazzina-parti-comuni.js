@@ -109,7 +109,7 @@ module.exports = {
       inviate = 0;
       await pagina.reload();
       await pagina.waitForSelector('#commessa');
-      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli !== undefined, 'menù pronti', 10000);
+      await aiuto.attendiMarcatore(pagina, () => true, 'menù pronti');
       await svuotaBozze();
     };
 
@@ -117,11 +117,9 @@ module.exports = {
     const scegli = async (campo, valore, prefisso = '') => {
       await pagina.selectOption(`#${prefisso}${campo === 'commessa' ? 'commessa' : campo}`, valore);
       if (campo === 'commessa') {
-        await aiuto.attendi(pagina, cod => document.querySelector('#fase').dataset.livelli.startsWith(`${cod}|`),
-          `menù rifatto per ${valore}`, 10000, valore);
+        await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${valore}|`), `menù rifatto per ${valore}`);
       } else if (campo === 'fase') {
-        await aiuto.attendi(pagina, f => document.querySelector('#fase').dataset.livelli.endsWith(`|${f}`),
-          `livelli rifatti per ${valore}`, 10000, valore);
+        await aiuto.attendiMarcatore(pagina, m => m.endsWith(`|${valore}`), `livelli rifatti per ${valore}`);
       }
       return assesta(prefisso);
     };
@@ -413,7 +411,7 @@ module.exports = {
       const menu = await pagina.$$eval('#cantiere option', o => o.filter(e => e.value).map(e => e.value));
       registro.controlla('TN1 c’è nel menù delle bolle (8 voci)', menu.includes('TN1') && menu.length === 8, menu.join(' '));
       await pagina.selectOption('#cantiere', 'TN1');
-      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('TN1|'), 'menù rifatto per TN1', 10000);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith('TN1|'), 'menù rifatto per TN1');
       await pagina.selectOption('#fase', 'Strutture');
       registro.controlla('nelle bolle i menù dei livelli non esistono, il lotto compreso',
         (await pagina.$$('#campo-piano, #campo-unita, #campo-scala, #campo-prospetto, #scala')).length === 0);

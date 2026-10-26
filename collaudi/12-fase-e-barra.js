@@ -27,15 +27,7 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 // volte un elenco vuoto, e il collaudo fallisce una volta su sei senza che
 // nulla sia rotto. Si aspetta il marcatore `data-livelli`, che la shell scrive
 // per ultimo, quando i menù sono a posto.
-const attendiMenuFase = (pagina, aiuto) => aiuto.attendi(
-  pagina,
-  () => {
-    const menu = document.querySelector('#fase');
-    return Boolean(menu && menu.dataset.livelli && menu.querySelectorAll('option').length > 1);
-  },
-  'menù della fase riempito',
-  10000,
-);
+const attendiMenuFase = (pagina, aiuto) => aiuto.attendiMarcatore(pagina, () => true, 'menù della fase riempito');
 
 // Il conteggio, che ha una storia: 27 date da Francesco il 14/09, meno
 // «CMC 128» che lui stesso ha tolto lo stesso giorno (era un codice di
@@ -257,8 +249,8 @@ module.exports = {
     // vede tutte lo stesso.
     const menuDi = async commessa => {
       await pagina.selectOption('#commessa', commessa);
-      await aiuto.attendi(pagina, cod => document.querySelector('#fase').dataset.livelli.startsWith(`${cod}|`),
-        `menù della fase pronto per ${commessa}`, 10000, commessa);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${commessa}|`),
+        `menù della fase pronto per ${commessa}`);
       return pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
     };
     const perMNG = await menuDi('MNG');
@@ -293,8 +285,8 @@ module.exports = {
     // Questo è il posto dove si vedrebbe se quella semplificazione avesse
     // lasciato in giro un ramo che lascia passare un invio senza fase.
     await pagina.selectOption('#commessa', 'SNZ2.2');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
-      'menù della fase pronto', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('SNZ2.2|'),
+      'menù della fase pronto');
     registro.dice('aiuto sotto il campo', await pagina.$eval('#aiuto-fase', e => e.textContent.trim()));
     registro.controlla('l’app dice dove finirà la foto, prima di scattare',
       /cartella della fase/i.test(await pagina.$eval('#aiuto-fase', e => e.textContent)),
@@ -341,8 +333,8 @@ module.exports = {
     // sbagliato.
     await accodaFoto();
     await pagina.selectOption('#commessa', 'SNZ2.2');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
-      'menù della fase pronto', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('SNZ2.2|'),
+      'menù della fase pronto');
     await pagina.selectOption('#fase', 'ImpiantoFotovoltaico');
     await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
     await pagina.selectOption('#fase', '');
@@ -358,8 +350,8 @@ module.exports = {
     await pagina.waitForSelector('#cantiere');
     await attendiMenuFase(pagina, aiuto);
     await pagina.selectOption('#cantiere', 'MNG');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MNG|'),
-      'menù della fase pronto per MNG', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('MNG|'),
+      'menù della fase pronto per MNG');
     const bolleMNG = await pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
     registro.controlla('«— nessuna fase —» e 29 fasi',
       /nessuna fase/.test(bolleMNG[0].t) && bolleMNG[0].v === '' && bolleMNG.length - 1 === QUANTE_FASI,

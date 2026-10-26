@@ -47,15 +47,10 @@ module.exports = {
       return dati[c] === undefined ? '(assente)' : dati[c];
     }, { k: chiave, c: campo });
     // Il menù della fase è pronto per quella commessa (trappola 4ter).
-    const attendiMenu = commessa => aiuto.attendi(pagina, c => {
-      const menu = document.querySelector('#fase');
-      return Boolean(menu && menu.dataset.livelli !== undefined && menu.dataset.livelli.startsWith(`${c}|`)
-        && menu.querySelectorAll('option').length > 1);
-    }, `menù della fase pronto per «${commessa}»`, 10000, commessa);
-    const attendiLivelli = (commessa, fase) => aiuto.attendi(pagina, v => {
-      const menu = document.querySelector('#fase');
-      return Boolean(menu && menu.dataset.livelli === v);
-    }, `livelli pronti per ${commessa}|${fase}`, 10000, `${commessa}|${fase}`);
+    const attendiMenu = commessa => aiuto.attendiMarcatore(pagina,
+      m => m.startsWith(`${commessa}|`), `menù della fase pronto per «${commessa}»`);
+    const attendiLivelli = (commessa, fase) => aiuto.attendiMarcatore(pagina,
+      m => m === `${commessa}|${fase}`, `livelli pronti per ${commessa}|${fase}`);
     const attendiInviate = (quante, descrizione) => aiuto.attendi(pagina,
       n => document.querySelectorAll('#lista-coda .badge-inviata').length >= n,
       descrizione, 90000, quante);

@@ -43,9 +43,8 @@ module.exports = {
     // costruito.
     const scegliCommessa = async (selettore, codice) => {
       await pagina.selectOption(selettore, codice);
-      await aiuto.attendi(pagina, cod =>
-        document.querySelector('#fase').dataset.livelli.startsWith(`${cod}|`),
-        `menù della fase rifatto per ${codice}`, 10000, codice);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${codice}|`),
+        `menù della fase rifatto per ${codice}`);
     };
 
     // Un invio completo dal modulo Foto: categoria, commessa, fase, livelli.
@@ -78,9 +77,8 @@ module.exports = {
     // costruiti, e finché non combacia si stanno leggendo quelli di prima.
     const scegliFase = async codice => {
       await pagina.selectOption('#fase', codice);
-      await aiuto.attendi(pagina, cod =>
-        document.querySelector('#fase').dataset.livelli.endsWith(`|${cod}`),
-        `livelli rifatti per ${codice}`, 10000, codice);
+      await aiuto.attendiMarcatore(pagina, m => m.endsWith(`|${codice}`),
+        `livelli rifatti per ${codice}`);
     };
 
     // L'elenco delle fasi vive in DUE posti dentro l'app: `core/fasi.js` dice

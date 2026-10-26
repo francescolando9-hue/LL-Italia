@@ -140,8 +140,8 @@ module.exports = {
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'TN1');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('TN1|'),
-      'menù della fase rifatto per TN1', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('TN1|'),
+      'menù della fase rifatto per TN1');
     await pagina.selectOption('#fase', 'Cantiere');
     await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
