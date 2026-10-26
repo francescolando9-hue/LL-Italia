@@ -89,6 +89,32 @@ export function messaggioScaduto(scadenza = scadenzaInvioMs()) {
     : `Invio interrotto: nessuna risposta dopo ${Math.round(scadenza / 1000)} secondi. Resta in coda e si riprova.`;
 }
 
+// --- Il momento in cui un elemento entra in coda (dalla 0.41.0) -------------
+// `accodatoIl` è il momento in cui l'elemento è entrato in coda: quando
+// l'operatore preme Invia (da bozza a coda), con «Rimanda» (la stessa o
+// corretta) e con «Cantiere sbagliato?». È il riferimento dell'avviso in cima
+// alla schermata: un elemento non arrivato 10 minuti dopo esserci entrato.
+// Non è `creatoIl`, che è il momento in cui la foto è entrata fra le bozze: una
+// foto fatta mezz'ora prima e mandata adesso non è in ritardo.
+//
+// **Non si sposta** con i ritentativi automatici, con la ripresa di un invio
+// interrotto e con «Riprova» (decisione di Francesco del 26/10/2026): è lo
+// stesso elemento, e non è arrivato. Spostarlo nasconderebbe il problema per
+// altri dieci minuti a ogni tocco.
+//
+// Resta sul telefono: non entra nel payload, il contratto col flow non cambia.
+export function segnaIngressoInCoda(record, ora = Date.now()) {
+  record.accodatoIl = ora;
+  return record;
+}
+
+// Per un elemento salvato da una versione che il campo non lo scriveva
+// (0.40.0 e prima) vale `creatoIl`: è un'approssimazione per eccesso del
+// ritardo, che al peggio accende l'avviso su un elemento davvero fermo.
+export function ingressoInCoda(record) {
+  return Number.isFinite(record.accodatoIl) ? record.accodatoIl : record.creatoIl;
+}
+
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
 
