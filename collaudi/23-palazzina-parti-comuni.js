@@ -1,4 +1,4 @@
-// Palazzina («Lotto») e parti comuni nel modulo Foto, dalla 0.39.0: 33 casi.
+// Palazzina («Lotto») e parti comuni nel modulo Foto, dalla 0.39.0: 34 casi.
 //
 // I casi 1–28 sono la tabella della specifica, con la numerazione del master
 // — la stessa del collaudo dello script, che dallo stesso payload ricava il
@@ -17,6 +17,13 @@
 //   33  la voce unica del lotto, che con il dato vero non scatta mai: si prova
 //       con commesse sintetiche, a livello di funzioni e di vista condivisa.
 //
+// Dal passaggio a fasi e attività del 26/10/2026 (app 0.40.0) cambiano due
+// casi della tabella e se ne aggiunge uno. Il 3, che era TN1 · `Interrato`
+// col P-1 scelto dall'app, diventa TN1 · `FinituraPartiComuniInterne` col P-1
+// scelto dall'operatore (`Interrato` non è più una fase). Il 28 conta 29 fasi
+// e verifica che `Interrato` non ci sia. Il 34 è il caso 6 di quella
+// specifica: TN1 · `FognaturaBianca` · P1 chiede il lotto.
+//
 // Ingresso = scelte dell'operatore; esito = i quattro campi del payload nell'ordine
 // piano, unita, prospetto, scala, oppure il blocco dell'invio.
 //
@@ -29,7 +36,7 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 const J = JSON.stringify;
 
 module.exports = {
-  nome: 'Palazzina («Lotto») e parti comuni: 33 casi nel modulo Foto',
+  nome: 'Palazzina («Lotto») e parti comuni: 34 casi nel modulo Foto',
 
   async esegui({ browser, app, flow, registro, aiuto }) {
     const { contesto, pagina, errori } = await nuovoTelefono(browser);
@@ -206,16 +213,26 @@ module.exports = {
           lotti.join(',') === '4,5,6,7', lotti.join(' '));
       },
     });
-    await tabella(3, 'TN1 · Interrato · nessuna scelta', {
-      commessa: 'TN1', fase: 'Interrato', atteso: ['P-1', null, null, null],
-      verifica: async s => {
-        const unico = await pagina.$eval('#unico-piano', e => e.textContent.replace(/\s+/g, ' ').trim());
-        registro.dice('al posto del menù si legge', unico);
-        registro.controlla('P-1 lo sceglie l’app e lo mostra col perché',
-          s.unico[0] && /P-1/.test(unico) && /Primo piano interrato/.test(unico) && /unico piano interrato/.test(unico), unico);
-        registro.controlla('nessun selettore «Lotto»', !visibile(s, 'scala'));
-        registro.controlla('e Invia si accende da solo', s.invia === false);
-      },
+    // Era «TN1 · Interrato · nessuna scelta», col P-1 scelto dall'app. Con
+    // `Interrato` fuori dall'elenco il percorso 3 del master è questo: la fase la
+    // decide l'oggetto, il piano lo sceglie l'operatore, e nessuna voce è unica.
+    await caso(3, 'TN1 · FinituraPartiComuniInterne · P-1 scelto dall’operatore', async () => {
+      await apri();
+      await scegli('commessa', 'TN1');
+      const dopoFase = await scegli('fase', 'FinituraPartiComuniInterne');
+      registro.controlla('il menù del piano si vede, coi sei piani di TN1, e nessuna voce unica',
+        visibile(dopoFase, 'piano') && campoDi(dopoFase, 'piano')[3] === 6 && dopoFase.unico[0] === false,
+        J(campoDi(dopoFase, 'piano')));
+      registro.controlla('il piano parte dal segnaposto: il P-1 non lo sceglie più l’app',
+        campoDi(dopoFase, 'piano')[2] === '', J(campoDi(dopoFase, 'piano')));
+      await scegli('piano', 'P-1');
+      const s = await aggiungi();
+      registro.controlla('P-1 è comune alle quattro palazzine: nessun selettore «Lotto»', !visibile(s, 'scala'));
+      registro.controlla('e Invia si accende con la sola scelta del piano', s.invia === false);
+      const p = await manda();
+      registro.dice('payload', `fase ${J(p.fase)} · piano ${J(p.piano)} · unita ${J(p.unita)} · prospetto ${J(p.prospetto)} · scala ${J(p.scala)}`);
+      registro.controlla('i quattro campi del payload sono quelli attesi',
+        J(quattro(p)) === J(['P-1', null, null, null]) && p.fase === 'FinituraPartiComuniInterne', J(quattro(p)));
     });
     await tabella(4, 'TN1 · Strutture · piano P-1', {
       commessa: 'TN1', fase: 'Strutture', passi: [['piano', 'P-1']], atteso: ['P-1', null, null, null],
@@ -416,13 +433,14 @@ module.exports = {
     });
 
     // ------------------------------------------------------------------ caso 28: il selettore della fase di TN1
-    await caso(28, 'TN1 · selettore della fase: 27 fasi, nessun lotto di urbanizzazione', async () => {
+    await caso(28, 'TN1 · selettore della fase: 29 fasi, nessun lotto di urbanizzazione', async () => {
       await apri();
       await scegli('commessa', 'TN1');
       const etichetta = await pagina.$eval('#etichetta-fase', e => e.textContent.trim());
       const fasi = await pagina.$$eval('#fase option', o => o.filter(e => e.value).map(e => e.value));
       registro.controlla('l’etichetta è «Fase di lavoro»', etichetta === 'Fase di lavoro', etichetta);
-      registro.controlla('le voci sono le 27 fasi, Interrato compreso', fasi.length === 27 && fasi.includes('Interrato'), String(fasi.length));
+      registro.controlla('le voci sono le 29 fasi, e Interrato non c’è più',
+        fasi.length === 29 && !fasi.includes('Interrato') && !fasi.includes('ImpiantiDiReteCondominiali'), String(fasi.length));
       registro.controlla('e non c’è nessun Lotto1–Lotto3: TN1 è un edificio, non un’urbanizzazione',
         !fasi.some(f => /^Lotto\d+$/.test(f)));
     });
@@ -675,10 +693,19 @@ module.exports = {
       registro.controlla('e sul piano con un solo lotto (P2) si torna alla voce unica', v.p2.unico && v.p2.scala === 'B', J(v.p2));
     });
 
+    // ------------------------------------------------------------------ caso 34: dalla specifica del 26/10/2026
+    await tabella(34, 'TN1 · FognaturaBianca · piano P1, lotto 4', {
+      commessa: 'TN1', fase: 'FognaturaBianca', passi: [['piano', 'P1'], ['scala', '4']], atteso: ['P1', null, null, '4'],
+      verifica: async s => registro.controlla('Fognatura bianca chiede il piano e poi il lotto, come le altre fasi per piano',
+        visibile(s, 'piano') && visibile(s, 'scala') && !visibile(s, 'unita') && !visibile(s, 'prospetto')),
+      payload: async p => registro.controlla('la fase è FognaturaBianca: a valle FognaturaBianca\\S4\\P1\\',
+        p.fase === 'FognaturaBianca', J(p.fase)),
+    });
+
     // ------------------------------------------------------------------ i numeri attesi
     registro.titolo('I numeri');
-    registro.dice('casi verdi', `${verdi.length} su 33${rossi.length ? ` — rossi: ${rossi.join(', ')}` : ''}`);
-    registro.controlla('33 casi verdi su 33', verdi.length === 33 && rossi.length === 0, rossi.length ? `rossi: ${rossi.join(', ')}` : 'tutti');
+    registro.dice('casi verdi', `${verdi.length} su 34${rossi.length ? ` — rossi: ${rossi.join(', ')}` : ''}`);
+    registro.controlla('34 casi verdi su 34', verdi.length === 34 && rossi.length === 0, rossi.length ? `rossi: ${rossi.join(', ')}` : 'tutti');
 
     await apri();
     const menuFoto = await pagina.$$eval('#commessa option', o => o.filter(e => e.value).map(e => e.value));
