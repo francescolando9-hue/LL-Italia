@@ -41,7 +41,7 @@ POST {endpoint}?api-version=2024-10-01
 Content-Type: application/json
 
 { "token": "collaudo",
-  "commessa": "MAR",            // solo il codice; sette commesse dal 16/09/2026
+  "commessa": "MAR",            // solo il codice; otto commesse dalla 0.39.0
   "fase": "FinituraAlloggi",    // CODICE della fase, senza spazi (rev. 3, codici dalla 0.34.0);
                                 //   per SNU e BRU qui c'è il LOTTO: "Lotto2" (rev. 5).
                                 //   I livelli piano/unita/prospetto NON ci sono: rev. 6
