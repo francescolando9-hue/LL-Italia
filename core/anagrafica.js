@@ -38,9 +38,20 @@
 // Il menù dei piani legge `piani`, non le scale: il Tetto di TN1, che tutte e
 // quattro le palazzine citano, compare una volta sola.
 //
-// **TN1 è nel menù dalla 0.39.0** (`core/cantieri.js`). Il P-1 è il suo unico
-// piano sotto quota, quindi TN1 · `Interrato` è una voce unica — lo sceglie
-// l'app — e il P-1, che non sta in nessuna scala, non chiede la palazzina.
+// **TN1 è nel menù dalla 0.39.0** (`core/cantieri.js`). Il P-1, che non sta in
+// nessuna scala, è l'autorimessa comune alle quattro palazzine e non chiede il
+// lotto.
+//
+// **L'interrato non è una fase** (dalla 0.40.0, master 202610261235). Con il
+// passaggio del gruppo a fasi e attività (24/10/2026) la fase `Interrato` è
+// uscita dall'elenco: l'interrato si legge dal piano, su tutte le fasi. Per
+// questo non esistono più i tre casi speciali che la riguardavano — il filtro
+// della fase per le commesse senza interrati, il filtro dei piani sotto quota
+// e la frase della voce unica — e **nessuna fase si nasconde più per
+// commessa**: ogni fase offre tutti i piani, e una fase a piano obbligatorio
+// non ha mai un piano solo. Chi scatta decide la fase dall'oggetto, non dal
+// piano: box, cantine e finiture dell'interrato sono `Finitura parti comuni
+// interne` col piano interrato, il cemento armato resta `Strutture`.
 //
 // A cosa serve. Dal 18/09/2026 l'archivio di commessa sul server ha UN LIVELLO
 // sotto la fase, e dove quel livello è obbligatorio **sostituisce la cartella
@@ -71,12 +82,13 @@
 import { FASI, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202610101049',
+  versione: '202610261235',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
   // '-' = il selettore non compare e il campo non viaggia.
   livelliPerFase: {
+    AcquistoTerreno:              { piano: '-', unita: '-', prospetto: '-' },
     Bonifica:                     { piano: '-', unita: '-', prospetto: '-' },
     Cantiere:                     { piano: '-', unita: '-', prospetto: '-' },
     Consolidamento:               { piano: '-', unita: '-', prospetto: '-' },
@@ -85,8 +97,9 @@ export const ANAGRAFICA = {
     FinituraAlloggi:              { piano: 'D', unita: 'O', prospetto: '-' },
     FinituraFacciata:             { piano: '-', unita: '-', prospetto: 'O' },
     FinituraPartiComuniInterne:   { piano: 'O', unita: '-', prospetto: '-' },
+    FognaturaBianca:              { piano: 'O', unita: '-', prospetto: '-' },
+    FognaturaNera:                { piano: 'O', unita: '-', prospetto: '-' },
     Impermeabilizzazioni:         { piano: 'O', unita: '-', prospetto: '-' },
-    ImpiantiDiReteCondominiali:   { piano: 'O', unita: '-', prospetto: '-' },
     ImpiantoAntincendio:          { piano: 'O', unita: '-', prospetto: '-' },
     ImpiantoAscensore:            { piano: '-', unita: '-', prospetto: '-' },
     ImpiantoElettricoAlloggi:     { piano: 'D', unita: 'O', prospetto: '-' },
@@ -96,12 +109,12 @@ export const ANAGRAFICA = {
     ImpiantoSEFCC:                { piano: 'O', unita: '-', prospetto: '-' },
     ImpiantoTermicoAlloggi:       { piano: 'D', unita: 'O', prospetto: '-' },
     ImpiantoTermicoCondominiale:  { piano: 'O', unita: '-', prospetto: '-' },
-    Interrato:                    { piano: 'O', unita: '-', prospetto: '-' },
     Marketing:                    { piano: '-', unita: '-', prospetto: '-' },
     Murature:                     { piano: 'O', unita: '-', prospetto: '-' },
     Ponteggio:                    { piano: '-', unita: '-', prospetto: '-' },
     Scavi:                        { piano: '-', unita: '-', prospetto: '-' },
     SistemazioneEsterna:          { piano: '-', unita: '-', prospetto: '-' },
+    SpeseTecniche:                { piano: '-', unita: '-', prospetto: '-' },
     Strutture:                    { piano: 'O', unita: '-', prospetto: '-' },
     Urbanizzazioni:               { piano: '-', unita: '-', prospetto: '-' },
     Lotto1:                       { piano: '-', unita: '-', prospetto: '-' },
@@ -179,6 +192,7 @@ export const ANAGRAFICA = {
       },
       etichetteUnita: {
         '0A': 'Trilocale con giardino esterno',
+        '8B': 'Attico (superficie di quadrilocale più cinquelocali)',
         '1A': 'Quadrilocale',
         '1B': 'Cinquelocali',
         '2A': 'Quadrilocale',
@@ -193,7 +207,6 @@ export const ANAGRAFICA = {
         '6B': 'Cinquelocali',
         '7A': 'Quadrilocale',
         '7B': 'Cinquelocali',
-        '8B': 'Attico (superficie di quadrilocale più cinquelocali)',
       },
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
     },
@@ -351,19 +364,6 @@ export function prospettiDi(codice) {
   return elenco.map(p => ({ codice: p, etichetta: p }));
 }
 
-export function haInterrati(codice) {
-  return pianiDi(codice).some(p => Number(p.ordine) < 0);
-}
-
-// I piani che una fase può offrire. Filtro dichiarato da Francesco: per
-// `Interrato` solo i piani sotto quota, perché «Interrato, piano terzo» è una
-// scelta che non vuol dire niente e in cartella diventerebbe un percorso che
-// nessuno cerca.
-export function pianiPerFase(codice, codiceFase) {
-  const piani = pianiDi(codice);
-  return codiceFase === 'Interrato' ? piani.filter(p => Number(p.ordine) < 0) : piani;
-}
-
 // ---------------------------------------------------------------------------
 // La palazzina e le parti comuni (dal master 202610101049).
 //
@@ -472,8 +472,7 @@ export function vociUnita(codice, codiceFase = '') {
 // stesso vale per la palazzina (`scalaDerivata`).
 //
 // Un livello si chiede solo se c'è qualcosa da offrire: una commessa senza
-// anagrafica, o senza piani sotto quota per `Interrato`, non può pretendere
-// una scelta impossibile. Vale anche al contrario: dove non si chiede, non
+// anagrafica, o senza piani, non può pretendere una scelta impossibile. Vale anche al contrario: dove non si chiede, non
 // viaggia.
 //
 // `scelte` serve ai due livelli che dipendono da un altro: con «Parti comuni»
@@ -490,7 +489,7 @@ export function livelliRichiesti(codice, codiceFase, scelte = {}) {
   const unita = regola.unita === 'O' && unitaDi(codice).length > 0;
   const partiComuniScelte = unita && faseConPartiComuni(codiceFase) && scelte.unita === codicePartiComuni();
   const piano = partiComuniScelte
-    || (!unita && regola.piano === 'O' && pianiPerFase(codice, codiceFase).length > 0);
+    || (!unita && regola.piano === 'O' && pianiDi(codice).length > 0);
   const prospetto = regola.prospetto === 'O' && prospettiDi(codice).length > 0;
   const distinti = corpiDistinti(codice);
   return {
@@ -507,7 +506,10 @@ export function livelliRichiesti(codice, codiceFase, scelte = {}) {
 // (dalla 0.37.7). Il caso che l'ha fatto notare: SNZ2.2, fase `Interrato` —
 // la commessa ha un solo piano sotto quota, e l'app apriva lo stesso un menù
 // con «— scegli il piano —» e una voce sola, `P-1`. Un tocco obbligatorio per
-// una scelta che non c'era.
+// una scelta che non c'era. **Con l'anagrafica di oggi non ha più casi reali**
+// (dalla 0.40.0 `Interrato` non è una fase, e ogni fase a piano obbligatorio
+// offre tutti i piani, che in nessuna commessa sono uno solo): la regola resta,
+// e si prova su una commessa sintetica (collaudo 15) — come quella del lotto.
 //
 // Non contraddice la regola di `opzioniLivello` — nessuna preselezione — ma
 // ne è il confine: quella regola esiste perché una voce preselezionata che
@@ -534,7 +536,7 @@ function risolvi(codice, codiceFase, fatte = {}) {
   const voceUnita = voceUnica(vociU);
   const unita = ammessa(vociU, fatte.unita) || (voceUnita ? voceUnita.codice : '');
   const dopoUnita = livelliRichiesti(codice, codiceFase, { unita });
-  const vocePiano = dopoUnita.piano ? voceUnica(pianiPerFase(codice, codiceFase)) : null;
+  const vocePiano = dopoUnita.piano ? voceUnica(pianiDi(codice)) : null;
   const piano = fatte.piano || (vocePiano ? vocePiano.codice : '');
   const voceProspetto = dopoUnita.prospetto ? voceUnica(prospettiDi(codice)) : null;
   const prospetto = fatte.prospetto || (voceProspetto ? voceProspetto.codice : '');
@@ -602,14 +604,15 @@ export function livelliMancanti(codice, codiceFase, scelteFatte = {}) {
 // codice diventa il nome della cartella, esattamente come `FinituraAlloggi`.
 // Il selettore è condiviso col modulo Bolle, quindi anche una bolla di SNU
 // prende il lotto: è voluto.
+//
+// **Per un edificio le fasi sono sempre tutte, per ogni commessa** (dalla
+// 0.40.0): non si nasconde più niente. Fino alla 0.39.0 una commessa senza
+// piani interrati non vedeva la fase `Interrato`; con l'interrato che si legge
+// dal piano quel filtro non ha più ragione, e una commessa senza anagrafica
+// non è mai stata un motivo per togliere voci a chi sta scattando.
 export function vociSelettoreFase(codiceCommessa) {
   if (eUrbanizzazione(codiceCommessa)) return lottiDi(codiceCommessa);
-  // Secondo filtro dichiarato: una commessa senza piani interrati non deve
-  // vedere la fase `Interrato` — è il caso di MAR. Una commessa SENZA
-  // anagrafica non si filtra: non sapere com'è fatta non è un motivo per
-  // togliere voci a chi sta scattando.
-  const nota = anagraficaNota(codiceCommessa);
-  return FASI.filter(f => !(nota && f.codice === 'Interrato' && !haInterrati(codiceCommessa)));
+  return FASI.slice();
 }
 
 export function etichettaSelettoreFase(codiceCommessa) {
@@ -708,8 +711,8 @@ export function opzioniScala(voci, scelto, scappaHtml) {
 // Foto e Bolle mostrano gli stessi menù — fase (o lotto), piano, unità,
 // palazzina, prospetto — con le stesse regole, e li ricostruiscono a ogni
 // ridisegno. Scritto due volte diventerebbe due comportamenti: uno dei due
-// modulo smetterebbe di filtrare `Interrato`, o terrebbe un piano scelto per
-// una commessa che non l'ha, e a dirlo sarebbe solo una cartella sbagliata sul
+// modulo mostrerebbe una fase che l'altro non mostra, o terrebbe un piano scelto
+// per una commessa che non l'ha, e a dirlo sarebbe solo una cartella sbagliata sul
 // server tre settimane dopo. Sta quindi nella shell, come l'anagrafica che
 // legge, e i moduli gli passano soltanto il codice della commessa — che nei
 // due si chiama `#commessa` e `#cantiere`, ed è l'unica differenza.
@@ -739,10 +742,11 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true) {
   // rimetterebbe una fase che l'operatore ha appena riportato a «nessuna».
   //
   // Un valore messo dall'APP — la voce unica, sotto — non è una scelta e non si
-  // porta dietro: passando da `Interrato` (un solo piano, `P-1`) a `Strutture`
-  // (tutti i piani, `P-1` compreso) il menù rifatto troverebbe `P-1` fra le
-  // voci e lo terrebbe selezionato, cioè una preselezione che nessuno ha
-  // fatto. È esattamente quello che `opzioniLivello` esiste per impedire.
+  // porta dietro: quando `Interrato` era una fase con un solo piano, `P-1`,
+  // passando a `Strutture` (tutti i piani, `P-1` compreso) il menù rifatto
+  // troverebbe `P-1` fra le voci e lo terrebbe selezionato, cioè una
+  // preselezione che nessuno ha fatto. È esattamente quello che
+  // `opzioniLivello` esiste per impedire, e vale per ogni voce unica.
   //
   // `portaDietro = false` vale per la FASE (dalla 0.37.9): quando il menù si
   // rifa perché è cambiata la commessa, si riparte dal segnaposto anche se la
@@ -776,9 +780,7 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true) {
 // dall'app: chi legge il valore lo trova, e `rifaiSeServe` sa che non è una
 // scelta da portarsi dietro.
 const PERCHE_UNICA = {
-  piano: fase => fase === 'Interrato'
-    ? 'è l’unico piano interrato di questa commessa: lo sceglie l’app'
-    : 'è l’unico piano di questa commessa: lo sceglie l’app',
+  piano: () => 'è l’unico piano di questa commessa: lo sceglie l’app',
   unita: () => 'è l’unica unità di questa commessa: la sceglie l’app',
   prospetto: () => 'è l’unico prospetto di questa commessa: lo sceglie l’app',
   scala: fase => (livelliDiFase(fase).prospetto === 'O'
@@ -883,13 +885,13 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
     // fuori contesto. Per questo la fase è nella chiave di tutti i menù, e il
     // valore di prima non si porta dietro.
     rifaiSeServe(menuPiano, `piano:${codiceCommessa}:${fase}`, iniziali.piano,
-      precedente => opzioniLivello(pianiPerFase(codiceCommessa, fase), '— scegli il piano —', precedente, scappaHtml),
+      precedente => opzioniLivello(pianiDi(codiceCommessa), '— scegli il piano —', precedente, scappaHtml),
       false);
   } else if (menuPiano) {
     menuPiano.value = '';
   }
   mostraVoceUnica(radice, prefisso, 'piano', menuPiano,
-    richiestiPiano.piano ? voceUnica(pianiPerFase(codiceCommessa, fase)) : null, fase, scappaHtml);
+    richiestiPiano.piano ? voceUnica(pianiDi(codiceCommessa)) : null, fase, scappaHtml);
   const pianoScelto = menuPiano ? menuPiano.value : '';
   // Nel markup il piano sta sopra l'unità: scegliendo «Parti comuni» il suo menù
   // compare sopra quello appena toccato, e va portato sotto gli occhi.

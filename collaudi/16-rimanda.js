@@ -196,6 +196,151 @@ module.exports = {
       flow.stato.ricevuti.length === 6 && distinti(flow.stato.ricevuti) === 4 && flow.stato.giaPresenti === 2,
       'due rimandi senza modifiche non hanno aggiunto niente in raccolta, e due con modifiche sì');
 
+    // ===================================================================
+    // Elementi di prima dell'aggiornamento 0.40.0, con una fase che nell'elenco
+    // non c'è più (specifica del 26/10/2026, casi 12, 13 e 14). `Interrato` e
+    // `ImpiantiDiReteCondominiali` sono usciti dall'elenco, e niente è
+    // retroattivo: quello che era già nel telefono parte com'è, col suo
+    // codice. Il collaudo non può farli nascere dall'app, che quelle fasi non
+    // le offre più: scrive i record direttamente nel database del telefono,
+    // nella forma che l'app di prima lasciava, e poi ricarica la pagina — è
+    // quello che succede a un telefono quando l'app si aggiorna.
+    registro.titolo('Elementi di prima dell’aggiornamento: le fasi tolte partono col loro codice');
+    const base64 = require('fs').readFileSync(materiale('scatto-exif.jpg')).toString('base64');
+    const azzeraDb = async nome => {
+      // Il database si cancella dalla pagina; con l'app che lo tiene aperto la
+      // cancellazione resta in attesa, e il ricarico che segue chiude le
+      // connessioni (come in `23-palazzina-parti-comuni.js`).
+      await pagina.evaluate(n => new Promise(risolvi => {
+        const richiesta = indexedDB.deleteDatabase(n);
+        richiesta.onsuccess = richiesta.onerror = richiesta.onblocked = () => risolvi();
+      }), nome);
+      await pagina.reload();
+    };
+    const iniettaRecord = (db, versione, record) => pagina.evaluate(async ({ b64, db, versione, record }) => {
+      const blob = new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'image/jpeg' });
+      const aperto = await new Promise((ok, ko) => {
+        const r = indexedDB.open(db, versione);
+        r.onsuccess = () => ok(r.result);
+        r.onerror = () => ko(r.error);
+      });
+      // Se il database non esiste ancora, `open` lo crea vuoto e l'app non lo
+      // riempirebbe più: meglio fermarsi che lasciare un telefono rotto.
+      if (!aperto.objectStoreNames.contains('foto')) throw new Error(`database ${db} senza archivio foto`);
+      const completo = { id: crypto.randomUUID(), foto: blob, byte: blob.size, ...record };
+      if ('anteprima' in record) completo.anteprima = blob;
+      await new Promise((ok, ko) => {
+        const tx = aperto.transaction('foto', 'readwrite');
+        tx.objectStore('foto').put(completo);
+        tx.oncomplete = ok;
+        tx.onerror = () => ko(tx.error);
+      });
+      aperto.close();
+      return completo.id;
+    }, { b64: base64, db, versione, record });
+    const ora = Date.now();
+
+    // --- Caso 12: Foto in coda con `Interrato` e piano `P-1`.
+    await pagina.goto(app.indirizzo + '/index.html#/foto');
+    await pagina.waitForSelector('#commessa');
+    await azzeraDb('llitalia-foto');
+    await pagina.waitForSelector('#commessa');
+    await pagina.waitForTimeout(500);
+    const prima12 = flow.stato.ricevuti.length;
+    await iniettaRecord('llitalia-foto', 2, {
+      stato: 'in_coda', tipo: 'ARCHIVIO', genere: 'foto', estensione: 'jpg', mime: 'image/jpeg', durata: 0,
+      commessa: 'MNG', fase: 'Interrato', piano: 'P-1', unita: null, prospetto: null, scala: null,
+      autore: 'Paolo Sanzarello', nota: '', anteprima: true, nome: 'prima.jpg',
+      dataScatto: '2026-10-20T10:00:00+02:00', scattoStimato: 'NO',
+      timestampDispositivo: '2026-10-20T10:00:00+02:00', creatoIl: ora - 1000, tentativi: 0, ultimoErrore: '',
+      inviatoIl: null, progressivo: 1, urlCaricamento: '', byteInviati: 0, byteCaricati: false,
+    });
+    await pagina.reload();
+    await pagina.waitForSelector('#commessa');
+    await attendiRicevuti(prima12 + 1);
+    const vecchiaFoto = ultimo();
+    registro.dice('foto in coda con Interrato: payload', `fase ${JSON.stringify(vecchiaFoto.fase)} · piano ${JSON.stringify(vecchiaFoto.piano)} · commessa ${JSON.stringify(vecchiaFoto.commessa)}`);
+    registro.controlla('caso 12 · parte senza blocco, col suo codice: fase «Interrato», piano «P-1»',
+      vecchiaFoto.fase === 'Interrato' && vecchiaFoto.piano === 'P-1' && vecchiaFoto.commessa === 'MNG',
+      'l’elenco non blocca né riscrive quello che era già in coda');
+    await aiuto.attendi(pagina, () => document.querySelectorAll('#lista-coda .badge-inviata').length === 1,
+      'la foto risulta inviata', 30000);
+    registro.controlla('e risulta inviata, non in errore',
+      (await pagina.$$('#lista-coda .badge-errore')).length === 0
+        && (await pagina.$$('#lista-coda .badge-inviata')).length === 1);
+    const rigaFoto = await pagina.$eval('#lista-coda', e => e.textContent.replace(/\s+/g, ' ').trim());
+    registro.dice('riga in coda', rigaFoto);
+    registro.controlla('a video si legge il codice, «Interrato», invece di far sparire il dato',
+      /Interrato/.test(rigaFoto), 'etichettaFase restituisce il codice per un codice che non c’è più');
+
+    // --- Caso 14: «Rimanda» su una foto inviata con `Interrato`. Le foto
+    // delle fasi tolte non si rimandano com'erano: il menù parte da «— scegli
+    // la fase —» e senza una fase nuova il pulsante resta spento. Fino alla
+    // 0.39.0 restava spento senza dire perché, perché la fase non era fra le
+    // cose mancanti che l'app nomina; per decisione di Francesco del
+    // 26/10/2026 ora lo dice («Scegli la fase per rimandarla.»).
+    registro.titolo('«Rimanda» su una foto inviata con una fase che non c’è più');
+    await aiuto.attendi(pagina, () => Boolean(document.querySelector('.foto-rimanda')), 'Rimanda', 20000);
+    await pagina.click('.foto-rimanda');
+    await pagina.waitForSelector('#r-manda');
+    const statoRimanda = () => pagina.evaluate(() => {
+      const menu = document.querySelector('#r-fase');
+      return {
+        valore: menu.value,
+        testo: menu.options[menu.selectedIndex].textContent.trim(),
+        pulsante: document.querySelector('#r-manda').textContent.trim(),
+        spento: document.querySelector('#r-manda').disabled,
+        spiegazione: document.querySelector('#r-spiegazione').textContent.replace(/\s+/g, ' ').trim(),
+      };
+    });
+    const aperto = await statoRimanda();
+    registro.dice('Rimanda appena aperto', JSON.stringify(aperto));
+    registro.controlla('caso 14 · il menù della fase parte da «— scegli la fase —»: la fase tolta non è fra le voci',
+      aperto.valore === '' && /scegli la fase/.test(aperto.testo), `«${aperto.testo}»`);
+    registro.controlla('e il pulsante è spento con «Scegli la fase per rimandarla.»',
+      aperto.spento === true && /Scegli la fase per rimandarla\./.test(aperto.spiegazione),
+      `${aperto.pulsante} · ${aperto.spiegazione}`);
+    const prima14 = flow.stato.ricevuti.length;
+    await pagina.selectOption('#r-fase', 'Cantiere');
+    await aiuto.attendi(pagina, () => document.querySelector('#r-manda').textContent.trim() === 'Rimanda corretta',
+      'il pulsante cambia da sé', 10000);
+    registro.controlla('scelta una fase, il pulsante dice «Rimanda corretta» e si accende',
+      (await statoRimanda()).spento === false);
+    await pagina.click('#r-manda');
+    await attendiRicevuti(prima14 + 1);
+    const corretta14 = ultimo();
+    registro.dice('foto rimandata', `idClient ${corretta14.idClient} · fase ${JSON.stringify(corretta14.fase)} · piano ${JSON.stringify(corretta14.piano)}`);
+    registro.controlla('parte con la fase nuova e un idClient nuovo',
+      corretta14.fase === 'Cantiere' && corretta14.idClient !== vecchiaFoto.idClient,
+      'in raccolta deve comparire una riga diversa, non sovrascrivere quella di prima');
+
+    // --- Caso 13: Bolla in coda con `ImpiantiDiReteCondominiali`.
+    registro.titolo('Bolle: un elemento in coda con la fase sciolta parte com’è');
+    await pagina.goto(app.indirizzo + '/index.html#/bolle');
+    await pagina.waitForSelector('#cantiere');
+    await pagina.waitForTimeout(500);
+    const prima13 = flow.stato.ricevuti.length;
+    await iniettaRecord('llitalia-bolle', 4, {
+      stato: 'in_coda', cantiere: 'MNG', autore: 'Paolo Sanzarello', miniatura: null, impronta: '',
+      qualita: 'ok', motivoQualita: '', nome: 'bolla-prima.jpg', fase: 'ImpiantiDiReteCondominiali',
+      timestampDispositivo: '2026-10-20T10:00:00+02:00', creatoIl: ora - 500, tentativi: 0, ultimoErrore: '',
+      inviatoIl: null, idServer: null, progressivo: 100, idBolla: '00000000-0000-4000-8000-000000000013',
+      pagina: 1, pagine: 1,
+    });
+    await pagina.reload();
+    await pagina.waitForSelector('#cantiere');
+    await attendiRicevuti(prima13 + 1);
+    const vecchiaBolla = ultimo();
+    registro.dice('bolla in coda con ImpiantiDiReteCondominiali: payload', `fase ${JSON.stringify(vecchiaBolla.fase)} · commessa ${JSON.stringify(vecchiaBolla.commessa)}`);
+    registro.controlla('caso 13 · parte com’è, col suo codice',
+      vecchiaBolla.fase === 'ImpiantiDiReteCondominiali' && vecchiaBolla.commessa === 'MNG'
+        && vecchiaBolla.idBolla === '00000000-0000-4000-8000-000000000013',
+      'la fase sciolta non blocca la bolla: meglio una bolla col codice vecchio che una bolla ferma');
+    await aiuto.attendi(pagina, () => /ImpiantiDiReteCondominiali/.test(document.querySelector('#lista-coda').textContent),
+      'la riga mostra il codice', 20000);
+    registro.controlla('e a video si legge il codice',
+      /ImpiantiDiReteCondominiali/.test(await pagina.$eval('#lista-coda', e => e.textContent)));
+
     registro.controllaConsole(errori);
     await contesto.close();
   },

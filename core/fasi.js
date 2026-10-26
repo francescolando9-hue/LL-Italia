@@ -1,19 +1,46 @@
 // Le fasi di lavoro del gruppo: elenco chiuso, uguale per tutti i moduli.
 //
-// Il lavoro è diviso in fasi → attività → lavorazioni; qui si sceglie il
-// livello delle **fasi**, che è quello a cui una bolla di consegna o una foto
-// di cantiere si attribuisce sul momento, senza dover conoscere il
-// cronoprogramma. Elenco dato da Francesco il 14/09/2026. «CMC 128» c'era ed
-// è stata tolta lo stesso giorno su sua decisione (è un codice di commessa,
-// non una fase); «Impianto SEFCC» era in rosso nell'elenco d'origine e resta
-// finché non decide lui — togliere una voce è un rigo, aggiungerla dopo che
-// le bolle sono già partite senza è un buco.
+// **Da dove viene.** Dal 24/10/2026 il gruppo articola ogni costo in tre
+// livelli — **Fase → Attività → Lavorazione** — e l'elenco delle fasi è quello
+// del master delle fasi e attività del gruppo, versione `2026-10-24.3`: le fasi
+// con ambito «cantiere», quelle in uso. **L'app registra solo la fase**: più,
+// nel modulo Foto, i livelli dell'archivio (piano, unità, prospetto, lotto, in
+// `core/anagrafica.js`). L'attività e la lavorazione le decide chi codifica la
+// fattura, e per i materiali l'attività la porta il codice articolo: non
+// entrano nell'app. `gen` e `tec` (spese generali, commessa `UFF`) non sono
+// fasi di cantiere e non sono qui. `Lotto1`–`Lotto3` non sono fasi: sono i
+// lotti di SNU e BRU, e prendono il posto della fase solo su quelle commesse.
+//
+// **Due voci sono uscite col passaggio, quattro sono entrate.**
+// - `Interrato` non è più una fase: l'interrato si legge dal **piano**, su
+//   tutte le fasi. Chi scatta decide la fase dall'oggetto, non da chi lavora:
+//   box, cantine, basculanti, pavimenti e finiture dell'interrato sono `Finitura
+//   parti comuni interne` col piano interrato; gli impianti di box, cantine e
+//   autorimessa `Impianto elettrico parti comuni`; il cemento armato resta
+//   `Strutture`; scavo e reinterro `Scavi`.
+// - `ImpiantiDiReteCondominiali` è sciolta in `FognaturaNera` e
+//   `FognaturaBianca`: scarichi e collettori in PEAD vanno in una delle due, a
+//   qualunque piano, interrato compreso.
+// - Entrano `AcquistoTerreno`, `FognaturaBianca`, `FognaturaNera`, `SpeseTecniche`.
+//
+// **Niente è retroattivo.** Un elemento già in coda con una fase tolta parte
+// com'è, col suo codice: l'elenco non lo blocca e non lo riscrive, e a video si
+// legge il codice (vedi `etichettaFase`). Le foto già archiviate restano dove sono.
+//
+// **L'elenco non si ritocca a mano.** È la copia di un master che vive fuori da
+// questo repository e cambia solo con una consegna da Cowork: il collaudo
+// `12-fase-e-barra.js` ricalcola l'impronta SHA-256 delle etichette, nell'ordine
+// dell'elenco, e la confronta con quella del master della versione dichiarata.
+// Una voce aggiunta, tolta, rinominata o spostata fa diventare rosso il
+// collaudo. Chi aggiunge una fase tocca anche `core/anagrafica.js` (cosa
+// pretende): un secondo collaudo verifica che i due elenchi combacino.
 //
 // CODICE ed ETICHETTA, come per i cantieri (core/cantieri.js) e le categorie
 // delle foto. **Viaggia il codice**, senza spazi e in PascalCase; a video si
-// legge l'etichetta, con gli spazi al posto giusto. Deciso il 15/09/2026,
-// quando si è deciso che sul server le foto d'archivio si smistano in una
-// cartella per fase (`…\[Fase]\[AAAAMM]\`): le cartelle non possono avere
+// legge l'etichetta, con gli spazi al posto giusto e con la grafia del master
+// (`Impianto Antincendio` ha la maiuscola interna, ed è così). Deciso il
+// 15/09/2026, quando si è deciso che sul server le foto d'archivio si smistano
+// in una cartella per fase (`…\[Fase]\[AAAAMM]\`): le cartelle non possono avere
 // spazi, e se il valore in colonna fosse «Finitura alloggi» mentre la
 // cartella si chiama «FinituraAlloggi» servirebbe una tabella di conversione
 // — una seconda verità che il giorno che si aggiunge una fase si disallinea
@@ -37,14 +64,13 @@
 // operatori (core/operatori.js). «Murature», «murature», «Muratura» e
 // «Murat.» in raccolta sono quattro fasi, e nessun conteggio per fase regge.
 //
-// Ordine alfabetico, non per frequenza: sono ventisette voci, e in un elenco
-// lungo si cerca per lettera, non per abitudine.
-//
-// `Sistemazione esterna` aggiunta il 18/09/2026 su decisione di Francesco.
-// «Sistemazione esterna» è anche il nome di un'attività in contabilità: la
-// coincidenza è nota e accettata, e si governa a valle qualificando il dominio
-// in una colonna — non rinominando quello che l'operatore legge in cantiere.
+// Ordine alfabetico **sull'etichetta**, cioè sulla stringa che si legge a
+// video — confronto italiano, senza distinzione di maiuscole e accenti —, non
+// per frequenza e non per codice: sono ventinove voci, e in un elenco lungo si
+// cerca per lettera, non per abitudine. Chi aggiunge una voce non decide dove
+// metterla.
 export const FASI = [
+  { codice: 'AcquistoTerreno', etichetta: 'Acquisto terreno' },
   { codice: 'Bonifica', etichetta: 'Bonifica' },
   { codice: 'Cantiere', etichetta: 'Cantiere' },
   { codice: 'Consolidamento', etichetta: 'Consolidamento' },
@@ -53,8 +79,9 @@ export const FASI = [
   { codice: 'FinituraAlloggi', etichetta: 'Finitura alloggi' },
   { codice: 'FinituraFacciata', etichetta: 'Finitura facciata' },
   { codice: 'FinituraPartiComuniInterne', etichetta: 'Finitura parti comuni interne' },
+  { codice: 'FognaturaBianca', etichetta: 'Fognatura bianca' },
+  { codice: 'FognaturaNera', etichetta: 'Fognatura nera' },
   { codice: 'Impermeabilizzazioni', etichetta: 'Impermeabilizzazioni' },
-  { codice: 'ImpiantiDiReteCondominiali', etichetta: 'Impianti di rete condominiali' },
   { codice: 'ImpiantoAntincendio', etichetta: 'Impianto Antincendio' },
   { codice: 'ImpiantoAscensore', etichetta: 'Impianto ascensore' },
   { codice: 'ImpiantoElettricoAlloggi', etichetta: 'Impianto elettrico alloggi' },
@@ -64,12 +91,12 @@ export const FASI = [
   { codice: 'ImpiantoSEFCC', etichetta: 'Impianto SEFCC' },
   { codice: 'ImpiantoTermicoAlloggi', etichetta: 'Impianto termico alloggi' },
   { codice: 'ImpiantoTermicoCondominiale', etichetta: 'Impianto termico condominiale' },
-  { codice: 'Interrato', etichetta: 'Interrato' },
   { codice: 'Marketing', etichetta: 'Marketing' },
   { codice: 'Murature', etichetta: 'Murature' },
   { codice: 'Ponteggio', etichetta: 'Ponteggio' },
   { codice: 'Scavi', etichetta: 'Scavi' },
   { codice: 'SistemazioneEsterna', etichetta: 'Sistemazione esterna' },
+  { codice: 'SpeseTecniche', etichetta: 'Spese tecniche' },
   { codice: 'Strutture', etichetta: 'Strutture' },
   { codice: 'Urbanizzazioni', etichetta: 'Urbanizzazioni' },
 ];
@@ -79,7 +106,8 @@ export function faseValida(codice) {
 }
 
 // A video si legge l'etichetta; se arriva un codice che non c'è — una fase
-// tolta dall'elenco, una bolla vecchia — si mostra il codice così com'è
+// tolta dall'elenco (`Interrato`, `ImpiantiDiReteCondominiali`), una bolla o
+// una foto accodate prima dell'aggiornamento — si mostra il codice così com'è
 // invece di far sparire il dato.
 export function etichettaFase(codice) {
   const trovata = FASI.find(f => f.codice === codice);
@@ -87,7 +115,6 @@ export function etichettaFase(codice) {
 }
 
 // Le opzioni del menù a tendina NON si costruiscono qui: le costruisce
-// `core/anagrafica.js` (`opzioniFaseOLotto`), perché dalla 0.36.0 dipendono
-// dalla commessa — un'urbanizzazione mostra i lotti al posto delle fasi, e una
-// commessa senza piani interrati non mostra `Interrato`. Questo file resta
-// quello che era: l'elenco chiuso, e niente di più.
+// `core/anagrafica.js` (`opzioniFaseOLotto`), perché dipendono dalla commessa —
+// un'urbanizzazione mostra i lotti al posto delle fasi, un edificio le mostra
+// tutte. Questo file resta quello che era: l'elenco chiuso, e niente di più.

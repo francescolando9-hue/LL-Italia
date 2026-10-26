@@ -4,7 +4,10 @@
 // fra le 16:31 e le 16:37, dallo stesso telefono con la 0.37.6, sono partite
 // 38 bolle consecutive di calcestruzzo — il pavimento dell'autorimessa, fase
 // giusta `Interrato` — tutte con la fase `FinituraPartiComuniInterne`.
-// Quaranta righe di magazzino corrette a mano.
+// Quaranta righe di magazzino corrette a mano. (Dal 26/10/2026 `Interrato`
+// non è più una fase: l'interrato si legge dal piano. Il caso resta com'è
+// come storia, e dove la prova sceglieva `Interrato` ora sceglie `Strutture`:
+// serve una fase diversa da `Cantiere`, quella in memoria sul telefono.)
 //
 // Il meccanismo era doppio, e il collaudo li prova separatamente perché
 // toglierne uno solo non basta:
@@ -152,7 +155,7 @@ module.exports = {
     // diversi), e la fase scelta vale per tutte quelle dell'invio.
     await pagina.selectOption('#cantiere', 'MNG');
     await attendiMenu('MNG');
-    await pagina.selectOption('#fase', 'Interrato');
+    await pagina.selectOption('#fase', 'Strutture');
     await pagina.setInputFiles('#input-galleria',
       [materiale('bolla.jpg'), materiale('bolla2.jpg'), materiale('foto-cantiere.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-anteprima').length === 3, 'tre anteprime', 90000);
@@ -163,7 +166,7 @@ module.exports = {
     const tre = ultimi(3);
     registro.dice('le tre bolle dello stesso invio', tre.map(r => `${r.fase} · bolla ${String(r.idBolla).slice(0, 8)} · pagina ${r.pagina}/${r.pagine}`));
     registro.controlla('tutte e tre con la fase scelta per quell’invio',
-      tre.every(r => r.fase === 'Interrato'));
+      tre.every(r => r.fase === 'Strutture'));
     registro.controlla('e sono tre bolle, non una di tre pagine',
       new Set(tre.map(r => r.idBolla)).size === 3 && tre.every(r => r.pagine === 1));
     registro.controlla('finito l’invio, la fase riparte', (await statoFase()).valore === '');

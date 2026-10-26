@@ -820,7 +820,14 @@ function lettureRimando(riquadro, record) {
     || !uguale(livelli.prospetto, record.prospetto)
     || !uguale(livelli.scala, record.scala)
     || !uguale(nota, record.nota);
-  const mancanti = [!commessa && 'il cantiere', ...livelli.mancanti].filter(Boolean);
+  // **La fase manca quando non c'è più** (dalla 0.40.0, decisione di Francesco
+  // del 26/10/2026). Una foto inviata con una fase uscita dall'elenco
+  // (`Interrato`, `ImpiantiDiReteCondominiali`) riapre il riquadro con la fase
+  // sul segnaposto, e senza questo controllo «Rimanda corretta» restava accesa e
+  // rimandava la foto con `fase` vuota e `piano` perso: in raccolta una foto che
+  // non sa in quale cartella andare. Nel modulo Foto la fase è obbligatoria su
+  // ogni invio, e «Rimanda» non fa eccezione.
+  const mancanti = [!commessa && 'il cantiere', !livelli.fase && 'la fase', ...livelli.mancanti].filter(Boolean);
   return { commessa, livelli, nota, cambiato, mancanti };
 }
 
