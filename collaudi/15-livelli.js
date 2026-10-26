@@ -96,10 +96,12 @@ module.exports = {
       const fasi = await import('./core/fasi.js');
       const ana = await import('./core/anagrafica.js');
       const codici = fasi.FASI.map(f => f.codice);
+      const etichette = fasi.FASI.map(f => f.etichetta);
       const chiavi = Object.keys(ana.ANAGRAFICA.livelliPerFase);
       const lotti = chiavi.filter(k => /^Lotto\d+$/.test(k));
       return {
         fasi: codici,
+        etichette,
         senzaRegola: codici.filter(c => !chiavi.includes(c)),
         regolaSenzaFase: chiavi.filter(k => !lotti.includes(k) && !codici.includes(k)),
         lotti,
@@ -116,9 +118,15 @@ module.exports = {
     registro.controlla('i codici di lotto sono i tre attesi',
       coerenza.lotti.join(',') === 'Lotto1,Lotto2,Lotto3', coerenza.lotti.join(' '),
       'Lotto4 è uscito dal master il 05/10/2026: SNU ha tre lotti, come BRU');
-    registro.controlla('in ordine alfabetico',
-      coerenza.fasi.join(',') === [...coerenza.fasi].sort((a, b) => a.localeCompare(b, 'it')).join(','),
-      'in un elenco di ventisette voci si cerca per lettera, non per abitudine');
+    // L'ordine è quello dell'ETICHETTA, la stringa che si legge a video, non
+    // quello del codice: «Impianto Antincendio» e «ImpiantoAntincendio» non
+    // ordinano allo stesso modo di «Impianto ascensore» e «ImpiantoAscensore»
+    // se si confronta il codice senza spazi. Confronto italiano, senza
+    // distinzione di maiuscole e accenti.
+    const perEtichetta = [...coerenza.etichette].sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+    registro.controlla('in ordine alfabetico sull’etichetta, come si legge a video',
+      coerenza.etichette.join('|') === perEtichetta.join('|'),
+      'in un elenco di ventinove voci si cerca per lettera, non per abitudine');
 
     // **L'anagrafica è la copia di un master che vive su L:**, e qui si
     // controlla che sia ESATTAMENTE quella copia: l'impronta SHA-256 della
@@ -139,8 +147,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202610101049';
-    const IMPRONTA_MASTER = 'df5dd3f6ecb6075ee74d70b7efd2de30be70f2d471b05617a725d680141495a8';
+    const VERSIONE_MASTER = '202610261235';
+    const IMPRONTA_MASTER = 'ecb2c273fa623b24291ba792530d12359e1c4ae0c0f996c2e980a31729a12ec4';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -184,7 +192,6 @@ module.exports = {
           crescente: p.every((x, i) => i === 0 || Number(x.ordine) > Number(p[i - 1].ordine)),
           unita: a.unitaDi(c).length,
           unitaSulTetto: a.unitaDi(c).filter(u => u.piano === 'Tetto').length,
-          tettoInInterrato: a.pianiPerFase(c, 'Interrato').some(x => x.codice === 'Tetto'),
         };
       }
       for (const c of ['SNU', 'BRU']) out.lotti[c] = a.lottiDi(c).map(l => l.codice || l);
@@ -203,6 +210,17 @@ module.exports = {
           }
         }
       }
+      // Quante fasi pretendono quale livello (O = obbligatorio, - = nessuno):
+      // dal passaggio del 26/10/2026 sono 10 per il piano, 4 per l'unità, 1 per
+      // il prospetto e 14 senza livelli, su 29.
+      const perLivello = { piano: 0, unita: 0, prospetto: 0, nessuno: 0 };
+      for (const f of FASI.map(x => x.codice)) {
+        const r = a.ANAGRAFICA.livelliPerFase[f];
+        const richiesti = ['piano', 'unita', 'prospetto'].filter(l => r[l] === 'O');
+        for (const l of richiesti) perLivello[l] += 1;
+        if (richiesti.length === 0) perLivello.nessuno += 1;
+      }
+      out.perLivello = perLivello;
       out.combinazioni = combinazioni;
       out.uniche = uniche;
       out.senzaVoci = senzaVoci;
@@ -250,7 +268,12 @@ module.exports = {
       return out;
     });
     registro.dice('numeri dell’anagrafica', numeri);
-    registro.controlla('30 voci per fase: 27 fasi e 3 lotti', numeri.voci === 30, String(numeri.voci));
+    registro.controlla('32 voci per fase: 29 fasi e 3 lotti', numeri.voci === 32, String(numeri.voci));
+    registro.controlla('fasi per livello: 10 a piano, 4 a unità, 1 a prospetto, 14 senza livelli',
+      numeri.perLivello.piano === 10 && numeri.perLivello.unita === 4
+        && numeri.perLivello.prospetto === 1 && numeri.perLivello.nessuno === 14,
+      `piano ${numeri.perLivello.piano} · unità ${numeri.perLivello.unita} · prospetto ${numeri.perLivello.prospetto} · nessuno ${numeri.perLivello.nessuno}`,
+      'sono 29 fasi: 10 + 4 + 1 + 14, e nessuna fase pretende due livelli obbligatori');
     registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
       numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
     registro.controlla('in tutte le commesse edificio il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
@@ -261,21 +284,20 @@ module.exports = {
       'il Tetto è un piano a sé, non una parte comune e non un alloggio');
     registro.controlla('unità invariate: MAR 15, MNG 16, SNZ2.2 51',
       numeri.edifici.MAR.unita === 15 && numeri.edifici.MNG.unita === 16 && numeri.edifici['SNZ2.2'].unita === 51);
-    registro.controlla('e il filtro di Interrato esclude il Tetto',
-      Object.values(numeri.edifici).every(e => !e.tettoInInterrato),
-      'ordine positivo: «Interrato, Tetto» non è una cartella che qualcuno cerchi');
     registro.controlla('lotti: SNU 3, BRU 3',
       numeri.lotti.SNU.join(',') === 'Lotto1,Lotto2,Lotto3' && numeri.lotti.BRU.join(',') === 'Lotto1,Lotto2,Lotto3');
     registro.controlla('le commesse del conteggio sono quelle del menù che hanno un edificio: MAR, MNG, SNZ2.2, TN1',
       numeri.edificiElenco.join(',') === 'MAR,MNG,SNZ2.2,TN1', numeri.edificiElenco.join(' '),
       'l’elenco si ricava da core/cantieri.js e dall’anagrafica, non si scrive a mano');
-    registro.controlla('voce unica: due combinazioni su 60, SNZ2.2 · Interrato · P-1 e TN1 · Interrato · P-1',
-      numeri.combinazioni === 60 && numeri.uniche.length === 2
-        && numeri.uniche[0] === 'SNZ2.2 · Interrato · P-1' && numeri.uniche[1] === 'TN1 · Interrato · P-1',
+    // Erano due, `SNZ2.2 · Interrato · P-1` e `TN1 · Interrato · P-1`, e una
+    // senza voci, `MAR · Interrato`: tutte e tre dipendevano da `Interrato`,
+    // che dal 26/10/2026 non è più una fase. Il caso 16 della specifica, la voce
+    // unica del piano, si prova con una commessa sintetica più sotto.
+    registro.controlla('60 combinazioni di commessa, fase e livello obbligatorio: 15 per commessa, e nessuna a voce unica',
+      numeri.combinazioni === 60 && numeri.uniche.length === 0,
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
-    registro.controlla('e una sola senza voci: MAR · Interrato, la fase che MAR non mostra',
-      numeri.senzaVoci.length === 1 && numeri.senzaVoci[0] === 'MAR · Interrato · piano',
-      numeri.senzaVoci.join(' ; ') || 'nessuna');
+    registro.controlla('e nessuna senza voci: ogni livello obbligatorio ha qualcosa da scegliere',
+      numeri.senzaVoci.length === 0, numeri.senzaVoci.join(' ; ') || 'nessuna');
 
     registro.titolo('Le scale, TN1 e le parti comuni (master 202610101049)');
     const sm = numeri.scale.MAR;
@@ -344,45 +366,69 @@ module.exports = {
     registro.controlla('su un edificio l’etichetta torna «Fase di lavoro»',
       (await pagina.$eval('#etichetta-fase', e => e.textContent.trim())) === 'Fase di lavoro');
 
-    registro.titolo('Il filtro su Interrato, nei due versi');
+    registro.titolo('Le fasi sono le stesse su ogni edificio');
     const fasiMAR = await voci('#fase');
     registro.dice('MAR: quante fasi', String(fasiMAR.length));
-    registro.controlla('MAR non mostra la fase Interrato', !fasiMAR.includes('Interrato'),
-      'MAR non ha piani sotto quota: offrirla sarebbe offrire una cartella che non esisterà mai');
-    registro.controlla('e ne mostra esattamente una in meno delle 27',
-      fasiMAR.length === 26, String(fasiMAR.length),
-      'il conteggio dice che il filtro toglie UNA voce e non due: senza, «non c’è Interrato» starebbe anche con mezzo elenco mancante');
     await scegliCommessa('#commessa', 'MNG');
     const fasiMNG = await voci('#fase');
-    registro.controlla('MNG la mostra, perché ha due interrati', fasiMNG.includes('Interrato'));
-    registro.controlla('e sono tutte e 27', fasiMNG.length === 27, String(fasiMNG.length));
-    await scegliFase('Interrato');
-    const pianiInterrato = await voci('#piano');
-    registro.dice('MNG, fase Interrato: piani offerti', pianiInterrato.join(' '));
-    registro.controlla('per Interrato solo i piani sotto quota',
-      pianiInterrato.join(',') === 'P-2,P-1',
-      '«Interrato, piano terzo» è una scelta che non vuol dire niente');
-    registro.controlla('e il menù del piano si vede, perché c’è da scegliere',
-      await visibile('#piano') && !(await visibile('#unico-piano')),
-      'due voci: si chiede, come sempre');
+    registro.dice('MNG: quante fasi', String(fasiMNG.length));
+    // Fino al 26/10/2026 MAR ne mostrava una in meno di MNG: senza piani sotto
+    // quota non offriva `Interrato`, perché sarebbe stata una cartella che non
+    // sarebbe mai esistita. Quella fase non c'è più — l'interrato si legge dal
+    // piano — e con lei il filtro: i due elenchi devono essere lo stesso.
+    registro.controlla('MAR e MNG mostrano le stesse 29 fasi, nello stesso ordine',
+      fasiMAR.length === 29 && fasiMNG.join(',') === fasiMAR.join(','),
+      `MAR ${fasiMAR.length} · MNG ${fasiMNG.length}`,
+      'un elenco diverso fra due edifici vorrebbe dire che un filtro è rimasto acceso');
+    registro.controlla('e né Interrato né ImpiantiDiReteCondominiali, che non sono più fasi',
+      ![...fasiMAR, ...fasiMNG].some(v => v === 'Interrato' || v === 'ImpiantiDiReteCondominiali'));
 
-    // **Una voce sola: non si chiede** (dalla 0.37.7). SNZ2.2 ha un solo piano
-    // sotto quota, e l'app apriva lo stesso un menù con «— scegli il piano —»
-    // e `P-1` come unica voce: un tocco obbligatorio per una scelta che non
-    // c'era. Previsione scritta prima di provare: menù nascosto, valore scritto
-    // a video, Invia acceso senza toccare niente, `piano: "P-1"` nel payload.
-    registro.titolo('Un piano solo possibile: non si chiede, lo sceglie l’app');
-    await scegliCommessa('#commessa', 'SNZ2.2');
-    await scegliFase('Interrato');
-    registro.controlla('su SNZ2.2 c’è un interrato solo', (await voci('#piano')).join(',') === 'P-1');
+    // **Una voce sola: non si chiede** (dalla 0.37.7). Il caso vero era SNZ2.2
+    // con un solo piano sotto quota e la fase `Interrato`: una tendina con
+    // `P-1` come unica voce, cioè un tocco obbligatorio per una scelta che non
+    // c'era. Dal 26/10/2026 `Interrato` non è più una fase, e con le commesse
+    // di oggi nessuna combinazione ha una voce sola: la regola resta nel
+    // codice (vale per piano, unità, prospetto e lotto) ma non ha più un caso
+    // reale su cui provarla. Si prova allora con una **commessa sintetica**, un
+    // solo piano per una fase a piano obbligatorio, messa in memoria dalla
+    // pagina e tolta a fine prova: non entra nei dati, e nel codice dell'app
+    // non si è toccato niente. Previsione scritta prima di provare: menù del
+    // piano nascosto, valore e perché a video, Invia acceso senza toccare
+    // niente, `piano: "P0"` nel payload.
+    registro.titolo('Un piano solo possibile: non si chiede, lo sceglie l’app (commessa sintetica)');
+    const ridisegnaFoto = async () => {
+      // La vista Foto costruisce il menù delle commesse e quello dei livelli
+      // quando si apre: dopo aver cambiato i dati in memoria si esce e si
+      // rientra, senza ricaricare la pagina (un ricarico rifarebbe i moduli).
+      await pagina.goto(app.indirizzo + '/index.html#/bolle');
+      await pagina.waitForSelector('#cantiere');
+      await pagina.goto(app.indirizzo + '/index.html#/foto');
+      await pagina.waitForSelector('#commessa');
+    };
+    await pagina.evaluate(async () => {
+      const a = await import('./core/anagrafica.js');
+      const { CANTIERI } = await import('./core/cantieri.js');
+      a.ANAGRAFICA.commesse.SINT1 = {
+        tipo: 'edificio',
+        piani: [{ codice: 'P0', etichetta: 'Piano terra', ordine: 0 }],
+        unita: { P0: ['A01', 'A02'] },
+        etichetteUnita: {}, prospetti: ['Nord', 'Sud'],
+      };
+      CANTIERI.push({ codice: 'SINT1', etichetta: 'SINT1 - commessa di prova' });
+    });
+    await ridisegnaFoto();
+    await scegliCommessa('#commessa', 'SINT1');
+    await scegliFase('Strutture');
+    registro.controlla('la commessa sintetica ha un piano solo, e Strutture lo pretende',
+      (await voci('#piano')).join(',') === 'P0');
     registro.controlla('il menù del piano NON si vede',
       !(await visibile('#piano')),
       'una tendina con una voce sola è un tocco per niente');
     const unico = await pagina.$eval('#unico-piano', e => e.textContent.replace(/\s+/g, ' ').trim());
     registro.dice('al suo posto si legge', unico);
     registro.controlla('al suo posto si legge il piano che parte, e perché',
-      await visibile('#unico-piano') && /P-1/.test(unico) && /Primo piano interrato/.test(unico)
-        && /unico piano interrato/.test(unico),
+      await visibile('#unico-piano') && /P0/.test(unico) && /Piano terra/.test(unico)
+        && /unico piano di questa commessa/.test(unico),
       'l’operatore deve vedere in che cartella va la foto anche quando non c’è niente da scegliere');
     registro.controlla('il campo «Piano» resta a video', await visibile('#campo-piano'));
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
@@ -396,36 +442,42 @@ module.exports = {
     while (flow.stato.ricevuti.length === primaUnico && Date.now() < fineUnico) {
       await new Promise(r => setTimeout(r, 300));
     }
-    const interrato = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
-    registro.dice('payload', `fase: ${JSON.stringify(interrato.fase)} · piano: ${JSON.stringify(interrato.piano)}`);
-    registro.controlla('nel payload il piano c’è, ed è P-1',
-      interrato.fase === 'Interrato' && interrato.piano === 'P-1',
-      'non chiederlo non vuol dire non mandarlo: a valle il percorso è Interrato\\P-1\\');
+    const sintetico = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    registro.dice('payload', `fase: ${JSON.stringify(sintetico.fase)} · piano: ${JSON.stringify(sintetico.piano)}`);
+    registro.controlla('nel payload il piano c’è, ed è P0',
+      sintetico.fase === 'Strutture' && sintetico.piano === 'P0',
+      'non chiederlo non vuol dire non mandarlo: a valle il percorso è Strutture\\P0\\');
 
     // La trappola: il valore messo dall'app non deve diventare una scelta.
-    // `Strutture` su SNZ2.2 offre TUTTI i piani, `P-1` compreso: se il menù
-    // rifatto si portasse dietro il valore di prima, `P-1` resterebbe
+    // Si ricompone la stessa commessa (dopo Invia cantiere e fase tornano
+    // vuoti), si sceglie la fase e l'app mette `P0`; poi la commessa «prende»
+    // un secondo piano e si cambia fase: il menù rifatto ha due voci, `P0`
+    // compreso. Se si portasse dietro il valore di prima, `P0` resterebbe
     // selezionato senza che nessuno l'abbia scelto — una preselezione, cioè
-    // la foto nella cartella sbagliata senza far rumore. Il caso è scelto
-    // perché possa fallire: con una fase che `P-1` non ce l'ha, il valore
+    // la foto nella cartella sbagliata senza far rumore. Il secondo piano si
+    // aggiunge DOPO aver visto la voce unica, così il caso può fallire: con
+    // una fase che `P0` non ce l'ha, o con una voce sola anche dopo, il valore
     // cadrebbe da sé e la prova non proverebbe niente.
     registro.titolo('Il piano scelto dall’app non si porta dietro come scelta');
-    // Dentro UNA composizione, senza invii in mezzo: dalla 0.38.0 dopo Invia
-    // cantiere e fase tornano vuoti, quindi la trappola si ricostruisce da
-    // capo — SNZ2.2, Interrato (l'app sceglie P-1), poi Strutture.
-    await scegliCommessa('#commessa', 'SNZ2.2');
-    await scegliFase('Interrato');
-    registro.controlla('di nuovo su Interrato, P-1 lo sceglie l’app',
-      (await pagina.$eval('#piano', e => e.value)) === 'P-1' && await visibile('#unico-piano'));
+    await scegliCommessa('#commessa', 'SINT1');
     await scegliFase('Strutture');
-    const pianiStrutture = await voci('#piano');
-    registro.dice('SNZ2.2, Strutture: piani offerti', pianiStrutture.join(' '));
-    registro.controlla('Strutture offre anche P-1, quindi la prova può fallire',
-      pianiStrutture.includes('P-1') && pianiStrutture.length > 1);
+    registro.controlla('di nuovo su Strutture, P0 lo sceglie l’app',
+      (await pagina.$eval('#piano', e => e.value)) === 'P0' && await visibile('#unico-piano'));
+    await pagina.evaluate(async () => {
+      const a = await import('./core/anagrafica.js');
+      const s = a.ANAGRAFICA.commesse.SINT1;
+      s.piani.push({ codice: 'P1', etichetta: 'Piano primo', ordine: 1 });
+      s.unita.P1 = ['A11'];
+    });
+    await scegliFase('Murature');
+    const pianiMurature = await voci('#piano');
+    registro.dice('SINT1 con due piani, Murature: piani offerti', pianiMurature.join(' '));
+    registro.controlla('Murature offre anche P0, quindi la prova può fallire',
+      pianiMurature.includes('P0') && pianiMurature.length === 2);
     registro.controlla('il menù torna a vedersi', await visibile('#piano') && !(await visibile('#unico-piano')));
-    registro.controlla('e parte dal segnaposto, NON da P-1',
+    registro.controlla('e parte dal segnaposto, NON da P0',
       (await pagina.$eval('#piano', e => e.value)) === '',
-      'P-1 l’aveva messo l’app per Interrato: per Strutture la scelta è dell’operatore');
+      'P0 l’aveva messo l’app per Strutture: per Murature la scelta è dell’operatore');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
     registro.controlla('e senza scelta Invia resta spento',
@@ -434,6 +486,78 @@ module.exports = {
     // La conferma «Eliminare questa foto?» la accetta già `nuovoTelefono`.
     await pagina.click('.foto-rimuovi');
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 0, 'foto tolta', 10000);
+    // La commessa sintetica si toglie: fuori da questo blocco i dati sono
+    // quelli veri, e la vista si ridisegna senza la sua voce.
+    await pagina.evaluate(async () => {
+      const a = await import('./core/anagrafica.js');
+      const { CANTIERI } = await import('./core/cantieri.js');
+      delete a.ANAGRAFICA.commesse.SINT1;
+      CANTIERI.splice(CANTIERI.findIndex(c => c.codice === 'SINT1'), 1);
+    });
+    await ridisegnaFoto();
+    registro.controlla('tolta la commessa sintetica, il menù ha di nuovo le otto commesse vere',
+      (await voci('#commessa')).join(',') === 'BRU,MAR,MNG,MRS,SNU,SNZ2.1,SNZ2.2,TN1',
+      (await voci('#commessa')).join(','));
+
+    // Le fasi entrate col passaggio del 26/10/2026 e quelle che hanno preso il
+    // posto di `Interrato`: ognuna col suo comportamento, perché sono i casi
+    // nuovi e non c'è un controllo vecchio che li copra.
+    registro.titolo('Le fasi entrate e quelle sciolte: Fognatura, Parti comuni interne, Spese, Terreno');
+    await scegliCommessa('#commessa', 'MNG');
+    await scegliFase('FognaturaNera');
+    const pianiFognatura = await voci('#piano');
+    registro.dice('MNG, FognaturaNera: piani offerti', pianiFognatura.join(' '));
+    registro.controlla('Fognatura nera chiede il piano, e sono i 12 di MNG',
+      pianiFognatura.length === 12 && await visibile('#piano') && !(await visibile('#unico-piano')),
+      `${pianiFognatura.length} voci`);
+    registro.controlla('e non chiede unità né prospetto',
+      !(await visibile('#campo-unita')) && !(await visibile('#campo-prospetto')));
+    await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+    registro.controlla('senza il piano Invia resta spento', await pagina.$eval('#invia', e => e.disabled),
+      'scarichi e collettori vanno in una cartella per piano, interrato compreso: la cartella non si indovina');
+    await pagina.selectOption('#piano', 'P-1');
+    await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+    const primaFogna = flow.stato.ricevuti.length;
+    await pagina.click('#invia');
+    const fineFogna = Date.now() + 90000;
+    while (flow.stato.ricevuti.length === primaFogna && Date.now() < fineFogna) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const fogna = flow.stato.ricevuti[flow.stato.ricevuti.length - 1];
+    registro.dice('payload', `fase: ${JSON.stringify(fogna.fase)} · piano: ${JSON.stringify(fogna.piano)} · unita: ${JSON.stringify(fogna.unita)} · prospetto: ${JSON.stringify(fogna.prospetto)} · scala: ${JSON.stringify(fogna.scala)}`);
+    registro.controlla('l’interrato si legge dal piano: fase FognaturaNera, piano P-1, il resto null',
+      fogna.fase === 'FognaturaNera' && fogna.piano === 'P-1'
+        && fogna.unita === null && fogna.prospetto === null && fogna.scala === null,
+      'a valle il percorso è FognaturaNera\\P-1\\');
+
+    await scegliCommessa('#commessa', 'SNZ2.2');
+    await scegliFase('FinituraPartiComuniInterne');
+    const pianiPC = await voci('#piano');
+    registro.dice('SNZ2.2, FinituraPartiComuniInterne: piani offerti', pianiPC.join(' '));
+    registro.controlla('Finitura parti comuni interne offre i 15 piani di SNZ2.2, P-1 compreso',
+      pianiPC.length === 15 && pianiPC.includes('P-1'), `${pianiPC.length} voci`);
+    registro.controlla('nessuna voce unica: il menù si vede e P-1 non è scelto dall’app',
+      await visibile('#piano') && !(await visibile('#unico-piano'))
+        && (await pagina.$eval('#piano', e => e.value)) === '',
+      'su SNZ2.2 box e cantine stavano in «Interrato» col P-1 scelto dall’app; ora la fase è di chi scatta e il piano lo sceglie lui');
+    const comuni = await mandaFoto('SNZ2.2', 'FinituraPartiComuniInterne', { piano: 'P-1' });
+    registro.dice('payload', `fase: ${JSON.stringify(comuni.fase)} · piano: ${JSON.stringify(comuni.piano)}`);
+    registro.controlla('scelto P-1 parte FinituraPartiComuniInterne con P-1',
+      comuni.fase === 'FinituraPartiComuniInterne' && comuni.piano === 'P-1');
+
+    for (const fase of ['SpeseTecniche', 'AcquistoTerreno']) {
+      await scegliCommessa('#commessa', 'MNG');
+      await scegliFase(fase);
+      registro.controlla(`${fase}: nessun livello chiesto`,
+        !(await visibile('#campo-piano')) && !(await visibile('#campo-unita')) && !(await visibile('#campo-prospetto')));
+      const senzaLivelli = await mandaFoto('MNG', fase);
+      registro.dice(`${fase}: payload`, `fase: ${JSON.stringify(senzaLivelli.fase)} · piano: ${JSON.stringify(senzaLivelli.piano)}`);
+      registro.controlla(`${fase}: Invia si accende con la sola fase e il payload non ha livelli`,
+        senzaLivelli.fase === fase && senzaLivelli.piano === null && senzaLivelli.unita === null
+          && senzaLivelli.prospetto === null && senzaLivelli.scala === null,
+        'a valle il percorso è la cartella del mese: AAAAMM');
+    }
 
     registro.titolo('Piano obbligatorio: senza, non si parte');
     await scegliCommessa('#commessa', 'MAR');
@@ -543,8 +667,8 @@ module.exports = {
     // scattando per un dato che manca in ufficio.
     await scegliCommessa('#commessa', 'MRS');
     const fasiMRS = await voci('#fase');
-    registro.controlla('una commessa senza anagrafica mostra tutte e 27 le fasi',
-      fasiMRS.length === 27 && fasiMRS.includes('Interrato'), String(fasiMRS.length));
+    registro.controlla('una commessa senza anagrafica mostra tutte e 29 le fasi, e non Interrato',
+      fasiMRS.length === 29 && !fasiMRS.includes('Interrato'), String(fasiMRS.length));
     const senzaAnagrafica = await mandaFoto('MRS', 'Strutture');
     registro.controlla('e non chiede il piano, perché non ne ha da offrire',
       senzaAnagrafica.piano === null,
