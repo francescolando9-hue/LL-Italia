@@ -4,7 +4,8 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
-import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
+import { messaggioSalvataggio, memoriaPiena, righeAvvisoRitardo } from '../../core/errori.js';
+import { elementiInRitardo, CONTROLLO_RITARDO_MS } from '../../core/coda-invio.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
@@ -135,8 +136,12 @@ async function vista(el) {
     ? '<p class="avviso avviso-attenzione">Modalità mock attiva: invii simulati, nessun dato lascia il dispositivo.</p>'
     : '';
 
+  // **In cima, solo quando c'è un problema** (dalla 0.41.0, decisione di
+  // Francesco del 26/10/2026): un elemento non arrivato 10 minuti dopo essere
+  // entrato in coda. Quando tutto è in ordine qui non c'è niente; i contatori
+  // del giorno stanno in fondo, dopo «Coda invii». Un tocco porta alla coda.
   el.innerHTML = `
-    <div id="bolle-contatori" class="bolle-contatori"></div>
+    <button id="bolle-avviso" class="avviso avviso-attenzione avviso-ritardo nascosto" type="button" aria-live="polite"></button>
     ${bannerMock}
     <section class="scheda">
       <div class="campo">
@@ -169,12 +174,13 @@ async function vista(el) {
       </div>
     </section>
     <a class="btn btn-secondario btn-minore bolle-vai-storico" href="#/bolle/storico">&#128203; Bolle inviate</a>
-    <section class="scheda">
+    <section id="sezione-coda" class="scheda">
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="bolle-coda"></ul>
       <div id="riquadro-rimando"></div>
     </section>
+    <div id="bolle-contatori" class="bolle-contatori"></div>
     <p style="text-align:center"><a class="tenue" href="#/bolle/impostazioni">Impostazioni del modulo Bolle</a></p>
     <div class="spazio-barra" aria-hidden="true"></div>
     <div class="barra-comandi">
@@ -201,9 +207,46 @@ async function vista(el) {
     el.querySelector('#input-camera').click();
   });
 
+  el.querySelector('#bolle-avviso').addEventListener('click', () => {
+    el.querySelector('#sezione-coda').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+
   await ridisegna();
+  avviaControlloRitardo();
   // Invio automatico a ogni apertura del modulo.
   invio.avvia();
+}
+
+// L'avviso in cima: le righe le scrive `core/errori.js`, il conto lo fa il
+// motore della coda; qui si mettono a video. Restituisce falso se la vista non
+// c'è più.
+const NOME_ELEMENTO = { uno: 'bolla', tanti: 'bolle' };
+function aggiornaAvviso(record) {
+  const riquadro = radice && radice.querySelector('#bolle-avviso');
+  if (!riquadro) return false;
+  const righe = righeAvvisoRitardo(elementiInRitardo(record), NOME_ELEMENTO);
+  riquadro.innerHTML = righe.map(r => `<span class="riga" data-caso="${r.caso}">${scappaHtml(r.testo)}</span>`).join('')
+    + (righe.length > 0 ? '<span class="vai">Tocca per vedere la coda invii</span>' : '');
+  riquadro.classList.toggle('nascosto', righe.length === 0);
+  return true;
+}
+
+// Il controllo che gira da solo, anche senza altri eventi: un elemento fermo
+// non produce eventi, e l'avviso deve comparire entro un minuto dal
+// superamento della soglia. Legge la coda e aggiorna il solo avviso — non
+// ridisegna la schermata, che a ogni giro rifarebbe anteprime e menù sotto le
+// dita dell'operatore. Si ferma da solo quando la vista non c'è più.
+let timerRitardo = null;
+function avviaControlloRitardo() {
+  clearInterval(timerRitardo);
+  timerRitardo = setInterval(async () => {
+    if (!radice || !radice.querySelector('#bolle-avviso')) {
+      clearInterval(timerRitardo);
+      timerRitardo = null;
+      return;
+    }
+    aggiornaAvviso(await coda.elenca());
+  }, CONTROLLO_RITARDO_MS);
 }
 
 async function gestisciFile(evento) {
@@ -357,6 +400,7 @@ async function ridisegna() {
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio');
   const inErrore = record.filter(r => r.stato === 'errore');
   const contatori = coda.contatoriOggi();
+  aggiornaAvviso(record);
 
   radice.querySelector('#bolle-contatori').innerHTML = `
     <div class="bolle-chip"><span class="valore">${contatori.scattate}</span><span class="etichetta">Scattate oggi</span></div>

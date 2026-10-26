@@ -19,8 +19,9 @@
 .bolle-chip .etichetta { display: block; font-size: 0.7rem; color: var(--testo-tenue); }
 .bolle-chip.errore .valore { color: var(--errore); }
 
-/* I contatori sono il riferimento del collaudo, non l'azione: compatti, in
-   alto, senza rubare l'altezza che serve alla scheda. */
+/* I contatori sono il riferimento del collaudo, non l'azione: compatti, e
+   dalla 0.41.0 in fondo, dopo «Coda invii». In cima c'è solo l'avviso, e solo
+   quando c'è un problema (core/ui.css, .avviso-ritardo). */
 
 /* Anteprime delle foto in attesa di Invia */
 .bolle-anteprime {

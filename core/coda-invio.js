@@ -115,6 +115,35 @@ export function ingressoInCoda(record) {
   return Number.isFinite(record.accodatoIl) ? record.accodatoIl : record.creatoIl;
 }
 
+// --- L'avviso in cima alla schermata (dalla 0.41.0) -------------------------
+// I contatori del giorno stanno in fondo; in cima compare un avviso SOLO quando
+// c'è un problema: un elemento della coda non ancora arrivato 10 minuti dopo
+// esserci entrato (decisione di Francesco del 26/10/2026). Le bozze non
+// contano. Con la soglia, un errore passeggero che il motore risolve da solo al
+// tentativo dopo — e «Errore» va e viene a ogni tentativo fallito — non
+// accende niente. Una costante sola per i due moduli.
+export const SOGLIA_RITARDO_MS = 10 * 60 * 1000;
+
+// Ogni quanto la vista ricontrolla da sola, anche senza altri eventi: l'avviso
+// deve comparire entro un minuto dal superamento della soglia. Trenta secondi
+// stanno dentro con margine e non pesano: si legge la coda, non si ridisegna.
+export const CONTROLLO_RITARDO_MS = 30 * 1000;
+
+// Quanti elementi sono in ritardo, per caso: `attesa` (In coda o Invio in
+// corso, come il contatore «In attesa») ed `errore`. I nomi dei casi sono le
+// chiavi delle frasi in `core/errori.js`, e il collaudo li confronta.
+export function elementiInRitardo(record, ora = Date.now()) {
+  const conti = { attesa: 0, errore: 0 };
+  for (const r of record) {
+    const caso = r.stato === 'errore' ? 'errore'
+      : (r.stato === 'in_coda' || r.stato === 'invio') ? 'attesa' : '';
+    if (!caso) continue;
+    const ingresso = ingressoInCoda(r);
+    if (Number.isFinite(ingresso) && ora - ingresso > SOGLIA_RITARDO_MS) conti[caso] += 1;
+  }
+  return conti;
+}
+
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
 

@@ -279,6 +279,24 @@ body {
 
 .avviso-noscript { padding: 24px; text-align: center; }
 
+/* L'avviso in cima ai moduli (dalla 0.41.0): compare solo quando un elemento
+   della coda non è arrivato 10 minuti dopo esserci entrato. È un pulsante —
+   un tocco porta alla coda — e dice il caso a parole, una riga per caso. */
+.avviso-ritardo {
+  display: block;
+  width: 100%;
+  min-height: var(--tocco);
+  margin: 0 0 12px;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.avviso-ritardo .riga { display: block; }
+.avviso-ritardo .riga + .riga { margin-top: 4px; }
+.avviso-ritardo .vai { display: block; margin-top: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: underline; }
+
 .nascosto { display: none !important; }
 
 /* Avviso di aggiornamento: sempre visibile, e non copre i comandi principali.
