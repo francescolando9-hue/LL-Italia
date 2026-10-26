@@ -18,6 +18,30 @@ let urlAperti = [];
 let mese = new Date();
 let giornoScelto = '';
 let commessaScelta = '';
+// Le righe nell'ordine in cui l'elenco le mostra, e quella aperta nel visore:
+// lo scorrimento (dalla 0.41.0) va da una all'altra di QUESTE, cioè dentro
+// l'elenco che si sta guardando — giorno o mese, col filtro del cantiere.
+let mostrate = [];
+let aperta = -1;
+// Ogni apertura ha un numero: con scorrimenti rapidi una lettura lenta della
+// bolla di prima non deve sovrascrivere quella di adesso.
+let aperturaInCorso = 0;
+
+// **Le soglie del gesto** (scelte il 26/10/2026, da verificare sul telefono).
+// - SOGLIA_GESTO_PX: un dito che scorre per cambiare bolla percorre più di
+//   60 px; un tocco, o il dito che trema col guanto, molto meno.
+// - RAPPORTO_GESTO: il gesto vale solo se lo spostamento orizzontale è almeno
+//   il DOPPIO di quello verticale (un angolo sotto i 27 gradi circa): uno
+//   scorrimento verticale per leggere la bolla non cambia mai bolla, anche se
+//   il dito scivola un po' di lato.
+// - FASCIA_BORDO_PX: un gesto che parte entro 32 px dal bordo sinistro o
+//   destro non si prende: su Android da lì parte il gesto «indietro», e chi lo
+//   fa sta chiedendo quello, non la bolla dopo.
+// - Con la pagina ingrandita (`visualViewport.scale` sopra 1) il dito sposta
+//   l'immagine: niente cambio di bolla. Anche un gesto a due dita non conta.
+const SOGLIA_GESTO_PX = 60;
+const RAPPORTO_GESTO = 2;
+const FASCIA_BORDO_PX = 32;
 
 function iso(data) {
   return data.toLocaleDateString('sv-SE');
@@ -58,7 +82,13 @@ export async function vistaStorico(el) {
     <a class="btn btn-secondario" href="#/bolle">Torna a Bolle</a>
     <div id="visore" class="bolle-visore nascosto">
       <button id="chiudi-visore" class="bolle-chiudi" aria-label="Chiudi">&#10005;</button>
-      <div id="visore-contenuto"></div>
+      <div id="visore-testa" class="bolle-visore-testa"></div>
+      <div id="visore-contenuto" class="bolle-visore-contenuto"></div>
+      <p id="visore-capo" class="bolle-visore-capo" aria-live="polite"></p>
+      <div class="bolle-visore-frecce">
+        <button id="bolla-prec" class="bolle-freccia-grande" type="button" aria-label="Bolla precedente">&#8249;</button>
+        <button id="bolla-succ" class="bolle-freccia-grande" type="button" aria-label="Bolla successiva">&#8250;</button>
+      </div>
     </div>
   `;
 
@@ -69,6 +99,9 @@ export async function vistaStorico(el) {
     disegna();
   });
   el.querySelector('#chiudi-visore').addEventListener('click', chiudiVisore);
+  el.querySelector('#bolla-prec').addEventListener('click', () => vaiA(aperta - 1));
+  el.querySelector('#bolla-succ').addEventListener('click', () => vaiA(aperta + 1));
+  collegaGesto(el.querySelector('#visore'));
 
   // Apre il calendario sul mese dell'ultimo invio: se non si manda nulla da
   // qualche giorno, è più utile del mese corrente vuoto.
@@ -183,17 +216,16 @@ function disegnaElenco() {
     giorni.get(giorno).push(riga);
   }
 
+  // L'ordine dello scorrimento è quello in cui le righe si vedono: giorno
+  // per giorno, e dentro il giorno come sono elencate.
+  mostrate = [...giorni.values()].flat();
   elenco.innerHTML = [...giorni.entries()].map(([giorno, delGiorno]) => `
     <h3 class="bolle-giorno">${formattaGiorno(giorno)} <span class="tenue">(${delGiorno.length})</span></h3>
     <ul class="bolle-storico">
       ${delGiorno.map(riga => `
         <li>
           <button class="bolle-riga" data-id="${scappaHtml(riga.idClient)}">
-            <span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
-            <span class="cantiere">${Number.isInteger(riga.progressivo)
-              ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${Number(riga.pagine) > 1
-              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}${riga.fase ? ` · ${scappaHtml(etichettaFaseOLotto(riga.fase))}` : ''}</span>
-            <span class="tenue">${scappaHtml(riga.operatore)}</span>
+            ${contenutoRiga(riga)}
             <span class="lente" aria-hidden="true">&#128269;</span>
           </button>
         </li>
@@ -206,16 +238,50 @@ function disegnaElenco() {
   }
 }
 
-async function apriBolla(idClient) {
+// I dati di una riga — ora, n. progressivo, pagina, cantiere, fase, operatore
+// — scritti una volta: li usano l'elenco e la testa del visore, che deve dire
+// di quale bolla si tratta con le stesse parole.
+function contenutoRiga(riga) {
+  return `<span class="ora">${scappaHtml(String(riga.dataInvio).slice(11, 16))}</span>
+            <span class="cantiere">${Number.isInteger(riga.progressivo)
+              ? `<span class="bolle-progressivo">n. ${riga.progressivo}</span> ` : ''}${Number(riga.pagine) > 1
+              ? `<span class="bolle-pagina-riga">pag. ${riga.pagina}/${riga.pagine}</span> ` : ''}${scappaHtml(etichettaCantiere(riga.commessa))}${riga.fase ? ` · ${scappaHtml(etichettaFaseOLotto(riga.fase))}` : ''}</span>
+            <span class="tenue">${scappaHtml(riga.operatore)}</span>`;
+}
+
+function apriBolla(idClient) {
+  return mostraBolla(mostrate.findIndex(r => r.idClient === idClient));
+}
+
+// Bolla successiva o precedente nell'elenco mostrato. Ai due capi ci si
+// ferma: niente giro dall'inizio, niente cambio di mese.
+function vaiA(indice) {
+  if (indice < 0 || indice >= mostrate.length || indice === aperta) return;
+  mostraBolla(indice);
+}
+
+async function mostraBolla(indice) {
+  const riga = mostrate[indice];
+  if (!riga) return;
+  const idClient = riga.idClient;
+  const mia = ++aperturaInCorso;
+  aperta = indice;
   const contenuto = radice.querySelector('#visore-contenuto');
   const visore = radice.querySelector('#visore');
   visore.classList.remove('nascosto');
+  disegnaTesta();
+  // La bolla di prima si toglie e la sua immagine si rilascia dalla memoria:
+  // scorrendo una giornata intera le immagini non si accumulano. Con lei se ne
+  // va una scelta nel riquadro «Cantiere sbagliato?» non mandata.
+  liberaImmagini();
   contenuto.innerHTML = '<p class="bolle-visore-messaggio">Apertura&hellip;</p>';
+  visore.scrollTop = 0;
 
   // Se la foto a piena risoluzione è ancora sul dispositivo si mostra quella,
   // altrimenti la miniatura conservata nello storico.
   const record = (await coda.elenca()).find(r => r.id === idClient && r.foto);
   const immagine = record ? record.foto : await coda.leggiMiniatura(idClient);
+  if (mia !== aperturaInCorso) return;
   if (!immagine) {
     contenuto.innerHTML = `
       <p class="bolle-visore-messaggio">
@@ -225,11 +291,54 @@ async function apriBolla(idClient) {
   }
   const url = URL.createObjectURL(immagine);
   urlAperti.push(url);
-  const riga = righe.find(r => r.idClient === idClient);
   contenuto.innerHTML = `<img src="${url}" alt="Bolla inviata">
     ${record ? '' : '<p class="bolle-visore-messaggio">Anteprima ridotta conservata sul telefono.</p>'}
     ${record ? riquadroCorrezione(riga) : ''}`;
   if (record) collegaCorrezione(record, riga);
+}
+
+// In cima la riga della bolla, con la posizione nell'elenco; in fondo le due
+// frecce, spente al capo del loro lato, e la frase che lo dice.
+function disegnaTesta() {
+  const testa = radice.querySelector('#visore-testa');
+  testa.innerHTML = `<div class="bolle-riga bolle-riga-testa">${contenutoRiga(mostrate[aperta])}</div>
+    <p class="bolle-visore-posizione">${aperta + 1} di ${mostrate.length}</p>`;
+  const prima = aperta === 0;
+  const ultima = aperta === mostrate.length - 1;
+  radice.querySelector('#bolla-prec').disabled = prima;
+  radice.querySelector('#bolla-succ').disabled = ultima;
+  radice.querySelector('#visore-capo').innerHTML = [
+    prima ? 'È la prima bolla di questo elenco' : '',
+    ultima ? 'È l’ultima bolla di questo elenco' : '',
+  ].filter(Boolean).map(testo => `<span>${testo}</span>`).join('');
+}
+
+// Il gesto: dito verso sinistra → bolla successiva (quella sotto
+// nell'elenco); verso destra → precedente. Solo un dito, solo con la pagina
+// non ingrandita, solo se non parte dal bordo e se è chiaramente orizzontale.
+// Ascoltatori passivi: lo scorrimento e lo zoom restano quelli del browser.
+function collegaGesto(visore) {
+  let inizio = null;
+  const ingrandita = () => Boolean(window.visualViewport) && window.visualViewport.scale > 1.01;
+  visore.addEventListener('touchstart', evento => {
+    if (evento.touches.length !== 1) { inizio = null; return; }
+    const tocco = evento.touches[0];
+    const bordo = tocco.clientX < FASCIA_BORDO_PX || tocco.clientX > window.innerWidth - FASCIA_BORDO_PX;
+    inizio = bordo || ingrandita() ? null : { x: tocco.clientX, y: tocco.clientY };
+  }, { passive: true });
+  visore.addEventListener('touchmove', evento => {
+    if (evento.touches.length > 1) inizio = null;
+  }, { passive: true });
+  visore.addEventListener('touchcancel', () => { inizio = null; }, { passive: true });
+  visore.addEventListener('touchend', evento => {
+    if (!inizio || evento.touches.length > 0 || ingrandita()) { inizio = null; return; }
+    const tocco = evento.changedTouches[0];
+    const dx = tocco.clientX - inizio.x;
+    const dy = tocco.clientY - inizio.y;
+    inizio = null;
+    if (Math.abs(dx) < SOGLIA_GESTO_PX || Math.abs(dx) < RAPPORTO_GESTO * Math.abs(dy)) return;
+    vaiA(dx < 0 ? aperta + 1 : aperta - 1);
+  }, { passive: true });
 }
 
 // Correzione del cantiere: possibile solo se la foto originale è ancora sul
@@ -292,7 +401,15 @@ function collegaCorrezione(record, riga) {
 }
 
 function chiudiVisore() {
+  aperturaInCorso += 1;
+  aperta = -1;
   radice.querySelector('#visore').classList.add('nascosto');
+  radice.querySelector('#visore-testa').innerHTML = '';
+  radice.querySelector('#visore-capo').innerHTML = '';
+  liberaImmagini();
+}
+
+function liberaImmagini() {
   radice.querySelector('#visore-contenuto').innerHTML = '';
   for (const url of urlAperti) URL.revokeObjectURL(url);
   urlAperti = [];

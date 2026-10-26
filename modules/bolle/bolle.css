@@ -243,11 +243,71 @@
 
 .bolle-visore img {
   max-width: 100%;
-  max-height: 88vh;
+  max-height: 68vh;
   border-radius: 8px;
   display: block;
   margin: 0 auto;
 }
+
+/* Dalla 0.41.0 il visore è una colonna: in cima la riga della bolla con la
+   posizione («3 di 12»), al centro l'immagine, in fondo il messaggio dei capi
+   e le due frecce grandi, che restano a portata di pollice (anche coi guanti)
+   mentre si scorre in verticale. */
+.bolle-visore {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-bottom: 0;
+}
+.bolle-visore-testa {
+  color: #fff;
+  padding: 0 64px 8px 0;
+}
+.bolle-visore-testa .bolle-riga {
+  min-height: 0;
+  padding: 2px 0;
+  cursor: default;
+  color: #fff;
+}
+.bolle-visore-testa .tenue { color: rgba(255, 255, 255, 0.75); }
+.bolle-visore-posizione {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bolle-visore-contenuto {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.bolle-visore-capo {
+  color: #fff;
+  text-align: center;
+  min-height: 1.4em;
+  margin: 8px 0 0;
+}
+.bolle-visore-capo span { display: block; }
+.bolle-visore-frecce {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 12px;
+  padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
+  background: rgba(10, 14, 30, 0.94);
+}
+.bolle-freccia-grande {
+  flex: 1;
+  min-height: 64px;
+  border: none;
+  border-radius: var(--raggio);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 2.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.bolle-freccia-grande:disabled { opacity: 0.3; cursor: default; }
 
 .bolle-visore-messaggio {
   color: #fff;
