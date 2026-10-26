@@ -10,18 +10,19 @@
 
   | Commit | Cosa |
   |---|---|
-  | `eb6da26` | collaudo 22: il modo dell'hook si legge dall'indice di git. **Fuori specifica, deciso da Francesco** (§6) |
-  | `4bc4681` | la specifica, invariata, in `Documentazione/`: SHA-256 `cc59e5c0369c2fb5ee7b39384d854e93e26329e7da38b37d2127cc1d8eaa02aa`, uguale nell'originale, nella copia e nel blob |
-  | `05de16e` | `CLAUDE.md`, commit dedicato |
-  | `d902a67` | i tre punti dei documenti |
+  | `f1bfe98` | collaudo 22: il modo dell'hook si legge dall'indice di git. **Fuori specifica, deciso da Francesco** (§6) |
+  | `a7b570d` | la specifica, invariata, in `Documentazione/`: SHA-256 `cc59e5c0369c2fb5ee7b39384d854e93e26329e7da38b37d2127cc1d8eaa02aa`, uguale nell'originale, nella copia e nel blob |
+  | `315f246` | `CLAUDE.md`, commit dedicato |
+  | `8dca0ac` | i tre punti dei documenti |
 
-  Più il commit di questo file.
+  Più due commit di questo file: `610a1ce`, che lo aggiunge, e quello che aggiorna questi codici dopo la firma.
+- **Commit firmati (SSH).** Il 26/10/2026 i cinque commit del ramo sono stati rifirmati, senza cambiarne il contenuto: rebase da `4ff05f6` con `--exec "git commit --amend --no-edit -S"`. Per ognuno albero, messaggio, autore e data d'autore sono identici a prima, e la firma risulta valida. I codici di prima erano `eb6da26`, `4bc4681`, `05de16e`, `d902a67` e `7daebc2`, e non sono più sul ramo. L'albero dell'ultimo è `02c05db2c6c13778a4ba8ad13ebb53873f683037`, uguale a quello di `7daebc2`. I numeri del collaudo, misurati prima della firma, valgono anche sui commit nuovi, perché gli alberi sono gli stessi.
 - **File modificati rispetto a `4ff05f6`** (7 prima di questo file): `CLAUDE.md`, `README.md`, `docs/AppFotoCantiereSpecifica202609141630Claude.md`, `docs/AppBolleSpecificaFunzionale202609011935Claude.md`, la specifica (nuova), `collaudi/22-riservatezza.js`, `collaudi/LEGGIMI.md`. `docs/INDICE.md` non cambia: nessun documento di `docs/` cambia nome.
 - **Esito del primo arresto: niente da chiedere.** L'albero è giusto. Il testo del §6 e l'estratto v2.36 nel blob del `CLAUDE.md` differiscono solo per **12 righe aggiunte**, le righe 13–24 del §6: la sezione «Agenti e attività programmate», fra «Passaggio di consegne fra ambienti» e «Riservatezza nei repository». Nessun «sette» corrente fuori dal §1 chiede una modifica (elenco al §7, punto 2), e non c'è nessun caso che la specifica non copra. Due rilievi, registrati senza fermarsi: il primo è al §2 (CRLF su disco), il secondo al §3, caso 4 (README, riga 363).
 
 ## 2. Impronta del testo dell'estratto nel `CLAUDE.md`
 
-- **Nel blob del commit `05de16e`**, dalla riga `## Passaggio di consegne fra ambienti` alla fine: **14832 byte**, 0 CR, un solo a capo finale, SHA-256 **`a3e947d543fb574bfd567780c4644542ea8ca72360a630c74a5298d738dc9735`**. È uguale all'atteso.
+- **Nel blob del commit `315f246`**, dalla riga `## Passaggio di consegne fra ambienti` alla fine: **14832 byte**, 0 CR, un solo a capo finale, SHA-256 **`a3e947d543fb574bfd567780c4644542ea8ca72360a630c74a5298d738dc9735`**. È uguale all'atteso.
 - **Su disco, su questo PC:** `core.autocrlf=true` e nessun `.gitattributes`. L'indice ha a capo LF, la copia di lavoro CRLF. Il file è stato tolto e ripreso con `git checkout`. Lo stesso testo su disco misura 14919 byte con 87 CR, e l'impronta è `4a5299d6d1d38897f245210901d0d700f737f9f337a01b3dc36451ba1fa969b8`. Senza i CR torna a 14832 byte e `a3e947d5…9735`. L'impronta di riferimento è quella del blob (§7, punto 3).
 
 ## 3. Collaudo del §3
@@ -29,8 +30,8 @@
 | # | Ingresso | Esito misurato | |
 |---|---|---|---|
 | 1 | `CLAUDE.md`, da `## Passaggio di consegne fra ambienti` alla fine | 14832 byte, SHA-256 `a3e947d5…9735` (§2) | ✓ |
-| 2 | intestazione e sezioni | intestazione `# Regole di condotta (estratto dalla skill organizzativa ll-italia v3.1 del 23/10/2026)`; **8** sezioni `##` nell'ordine del §6; parte del progetto (8686 byte, fino all'intestazione esclusa) identica byte per byte a quella di `4bc4681`; riga d'introduzione identica | ✓ |
-| 3 | `git diff 4bc4681 05de16e -- CLAUDE.md` | 13 inserzioni, 1 cancellazione: la riga dell'intestazione, più le 12 righe della sezione «Agenti e attività programmate» | ✓ |
+| 2 | intestazione e sezioni | intestazione `# Regole di condotta (estratto dalla skill organizzativa ll-italia v3.1 del 23/10/2026)`; **8** sezioni `##` nell'ordine del §6; parte del progetto (8686 byte, fino all'intestazione esclusa) identica byte per byte a quella di `a7b570d`; riga d'introduzione identica | ✓ |
+| 3 | `git diff a7b570d 315f246 -- CLAUDE.md` | 13 inserzioni, 1 cancellazione: la riga dell'intestazione, più le 12 righe della sezione «Agenti e attività programmate» | ✓ |
 | 4 | parti correnti di `README.md` e delle due specifiche | «otto» una volta in ciascuno dei tre punti del §1; nessun «sette» come numero corrente delle commesse. Restano due «sette» riferiti alle commesse in parti correnti, tutti e due come storia dentro una frase che dice otto: README, riga 363 («**Otto commesse**, in ordine alfabetico di codice: sette dal 16/09/2026 (erano tre) e **TN1 dalla 0.39.0**», già così su `main`, non toccata), e la voce Cantiere della specifica Foto («(erano sette dal 16/09/2026)», testo chiesto dalla specifica) | ✓ |
 | 5 | parti storiche | `git diff` dei tre documenti: 3 righe cambiate in tutto, una per file. Invariate le note di revisione con le sette commesse (Bolle rev. 4 e rev. 8; Foto rev. 10) e il resoconto del rilascio 0.38.0 nella specifica Foto («`core/cantieri.js` ha sette voci», «sette voci nei due moduli») | ✓ |
 | 6 | file dell'app | `core/`, `modules/`, `sw.js`, `index.html` invariati; `0.40.0` in `sw.js` e `core/versione.js`. In `collaudi/` cambiano `22-riservatezza.js` e `LEGGIMI.md`, per la modifica fuori specifica del §6: rispetto al caso come scritto è l'**unica differenza** | ✓ con la differenza del §6 |
@@ -46,7 +47,7 @@ La data della 0.39.0, il 13/10/2026, è riscontrata sul commit `811be14`. Nel te
 
 ## 4. Numeri della suite e controllo di riservatezza
 
-- **Suite intera su `d902a67`: 23 collaudi verdi, 677 controlli: 677 ✓, 0 ✗.** È lo stesso numero di `33d462b`: il controllo dell'hook è stato riscritto, non aggiunto.
+- **Suite intera su `8dca0ac`: 23 collaudi verdi, 677 controlli: 677 ✓, 0 ✗.** È lo stesso numero di `33d462b`: il controllo dell'hook è stato riscritto, non aggiunto.
 - **Riservatezza:** `node collaudi/riservatezza.js` ha letto 94 file e non ha niente da segnalare. L'hook prima del commit è girato su ognuno dei quattro commit, con 2, 1, 1 e 3 file in stage, sempre senza niente da segnalare.
 - **Distribuzione:** nessuna. La PR non è unita, quindi non ci sono commit né impronta in esercizio e non c'è una prima esecuzione.
 
@@ -57,7 +58,7 @@ La data della 0.39.0, il 13/10/2026, è riscontrata sul commit `811be14`. Nel te
 
 ## 6. Modifiche fuori specifica, decise da Francesco
 
-- **`eb6da26`, collaudo 22 — decisione di Francesco del 26/10/2026, dopo la misura iniziale del §1.**
+- **`f1bfe98`, collaudo 22 — decisione di Francesco del 26/10/2026, dopo la misura iniziale del §1.**
   - **La causa del rosso:** su Windows il file system non ha il bit di esecuzione, e Node riporta `100666` per qualunque file (misurato su `.githooks/pre-commit` e su `sw.js`), mentre nell'indice l'hook è `100755`. Il vecchio controllo leggeva il disco, quindi era rosso anche con l'hook a posto. L'hook funzionava: nella stessa esecuzione la sezione del repository usa e getta l'aveva visto bloccare UNC, L: e partita IVA, con 8 controlli verdi su 8.
   - **Il controllo nuovo** legge il modo dall'indice di git e ha una frase per ogni caso: git che non si può eseguire; cartella che non è un clone git; `.git` presente ma illeggibile; cartella dentro un altro repository; hook assente dalla copia di lavoro; hook su disco ma non nell'indice; git che non legge l'indice; modo diverso da `100755`.
   - **Visto rosso prima di renderlo verde, su copie usa e getta poi tolte.** Su un clone senza modifiche è verde («modo 100755 nell'indice di git», 0 falliti). Sullo stesso clone dopo `git update-index --chmod=-x .githooks/pre-commit` dà 1 fallito: «nell'indice di git l'hook ha modo 100644, atteso 100755: chi clona su Linux o macOS riceve un hook che git non esegue». Su una copia senza `.git` risponde «la cartella non è un clone git: il modo dell'hook si legge dall'indice di git, e qui l'indice non c'è (fatal: not a git repository …)». Lì il collaudo intero si ferma prima, sullo scanner (`git ls-files`), e per questo la funzione è esportata e provata da sola.
