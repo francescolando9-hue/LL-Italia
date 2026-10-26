@@ -84,10 +84,12 @@ export async function vistaStorico(el) {
       <button id="chiudi-visore" class="bolle-chiudi" aria-label="Chiudi">&#10005;</button>
       <div id="visore-testa" class="bolle-visore-testa"></div>
       <div id="visore-contenuto" class="bolle-visore-contenuto"></div>
-      <p id="visore-capo" class="bolle-visore-capo" aria-live="polite"></p>
-      <div class="bolle-visore-frecce">
-        <button id="bolla-prec" class="bolle-freccia-grande" type="button" aria-label="Bolla precedente">&#8249;</button>
-        <button id="bolla-succ" class="bolle-freccia-grande" type="button" aria-label="Bolla successiva">&#8250;</button>
+      <div class="bolle-visore-piede">
+        <p id="visore-capo" class="bolle-visore-capo" aria-live="polite"></p>
+        <div class="bolle-visore-frecce">
+          <button id="bolla-prec" class="bolle-freccia-grande" type="button" aria-label="Bolla precedente">&#8249;</button>
+          <button id="bolla-succ" class="bolle-freccia-grande" type="button" aria-label="Bolla successiva">&#8250;</button>
+        </div>
       </div>
     </div>
   `;

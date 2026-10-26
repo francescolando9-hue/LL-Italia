@@ -258,18 +258,22 @@
   align-items: stretch;
   justify-content: flex-start;
   padding-bottom: 0;
+  /* Pieno, non trasparente: con la riga della bolla in cima, il calendario
+     che traspariva sotto la rendeva difficile da leggere. */
+  background: rgb(10, 14, 30);
 }
 .bolle-visore-testa {
   color: #fff;
   padding: 0 64px 8px 0;
 }
 .bolle-visore-testa .bolle-riga {
+  flex-wrap: wrap;
   min-height: 0;
   padding: 2px 0;
   cursor: default;
   color: #fff;
 }
-.bolle-visore-testa .tenue { color: rgba(255, 255, 255, 0.75); }
+.bolle-visore-testa .tenue { flex-basis: 100%; color: rgba(255, 255, 255, 0.75); }
 .bolle-visore-posizione {
   margin: 2px 0 0;
   font-weight: 700;
@@ -284,17 +288,22 @@
 .bolle-visore-capo {
   color: #fff;
   text-align: center;
-  min-height: 1.4em;
-  margin: 8px 0 0;
+  margin: 0;
 }
 .bolle-visore-capo span { display: block; }
-.bolle-visore-frecce {
+/* Il piede resta fermo in basso mentre si scorre: il messaggio dei capi e le
+   frecce si vedono anche quando sotto la bolla c'è «Cantiere sbagliato?». */
+.bolle-visore-piede {
   position: sticky;
   bottom: 0;
+  margin-top: 8px;
+  padding: 8px 0 calc(12px + env(safe-area-inset-bottom));
+  background: rgb(10, 14, 30);
+}
+.bolle-visore-frecce {
   display: flex;
   gap: 12px;
-  padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
-  background: rgba(10, 14, 30, 0.94);
+  margin-top: 6px;
 }
 .bolle-freccia-grande {
   flex: 1;
