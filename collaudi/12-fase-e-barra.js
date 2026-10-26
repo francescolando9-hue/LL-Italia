@@ -37,7 +37,15 @@ const attendiMenuFase = (pagina, aiuto) => aiuto.attendiMarcatore(pagina, () => 
 // `AcquistoTerreno`, `FognaturaBianca`, `FognaturaNera` e `SpeseTecniche` = 29.
 // Sta in una costante perché il numero ricompare in più controlli, e un elenco
 // che si accorcia per sbaglio si vede qui.
+// **Dalla 0.41.0 il menù ne mostra 26** (decisione di Francesco del 26/10/2026):
+// `AcquistoTerreno`, `Marketing` e `SpeseTecniche` sono fasi della contabilità
+// e le app non le offrono. `FASI` resta a 29, copia del master: le escluse
+// sono dichiarate in una riga di `core/fasi.js`, e qui si riscrivono a mano per
+// confrontarle con quella riga — due copie che cambiano insieme non si
+// accorgerebbero di un codice scritto male.
 const QUANTE_FASI = 29;
+const QUANTE_NEL_MENU = 26;
+const FASI_ESCLUSE = ['AcquistoTerreno', 'Marketing', 'SpeseTecniche'];
 
 // **L'elenco è la copia di un master** (il master delle fasi e attività del
 // gruppo, fasi di cantiere), e qui si controlla che sia ESATTAMENTE quella
@@ -51,7 +59,6 @@ const QUANTE_FASI = 29;
 const VERSIONE_MASTER_FASI = '2026-10-24.3';
 const IMPRONTA_ETICHETTE_FASI = '682df6edbc092d8caf2dcf7e2e0ca68c13a5a57bc4e5404a39db8b68edb0dc1d';
 const FASI_TOLTE = ['Interrato', 'ImpiantiDiReteCondominiali'];
-const FASI_ENTRATE = ['AcquistoTerreno', 'FognaturaBianca', 'FognaturaNera', 'SpeseTecniche'];
 
 module.exports = {
   nome: 'Fase di lavoro nei due moduli, e barra dei comandi delle bolle',
@@ -96,6 +103,29 @@ module.exports = {
         'bolla dichiarata Inviata', 60000, primaInviate);
     };
 
+    // Caso 22 della specifica del 26/10/2026: il menù della fase su MNG, MAR,
+    // TN1 e MRS ha 26 voci più il segnaposto del modulo, in ordine alfabetico
+    // sull'etichetta, uguali su tutte e quattro, senza le fasi tolte e senza le
+    // escluse dalle app.
+    const menuSuQuattroCommesse = async (selettore, segnaposto, modulo) => {
+      let primo = null;
+      for (const commessa of ['MNG', 'MAR', 'TN1', 'MRS']) {
+        await pagina.selectOption(selettore, commessa);
+        await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${commessa}|`), `menù della fase pronto per ${commessa}`);
+        const voci = await pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
+        const etichette = voci.slice(1).map(o => o.t);
+        const codiciMenu = voci.slice(1).map(o => o.v);
+        const ordinate = [...etichette].sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+        registro.controlla(`${modulo} · ${commessa}: «${voci[0].t}» e ${QUANTE_NEL_MENU} voci in ordine alfabetico, senza tolte né escluse`,
+          segnaposto.test(voci[0].t) && voci[0].v === '' && codiciMenu.length === QUANTE_NEL_MENU
+            && etichette.join('|') === ordinate.join('|')
+            && ![...FASI_TOLTE, ...FASI_ESCLUSE].some(f => codiciMenu.includes(f))
+            && (primo === null || primo === codiciMenu.join('|')),
+          `${codiciMenu.length} voci${[...FASI_TOLTE, ...FASI_ESCLUSE].filter(f => codiciMenu.includes(f)).map(f => ` · c'è ${f}`).join('')}`);
+        if (primo === null) primo = codiciMenu.join('|');
+      }
+    };
+
     registro.titolo('Bolle: la fase si sceglie da un elenco, e non è obbligatoria');
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#fase');
@@ -104,13 +134,17 @@ module.exports = {
     const scelte = voci.filter(o => o.v);
     const nomi = scelte.map(o => o.t);
     registro.dice('fasi a video', `${nomi.length}: ${nomi[0]} … ${nomi[nomi.length - 1]}`);
-    registro.controlla(`ci sono le ${QUANTE_FASI} fasi`, nomi.length === QUANTE_FASI, String(nomi.length));
+    registro.controlla(`senza cantiere scelto ci sono le ${QUANTE_NEL_MENU} fasi delle app`,
+      nomi.length === QUANTE_NEL_MENU, String(nomi.length),
+      'dalla 0.41.0 anche qui: le app non offrono le tre fasi della contabilità');
     const codici = scelte.map(o => o.v);
     registro.controlla('le due fasi tolte col passaggio del 24/10/2026 non ci sono',
       FASI_TOLTE.every(f => !codici.includes(f)), FASI_TOLTE.filter(f => codici.includes(f)).join(', ') || 'nessuna',
       '`Interrato` si legge dal piano; `ImpiantiDiReteCondominiali` è sciolta in `FognaturaNera` e `FognaturaBianca`');
-    registro.controlla('e le quattro nuove ci sono',
-      FASI_ENTRATE.every(f => codici.includes(f)), FASI_ENTRATE.filter(f => !codici.includes(f)).join(', ') || 'tutte');
+    registro.controlla('né le tre escluse dalle app (AcquistoTerreno, Marketing, SpeseTecniche)',
+      FASI_ESCLUSE.every(f => !codici.includes(f)), FASI_ESCLUSE.filter(f => codici.includes(f)).join(', ') || 'nessuna');
+    registro.controlla('e le due fognature, entrate col passaggio, ci sono',
+      ['FognaturaBianca', 'FognaturaNera'].every(f => codici.includes(f)));
     registro.controlla('«CMC 128» non c\'è più', !nomi.includes('CMC 128'), 'tolta da Francesco il 14/09: è una commessa, non una fase');
 
     // A video si legge l'etichetta, con gli spazi; quello che viaggia — e che
@@ -142,10 +176,16 @@ module.exports = {
       (await pagina.$eval('#fase', e => e.tagName.toLowerCase())) === 'select');
 
     registro.titolo('L’elenco è la copia esatta del master delle fasi');
-    const dalCodice = await pagina.evaluate(async () => {
-      const { FASI } = await import('./core/fasi.js');
-      return FASI.map(f => f.etichetta);
+    const elencoDelCodice = await pagina.evaluate(async () => {
+      const { FASI, FASI_ESCLUSE_DALLE_APP, etichettaFase } = await import('./core/fasi.js');
+      return {
+        etichette: FASI.map(f => f.etichetta),
+        codici: FASI.map(f => f.codice),
+        escluse: FASI_ESCLUSE_DALLE_APP,
+        etichetteEscluse: FASI_ESCLUSE_DALLE_APP.map(etichettaFase),
+      };
     });
+    const dalCodice = elencoDelCodice.etichette;
     const testoEtichette = JSON.stringify(dalCodice);
     const improntaEtichette = require('crypto').createHash('sha256').update(testoEtichette, 'utf8').digest('hex');
     registro.dice('master delle fasi e impronta nell’app',
@@ -154,7 +194,22 @@ module.exports = {
       improntaEtichette === IMPRONTA_ETICHETTE_FASI,
       improntaEtichette === IMPRONTA_ETICHETTE_FASI ? 'impronta uguale'
         : `impronta diversa (${improntaEtichette.slice(0, 16)}…): un’etichetta o l’ordine sono cambiati a mano, o il master è cambiato`);
-    registro.controlla('e sono le 29 del menù, nello stesso ordine', dalCodice.join('|') === nomi.join('|'),
+    registro.controlla(`FASI ha ${QUANTE_FASI} voci, con le tre escluse dentro`,
+      dalCodice.length === QUANTE_FASI, String(dalCodice.length),
+      'la lista resta una sola: le escluse si tolgono dal menù, non dalla copia del master');
+    registro.dice('fasi escluse dalle app (core/fasi.js)', elencoDelCodice.escluse.join(', '));
+    registro.controlla('la riga delle escluse dice AcquistoTerreno, Marketing, SpeseTecniche',
+      elencoDelCodice.escluse.join('|') === FASI_ESCLUSE.join('|'), elencoDelCodice.escluse.join(', '));
+    registro.controlla('e ognuna è un codice di FASI',
+      elencoDelCodice.escluse.length > 0 && elencoDelCodice.escluse.every(c => elencoDelCodice.codici.includes(c)),
+      elencoDelCodice.escluse.filter(c => !elencoDelCodice.codici.includes(c)).join(', ') || 'tutte',
+      'un codice scritto male non escluderebbe niente, senza nessun segnale');
+    registro.controlla('etichettaFase dà ancora la loro etichetta, per quello che è già in coda',
+      elencoDelCodice.etichetteEscluse.join('|') === 'Acquisto terreno|Marketing|Spese tecniche',
+      elencoDelCodice.etichetteEscluse.join(', '));
+    const menuAtteso = dalCodice.filter((_, i) => !FASI_ESCLUSE.includes(elencoDelCodice.codici[i]));
+    registro.controlla(`e il menù è FASI meno le escluse: ${QUANTE_NEL_MENU} voci, nello stesso ordine`,
+      menuAtteso.join('|') === nomi.join('|'),
       'il menù legge l’elenco: se due liste diverse fossero in giro, qui si vedrebbe');
 
     await pagina.selectOption('#cantiere', 'MAR');
@@ -242,31 +297,13 @@ module.exports = {
     registro.controlla('e qui nessuna fase è preselezionata: sono moduli diversi',
       (await pagina.$eval('#fase', e => e.value)) === '');
 
-    registro.titolo('Foto cantiere: le stesse 29 fasi su ogni edificio, nessuna si nasconde');
-    // Fino alla 0.39.0 MAR, senza piani interrati, vedeva 26 fasi invece di 27
-    // (il filtro di `Interrato`); dalla 0.40.0 `Interrato` non è una fase e
-    // nessuna fase si nasconde per commessa. MRS non ha anagrafica: le fasi le
-    // vede tutte lo stesso.
-    const menuDi = async commessa => {
-      await pagina.selectOption('#commessa', commessa);
-      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${commessa}|`),
-        `menù della fase pronto per ${commessa}`);
-      return pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
-    };
-    const perMNG = await menuDi('MNG');
-    registro.controlla('MNG: «— scegli la fase —» e 29 voci',
-      /scegli la fase/.test(perMNG[0].t) && perMNG[0].v === '' && perMNG.length - 1 === QUANTE_FASI,
-      `${perMNG[0].t} · ${perMNG.length - 1} voci`);
-    registro.controlla('in ordine alfabetico, né Interrato né ImpiantiDiReteCondominiali',
-      perMNG.slice(1).map(o => o.t).join('|') === [...perMNG.slice(1).map(o => o.t)].sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' })).join('|')
-      && FASI_TOLTE.every(f => !perMNG.some(o => o.v === f)));
-    const perMAR = await menuDi('MAR');
-    registro.controlla('MAR mostra le stesse 29 voci di MNG (oggi 26)',
-      perMAR.slice(1).map(o => o.v).join('|') === perMNG.slice(1).map(o => o.v).join('|') && perMAR.length - 1 === QUANTE_FASI,
-      `${perMAR.length - 1} voci`);
-    const perMRS = await menuDi('MRS');
-    registro.controlla('MRS, senza anagrafica, ne mostra 29 e non Interrato',
-      perMRS.length - 1 === QUANTE_FASI && !perMRS.some(o => o.v === 'Interrato'), `${perMRS.length - 1} voci`);
+    registro.titolo('Foto cantiere: le stesse 26 fasi su ogni edificio e senza anagrafica');
+    // Fino alla 0.39.0 MAR, senza piani interrati, vedeva una fase in meno
+    // (il filtro di `Interrato`); dalla 0.40.0 nessuna fase si nasconde per
+    // commessa. Dalla 0.41.0 le app non offrono le tre fasi della contabilità:
+    // 26 voci su MNG, MAR, TN1 e su MRS, che non ha anagrafica (caso 22 della
+    // specifica del 26/10/2026; nelle bolle più sotto).
+    await menuSuQuattroCommesse('#commessa', /scegli la fase/, 'Foto');
     const mandaFoto = async () => {
       await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
@@ -352,19 +389,16 @@ module.exports = {
       await pagina.$eval('#invia', e => e.disabled),
       'non c’è più una categoria che permetta di mandare una foto senza fase');
 
-    registro.titolo('Bolle: MNG offre le 29 fasi, e una fase nuova non chiede nessun livello');
+    registro.titolo('Bolle: le stesse 26 fasi, e una fase nuova non chiede nessun livello');
     // `FognaturaNera` nel modulo Foto vuole il piano; nelle bolle no: i livelli
     // sono le cartelle dell'archivio di commessa, dove le bolle non vanno.
     await pagina.goto(app.indirizzo + '/index.html#/bolle');
     await pagina.waitForSelector('#cantiere');
     await attendiMenuFase(pagina, aiuto);
+    await menuSuQuattroCommesse('#cantiere', /nessuna fase/, 'Bolle');
     await pagina.selectOption('#cantiere', 'MNG');
     await aiuto.attendiMarcatore(pagina, m => m.startsWith('MNG|'),
       'menù della fase pronto per MNG');
-    const bolleMNG = await pagina.$$eval('#fase option', o => o.map(e => ({ v: e.value, t: e.textContent.trim() })));
-    registro.controlla('«— nessuna fase —» e 29 fasi',
-      /nessuna fase/.test(bolleMNG[0].t) && bolleMNG[0].v === '' && bolleMNG.length - 1 === QUANTE_FASI,
-      `${bolleMNG[0].t} · ${bolleMNG.length - 1} voci`);
     await pagina.selectOption('#fase', 'FognaturaNera');
     registro.controlla('con FognaturaNera nessun livello chiesto: i menù dei livelli non esistono',
       (await pagina.$$('#campo-piano, #campo-unita, #campo-scala, #campo-prospetto')).length === 0);

@@ -79,7 +79,7 @@
 // finisce nella cartella del mese con un'anomalia — voluto: non blocca chi sta
 // scattando in cantiere per un dato che manca in ufficio.
 
-import { FASI, etichettaFase } from './fasi.js';
+import { FASI, FASI_ESCLUSE_DALLE_APP, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
   versione: '202610261235',
@@ -610,9 +610,13 @@ export function livelliMancanti(codice, codiceFase, scelteFatte = {}) {
 // piani interrati non vedeva la fase `Interrato`; con l'interrato che si legge
 // dal piano quel filtro non ha più ragione, e una commessa senza anagrafica
 // non è mai stata un motivo per togliere voci a chi sta scattando.
+// Le fasi del menù sono `FASI` meno quelle che le app non offrono (dalla
+// 0.41.0, `FASI_ESCLUSE_DALLE_APP` in `core/fasi.js`): 26 voci con o senza
+// cantiere, sugli edifici e sulle commesse senza anagrafica. I lotti delle
+// urbanizzazioni non c'entrano.
 export function vociSelettoreFase(codiceCommessa) {
   if (eUrbanizzazione(codiceCommessa)) return lottiDi(codiceCommessa);
-  return FASI.slice();
+  return FASI.filter(f => !FASI_ESCLUSE_DALLE_APP.includes(f.codice));
 }
 
 export function etichettaSelettoreFase(codiceCommessa) {

@@ -219,6 +219,17 @@ module.exports = {
         if (richiesti.length === 0) perLivello.nessuno += 1;
       }
       out.perLivello = perLivello;
+      // Lo stesso conto sul MENÙ (dalla 0.41.0): le tre fasi escluse dalle app
+      // non hanno livelli, quindi il menù a 26 voci ha 10 / 4 / 1 / 11.
+      const perLivelloMenu = { piano: 0, unita: 0, prospetto: 0, nessuno: 0, voci: 0 };
+      for (const f of a.vociSelettoreFase('MNG').map(x => x.codice)) {
+        const r = a.ANAGRAFICA.livelliPerFase[f];
+        const richiesti = ['piano', 'unita', 'prospetto'].filter(l => r[l] === 'O');
+        for (const l of richiesti) perLivelloMenu[l] += 1;
+        if (richiesti.length === 0) perLivelloMenu.nessuno += 1;
+        perLivelloMenu.voci += 1;
+      }
+      out.perLivelloMenu = perLivelloMenu;
       out.combinazioni = combinazioni;
       out.uniche = uniche;
       out.senzaVoci = senzaVoci;
@@ -272,6 +283,11 @@ module.exports = {
         && numeri.perLivello.prospetto === 1 && numeri.perLivello.nessuno === 14,
       `piano ${numeri.perLivello.piano} · unità ${numeri.perLivello.unita} · prospetto ${numeri.perLivello.prospetto} · nessuno ${numeri.perLivello.nessuno}`,
       'sono 29 fasi: 10 + 4 + 1 + 14, e nessuna fase pretende due livelli obbligatori');
+    const m = numeri.perLivelloMenu;
+    registro.controlla('nel menù (26 voci): 10 a piano, 4 a unità, 1 a prospetto, 11 senza livelli',
+      m.voci === 26 && m.piano === 10 && m.unita === 4 && m.prospetto === 1 && m.nessuno === 11,
+      `voci ${m.voci} · piano ${m.piano} · unità ${m.unita} · prospetto ${m.prospetto} · nessuno ${m.nessuno}`,
+      'le tre fasi escluse dalle app (0.41.0) non hanno livelli: escono tutte dal gruppo «senza livelli»');
     registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
       numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
     registro.controlla('in tutte le commesse edificio il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
@@ -374,8 +390,8 @@ module.exports = {
     // quota non offriva `Interrato`, perché sarebbe stata una cartella che non
     // sarebbe mai esistita. Quella fase non c'è più — l'interrato si legge dal
     // piano — e con lei il filtro: i due elenchi devono essere lo stesso.
-    registro.controlla('MAR e MNG mostrano le stesse 29 fasi, nello stesso ordine',
-      fasiMAR.length === 29 && fasiMNG.join(',') === fasiMAR.join(','),
+    registro.controlla('MAR e MNG mostrano le stesse 26 fasi, nello stesso ordine',
+      fasiMAR.length === 26 && fasiMNG.join(',') === fasiMAR.join(','),
       `MAR ${fasiMAR.length} · MNG ${fasiMNG.length}`,
       'un elenco diverso fra due edifici vorrebbe dire che un filtro è rimasto acceso');
     registro.controlla('e né Interrato né ImpiantiDiReteCondominiali, che non sono più fasi',
@@ -544,7 +560,16 @@ module.exports = {
     registro.controlla('scelto P-1 parte FinituraPartiComuniInterne con P-1',
       comuni.fase === 'FinituraPartiComuniInterne' && comuni.piano === 'P-1');
 
-    for (const fase of ['SpeseTecniche', 'AcquistoTerreno']) {
+    // Dalla 0.41.0 `SpeseTecniche` e `AcquistoTerreno` (con `Marketing`) non
+    // sono più nel menù: qui si provavano come fasi nuove senza livelli. Si
+    // controlla che non ci siano, e la prova «parte con la sola fase» passa a
+    // `Extra`, che resta.
+    await scegliCommessa('#commessa', 'MNG');
+    const fasiOfferte = await voci('#fase');
+    registro.controlla('MNG: AcquistoTerreno, Marketing e SpeseTecniche non sono nel menù',
+      ['AcquistoTerreno', 'Marketing', 'SpeseTecniche'].every(f => !fasiOfferte.includes(f)) && fasiOfferte.includes('Extra'),
+      `${fasiOfferte.length} voci`);
+    for (const fase of ['Extra']) {
       await scegliCommessa('#commessa', 'MNG');
       await scegliFase(fase);
       registro.controlla(`${fase}: nessun livello chiesto`,
@@ -665,8 +690,9 @@ module.exports = {
     // scattando per un dato che manca in ufficio.
     await scegliCommessa('#commessa', 'MRS');
     const fasiMRS = await voci('#fase');
-    registro.controlla('una commessa senza anagrafica mostra tutte e 29 le fasi, e non Interrato',
-      fasiMRS.length === 29 && !fasiMRS.includes('Interrato'), String(fasiMRS.length));
+    registro.controlla('una commessa senza anagrafica mostra le 26 fasi delle app, e non Interrato',
+      fasiMRS.length === 26 && !fasiMRS.includes('Interrato')
+        && !['AcquistoTerreno', 'Marketing', 'SpeseTecniche'].some(f => fasiMRS.includes(f)), String(fasiMRS.length));
     const senzaAnagrafica = await mandaFoto('MRS', 'Strutture');
     registro.controlla('e non chiede il piano, perché non ne ha da offrire',
       senzaAnagrafica.piano === null,

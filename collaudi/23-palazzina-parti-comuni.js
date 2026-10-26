@@ -22,7 +22,8 @@
 // col P-1 scelto dall'app, diventa TN1 · `FinituraPartiComuniInterne` col P-1
 // scelto dall'operatore (`Interrato` non è più una fase). Il 28 conta 29 fasi
 // e verifica che `Interrato` non ci sia. Il 34 è il caso 6 di quella
-// specifica: TN1 · `FognaturaBianca` · P1 chiede il lotto.
+// specifica: TN1 · `FognaturaBianca` · P1 chiede il lotto. Dalla 0.41.0 il 28
+// conta 26 fasi: le app non offrono le tre fasi della contabilità.
 //
 // Ingresso = scelte dell'operatore; esito = i quattro campi del payload nell'ordine
 // piano, unita, prospetto, scala, oppure il blocco dell'invio.
@@ -431,14 +432,17 @@ module.exports = {
     });
 
     // ------------------------------------------------------------------ caso 28: il selettore della fase di TN1
-    await caso(28, 'TN1 · selettore della fase: 29 fasi, nessun lotto di urbanizzazione', async () => {
+    await caso(28, 'TN1 · selettore della fase: 26 fasi, nessun lotto di urbanizzazione', async () => {
       await apri();
       await scegli('commessa', 'TN1');
       const etichetta = await pagina.$eval('#etichetta-fase', e => e.textContent.trim());
       const fasi = await pagina.$$eval('#fase option', o => o.filter(e => e.value).map(e => e.value));
       registro.controlla('l’etichetta è «Fase di lavoro»', etichetta === 'Fase di lavoro', etichetta);
-      registro.controlla('le voci sono le 29 fasi, e Interrato non c’è più',
-        fasi.length === 29 && !fasi.includes('Interrato') && !fasi.includes('ImpiantiDiReteCondominiali'), String(fasi.length));
+      // Dalla 0.41.0 le app non offrono AcquistoTerreno, Marketing e
+      // SpeseTecniche: 29 fasi del master meno 3.
+      registro.controlla('le voci sono le 26 fasi delle app: né Interrato né le tre escluse',
+        fasi.length === 26 && !fasi.includes('Interrato') && !fasi.includes('ImpiantiDiReteCondominiali')
+          && !['AcquistoTerreno', 'Marketing', 'SpeseTecniche'].some(f => fasi.includes(f)), String(fasi.length));
       registro.controlla('e non c’è nessun Lotto1–Lotto3: TN1 è un edificio, non un’urbanizzazione',
         !fasi.some(f => /^Lotto\d+$/.test(f)));
     });
