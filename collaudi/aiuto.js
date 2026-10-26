@@ -62,6 +62,9 @@
 //    nei collaudi che le inviano si è visto solo quando un caso ha mandato un
 //    video. Chi manda un video in un collaudo parte, nei casi dopo, da una coda
 //    vuota (23-palazzina-parti-comuni.js azzera il database delle foto).
+// 8. **La guardia sui duplicati del flow finto resta accesa** da un collaudo
+//    all'altro: `esegui.js` non la spegne. Chi ha bisogno di un flow che
+//    rifiuti anche un ritentativo la spegne da sé (vedi 24-contatori-avviso.js).
 // 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
 //    lo controlla come script CommonJS e lascia passare errori che in un
 //    modulo ES sono fatali. Il controllo giusto è
