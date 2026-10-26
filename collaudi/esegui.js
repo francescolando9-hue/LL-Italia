@@ -22,6 +22,11 @@ async function principale() {
     .filter(n => FILTRO.length === 0 || FILTRO.some(f => n.includes(f)))
     .sort();
   if (files.length === 0) { console.error('Nessun collaudo corrisponde a', FILTRO.join(' ')); process.exit(1); }
+  // Le leve di `aiuto.js` (`--cpu=N`, `--ritardo-letture=ms`) si dichiarano in
+  // testa: un verde ottenuto in condizioni diverse da quelle di tutti i giorni
+  // va letto sapendolo.
+  const leve = process.argv.slice(2).filter(a => a.startsWith('-'));
+  if (leve.length > 0) console.log(`Condizioni di prova: ${leve.join(' ')}`);
 
   // Il server dell'app si spegne e si riaccende: il collaudo offline lo
   // spegne apposta, ed è l'unico modo onesto di provarlo.

@@ -15,6 +15,29 @@
 //    che l'operatore lo capisca e faccia qualcosa: un messaggio che non si
 //    legge vale come nessun messaggio.
 
+import { SOGLIA_RITARDO_MS } from './coda-invio.js';
+
+// L'avviso in cima ai due moduli (dalla 0.41.0), quando un elemento della coda
+// non è arrivato 10 minuti dopo esserci entrato. Sta qui perché è un messaggio
+// all'operatore condiviso dai due moduli, come gli altri di questo file. Una
+// riga per caso, a parole e non col solo colore, col numero e con singolare e
+// plurale giusti. I casi sono quelli di `elementiInRitardo`
+// (core/coda-invio.js) e il collaudo verifica che ognuno abbia la sua frase:
+// un caso nuovo senza frase lo fa fallire. `nome` è la parola del modulo:
+// { uno: 'bolla', tanti: 'bolle' } oppure { uno: 'foto o video', tanti: 'foto o video' }.
+const MINUTI_RITARDO = Math.round(SOGLIA_RITARDO_MS / 60000);
+export const FRASI_AVVISO_RITARDO = {
+  attesa: (n, nome) => `${n} ${n === 1 ? nome.uno : nome.tanti} in attesa da più di ${MINUTI_RITARDO} minuti`,
+  errore: (n, nome) => `${n} ${n === 1 ? nome.uno : nome.tanti} in errore da più di ${MINUTI_RITARDO} minuti`,
+};
+
+// Le righe dell'avviso, nell'ordine dei casi: vuoto quando tutto è in ordine.
+export function righeAvvisoRitardo(conti, nome) {
+  return Object.keys(FRASI_AVVISO_RITARDO)
+    .filter(caso => conti[caso] > 0)
+    .map(caso => ({ caso, testo: FRASI_AVVISO_RITARDO[caso](conti[caso], nome) }));
+}
+
 // Perché il flow ha rifiutato: il numero da solo non dice a chi guarda cosa
 // fare. Il 502 in particolare non è un problema di rete — è il flow che è
 // terminato senza eseguire nessuna azione Response: il file non è stato

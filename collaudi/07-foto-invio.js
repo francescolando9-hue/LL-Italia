@@ -50,8 +50,8 @@ module.exports = {
       // `Cantiere` non pretende livelli: è il percorso veloce per una foto
       // generica, e qui serve a provare l'invio senza trascinarsi dentro la
       // regola dei livelli, che ha il suo collaudo.
-      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MAR|'),
-        'menù della fase pronto', 10000);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith('MAR|'),
+        'menù della fase pronto');
       await pagina.selectOption('#fase', 'Cantiere');
       await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
       await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);

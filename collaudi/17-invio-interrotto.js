@@ -68,8 +68,8 @@ module.exports = {
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#commessa');
     await pagina.selectOption('#commessa', 'SNZ2.2');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
-      'menù pronto', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('SNZ2.2|'),
+      'menù pronto');
     await pagina.selectOption('#fase', 'Impermeabilizzazioni');
     await pagina.selectOption('#piano', 'P-1');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
@@ -123,8 +123,8 @@ module.exports = {
     await pagina.waitForSelector('#commessa');
     flow.stato.nonRispondere = true;
     await pagina.selectOption('#commessa', 'SNZ2.2');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
-      'menù pronto', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('SNZ2.2|'),
+      'menù pronto');
     await pagina.selectOption('#fase', 'Cantiere');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif-mm.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);

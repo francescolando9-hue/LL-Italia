@@ -89,6 +89,61 @@ export function messaggioScaduto(scadenza = scadenzaInvioMs()) {
     : `Invio interrotto: nessuna risposta dopo ${Math.round(scadenza / 1000)} secondi. Resta in coda e si riprova.`;
 }
 
+// --- Il momento in cui un elemento entra in coda (dalla 0.41.0) -------------
+// `accodatoIl` è il momento in cui l'elemento è entrato in coda: quando
+// l'operatore preme Invia (da bozza a coda), con «Rimanda» (la stessa o
+// corretta) e con «Cantiere sbagliato?». È il riferimento dell'avviso in cima
+// alla schermata: un elemento non arrivato 10 minuti dopo esserci entrato.
+// Non è `creatoIl`, che è il momento in cui la foto è entrata fra le bozze: una
+// foto fatta mezz'ora prima e mandata adesso non è in ritardo.
+//
+// **Non si sposta** con i ritentativi automatici, con la ripresa di un invio
+// interrotto e con «Riprova» (decisione di Francesco del 26/10/2026): è lo
+// stesso elemento, e non è arrivato. Spostarlo nasconderebbe il problema per
+// altri dieci minuti a ogni tocco.
+//
+// Resta sul telefono: non entra nel payload, il contratto col flow non cambia.
+export function segnaIngressoInCoda(record, ora = Date.now()) {
+  record.accodatoIl = ora;
+  return record;
+}
+
+// Per un elemento salvato da una versione che il campo non lo scriveva
+// (0.40.0 e prima) vale `creatoIl`: è un'approssimazione per eccesso del
+// ritardo, che al peggio accende l'avviso su un elemento davvero fermo.
+export function ingressoInCoda(record) {
+  return Number.isFinite(record.accodatoIl) ? record.accodatoIl : record.creatoIl;
+}
+
+// --- L'avviso in cima alla schermata (dalla 0.41.0) -------------------------
+// I contatori del giorno stanno in fondo; in cima compare un avviso SOLO quando
+// c'è un problema: un elemento della coda non ancora arrivato 10 minuti dopo
+// esserci entrato (decisione di Francesco del 26/10/2026). Le bozze non
+// contano. Con la soglia, un errore passeggero che il motore risolve da solo al
+// tentativo dopo — e «Errore» va e viene a ogni tentativo fallito — non
+// accende niente. Una costante sola per i due moduli.
+export const SOGLIA_RITARDO_MS = 10 * 60 * 1000;
+
+// Ogni quanto la vista ricontrolla da sola, anche senza altri eventi: l'avviso
+// deve comparire entro un minuto dal superamento della soglia. Trenta secondi
+// stanno dentro con margine e non pesano: si legge la coda, non si ridisegna.
+export const CONTROLLO_RITARDO_MS = 30 * 1000;
+
+// Quanti elementi sono in ritardo, per caso: `attesa` (In coda o Invio in
+// corso, come il contatore «In attesa») ed `errore`. I nomi dei casi sono le
+// chiavi delle frasi in `core/errori.js`, e il collaudo li confronta.
+export function elementiInRitardo(record, ora = Date.now()) {
+  const conti = { attesa: 0, errore: 0 };
+  for (const r of record) {
+    const caso = r.stato === 'errore' ? 'errore'
+      : (r.stato === 'in_coda' || r.stato === 'invio') ? 'attesa' : '';
+    if (!caso) continue;
+    const ingresso = ingressoInCoda(r);
+    if (Number.isFinite(ingresso) && ora - ingresso > SOGLIA_RITARDO_MS) conti[caso] += 1;
+  }
+  return conti;
+}
+
 const RITARDO_MINIMO_MS = 5000;
 const RITARDO_MASSIMO_MS = 5 * 60 * 1000;
 

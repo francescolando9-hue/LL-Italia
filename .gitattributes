@@ -1,0 +1,2 @@
+# A capo come nel repository (LF) su ogni PC, qualunque sia core.autocrlf: un file letto dal disco deve dare l'impronta del contenuto registrato. Le immagini restano binarie.
+* text=auto eol=lf

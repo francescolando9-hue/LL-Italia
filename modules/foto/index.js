@@ -10,7 +10,8 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
-import { messaggioSalvataggio, memoriaPiena } from '../../core/errori.js';
+import { messaggioSalvataggio, memoriaPiena, righeAvvisoRitardo } from '../../core/errori.js';
+import { elementiInRitardo, CONTROLLO_RITARDO_MS } from '../../core/coda-invio.js';
 import { timestampDispositivo } from '../../core/orario.js';
 import { dataScattoDaFoto, spiegazioneMotivo } from '../../core/exif.js';
 import { fileInMemoria, eLetturaNegata, descriviLettura } from '../../core/byte.js';
@@ -215,8 +216,10 @@ async function vista(el) {
   const opzioniCommessa = '<option value="" selected>— scegli il cantiere —</option>'
     + CANTIERI.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('');
 
+  // In cima, solo quando c'è un problema (dalla 0.41.0): il perché è scritto
+  // nel modulo Bolle. I contatori del giorno stanno in fondo.
   el.innerHTML = `
-    <div id="foto-contatori" class="foto-contatori"></div>
+    <button id="foto-avviso" class="avviso avviso-attenzione avviso-ritardo nascosto" type="button" aria-live="polite"></button>
     <section class="scheda">
       <div class="campo">
         <label for="commessa">Cantiere</label>
@@ -247,12 +250,13 @@ async function vista(el) {
         <p class="aiuto tenue">Vale per tutte le foto di questo invio.</p>
       </div>
     </section>
-    <section class="scheda">
+    <section id="sezione-coda" class="scheda">
       <h2>Coda invii</h2>
       <div id="coda-azioni"></div>
       <ul id="lista-coda" class="foto-coda"></ul>
       <div id="riquadro-rimando"></div>
     </section>
+    <div id="foto-contatori" class="foto-contatori"></div>
     <p style="text-align:center"><a class="tenue" href="#/foto/impostazioni">Impostazioni del modulo Foto</a></p>
     <div class="spazio-barra" aria-hidden="true"></div>
     <div class="barra-comandi">
@@ -275,9 +279,39 @@ async function vista(el) {
   el.querySelector('#input-video').addEventListener('change', gestisciFile);
   el.querySelector('#input-galleria').addEventListener('change', gestisciFile);
   el.querySelector('#invia').addEventListener('click', invia);
+  el.querySelector('#foto-avviso').addEventListener('click', () => {
+    el.querySelector('#sezione-coda').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
 
   await ridisegna();
+  avviaControlloRitardo();
   invio.avvia();
+}
+
+// L'avviso in cima e il controllo che gira da solo: come nel modulo Bolle,
+// con la parola di questo modulo.
+const NOME_ELEMENTO = { uno: 'foto o video', tanti: 'foto o video' };
+function aggiornaAvviso(record) {
+  const riquadro = radice && radice.querySelector('#foto-avviso');
+  if (!riquadro) return false;
+  const righe = righeAvvisoRitardo(elementiInRitardo(record), NOME_ELEMENTO);
+  riquadro.innerHTML = righe.map(r => `<span class="riga" data-caso="${r.caso}">${scappaHtml(r.testo)}</span>`).join('')
+    + (righe.length > 0 ? '<span class="vai">Tocca per vedere la coda invii</span>' : '');
+  riquadro.classList.toggle('nascosto', righe.length === 0);
+  return true;
+}
+
+let timerRitardo = null;
+function avviaControlloRitardo() {
+  clearInterval(timerRitardo);
+  timerRitardo = setInterval(async () => {
+    if (!radice || !radice.querySelector('#foto-avviso')) {
+      clearInterval(timerRitardo);
+      timerRitardo = null;
+      return;
+    }
+    aggiornaAvviso(await coda.elenca());
+  }, CONTROLLO_RITARDO_MS);
 }
 
 // Da dove arriva un file cambia cosa si sa della sua ora, ed è l'unica cosa
@@ -568,6 +602,7 @@ async function ridisegna() {
   const inAttesa = record.filter(r => r.stato === 'in_coda' || r.stato === 'invio');
   const inErrore = record.filter(r => r.stato === 'errore');
   const contatori = coda.contatoriOggi();
+  aggiornaAvviso(record);
 
   radice.querySelector('#foto-contatori').innerHTML = `
     <div class="foto-chip"><span class="valore">${contatori.scattate}</span><span class="etichetta">Scattate oggi</span></div>

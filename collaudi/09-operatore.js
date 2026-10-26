@@ -170,8 +170,8 @@ module.exports = {
     await pagina.goto(app.indirizzo + '/index.html#/foto');
     await pagina.waitForSelector('#commessa', { timeout: 20000 });
     await pagina.selectOption('#commessa', 'MAR');
-    await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('MAR|'),
-      'menù della fase pronto', 10000);
+    await aiuto.attendiMarcatore(pagina, m => m.startsWith('MAR|'),
+      'menù della fase pronto');
     await pagina.selectOption('#fase', 'Cantiere');
     await pagina.setInputFiles('#input-galleria', [materiale('foto-cantiere.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1,

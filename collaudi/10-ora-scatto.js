@@ -29,8 +29,8 @@ module.exports = {
     // il percorso più corto per provare l'ORA, che è la cosa in prova qui.
     const scegli = async () => {
       await pagina.selectOption('#commessa', 'SNZ2.2');
-      await aiuto.attendi(pagina, () => document.querySelector('#fase').dataset.livelli.startsWith('SNZ2.2|'),
-        'menù della fase pronto', 10000);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith('SNZ2.2|'),
+        'menù della fase pronto');
       await pagina.selectOption('#fase', 'Cantiere');
     };
 

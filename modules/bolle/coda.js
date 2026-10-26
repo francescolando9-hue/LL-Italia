@@ -4,6 +4,7 @@
 // errore = invio fallito, resta in coda e si ritenta.
 
 import { timestampDispositivo } from '../../core/orario.js';
+import { segnaIngressoInCoda } from '../../core/coda-invio.js';
 
 const NOME_DB = 'llitalia-bolle';
 const VERSIONE_DB = 4;
@@ -173,8 +174,11 @@ export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase
   const idComune = unaSolaBolla ? crypto.randomUUID() : '';
   let numero = primo;
   let pagina = 1;
+  // Un invio, un momento d'ingresso in coda: è il tocco su Invia.
+  const adesso = Date.now();
   for (const record of bozze) {
     record.stato = 'in_coda';
+    segnaIngressoInCoda(record, adesso);
     record.cantiere = cantiere;
     record.fase = fase;
     record.autore = autore;
@@ -201,6 +205,7 @@ export async function confermaSingola(id, cantiere, autore, bolla = null) {
   const record = (await elenca()).find(r => r.id === id && r.stato === 'bozza');
   if (!record) return false;
   record.stato = 'in_coda';
+  segnaIngressoInCoda(record);
   record.cantiere = cantiere;
   // La fase resta quella dell'invio originale: si corregge il cantiere, non
   // l'attribuzione.
@@ -392,6 +397,8 @@ export async function rimandaStessa(id) {
   const record = (await elenca()).find(r => r.id === id);
   if (!record || record.stato !== 'inviata') return null;
   record.stato = 'in_coda';
+  // Rientra in coda adesso: il ritardo si conta da qui, non dal primo invio.
+  segnaIngressoInCoda(record);
   record.tentativi = 0;
   record.ultimoErrore = '';
   record.inviatoIl = null;
@@ -410,6 +417,7 @@ export async function rimandaCorretta(id, dati) {
     originale.foto, originale.nome, originale.miniatura,
     originale.impronta, originale.qualita, originale.motivoQualita);
   nuovo.stato = 'in_coda';
+  segnaIngressoInCoda(nuovo);
   nuovo.cantiere = dati.cantiere;
   nuovo.fase = dati.fase || '';
   nuovo.autore = dati.autore || originale.autore;

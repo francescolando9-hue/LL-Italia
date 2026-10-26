@@ -23,9 +23,22 @@
 //   qualunque piano, interrato compreso.
 // - Entrano `AcquistoTerreno`, `FognaturaBianca`, `FognaturaNera`, `SpeseTecniche`.
 //
+// **Le app non offrono tre fasi** (dalla 0.41.0, decisione di Francesco del
+// 26/10/2026): `AcquistoTerreno`, `Marketing` e `SpeseTecniche` sono fasi della
+// contabilità — su quelle non arrivano mai bolle né foto di cantiere. **La
+// lista resta una sola**: `FASI` qui sotto resta la copia delle 29 fasi del
+// master, controllata dall'impronta delle etichette, e `FASI_ESCLUSE_DALLE_APP`
+// dichiara in una riga quali le app non mostrano. Il menù della fase è `FASI`
+// meno le escluse (`vociSelettoreFase` in `core/anagrafica.js`): 26 voci, con
+// o senza cantiere scelto, su ogni edificio e sulle commesse senza anagrafica;
+// i lotti di SNU e BRU non cambiano. `etichettaFase` continua a dare
+// l'etichetta anche delle escluse, per gli elementi già in coda, e le loro
+// righe in `livelliPerFase` restano: il dato dell'anagrafica non cambia.
+//
 // **Niente è retroattivo.** Un elemento già in coda con una fase tolta parte
 // com'è, col suo codice: l'elenco non lo blocca e non lo riscrive, e a video si
 // legge il codice (vedi `etichettaFase`). Le foto già archiviate restano dove sono.
+// Vale anche per le tre fasi escluse dalle app: quello che è in coda parte com'è.
 //
 // **L'elenco non si ritocca a mano.** È la copia di un master che vive fuori da
 // questo repository e cambia solo con una consegna da Cowork: il collaudo
@@ -100,6 +113,9 @@ export const FASI = [
   { codice: 'Strutture', etichetta: 'Strutture' },
   { codice: 'Urbanizzazioni', etichetta: 'Urbanizzazioni' },
 ];
+
+// Fasi della contabilità che le app non offrono: decisione di Francesco del 26/10/2026 (vedi in testa).
+export const FASI_ESCLUSE_DALLE_APP = ['AcquistoTerreno', 'Marketing', 'SpeseTecniche'];
 
 export function faseValida(codice) {
   return FASI.some(f => f.codice === String(codice || '').trim());

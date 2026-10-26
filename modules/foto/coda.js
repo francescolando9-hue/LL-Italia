@@ -19,6 +19,7 @@
 // shell, perché è l'identità del telefono e non di un modulo.
 
 import { timestampDispositivo } from '../../core/orario.js';
+import { segnaIngressoInCoda } from '../../core/coda-invio.js';
 import { TIPO_ARCHIVIO } from './categorie.js';
 
 const NOME_DB = 'llitalia-foto';
@@ -204,8 +205,11 @@ export async function confermaBozze(commessa, autore, nota, fase = '', livelli =
   // scatto: `elenca()` ordina per creatoIl, quindi la sequenza in raccolta
   // rispecchia l'ordine in cui le foto sono state fatte.
   let progressivo = await riservaProgressivi(bozze.length);
+  // Un invio, un momento d'ingresso in coda: è il tocco su Invia.
+  const adesso = Date.now();
   for (const record of bozze) {
     record.stato = 'in_coda';
+    segnaIngressoInCoda(record, adesso);
     record.commessa = commessa;
     record.fase = fase;
     record.piano = livelli.piano || null;
@@ -283,6 +287,8 @@ export async function rimandaStessa(id) {
   const record = (await elenca()).find(r => r.id === id);
   if (!record || record.stato !== 'inviata') return null;
   record.stato = 'in_coda';
+  // Rientra in coda adesso: il ritardo si conta da qui, non dal primo invio.
+  segnaIngressoInCoda(record);
   record.tentativi = 0;
   record.ultimoErrore = '';
   record.inviatoIl = null;
@@ -318,6 +324,7 @@ export async function rimandaCorretta(id, dati) {
       scattoStimato: originale.scattoStimato,
     });
   nuovo.stato = 'in_coda';
+  segnaIngressoInCoda(nuovo);
   nuovo.commessa = dati.commessa;
   nuovo.fase = dati.fase || '';
   nuovo.piano = dati.piano || null;

@@ -31,7 +31,16 @@
 //    lettura delle voci può dare un elenco vuoto. Costa un fallimento ogni
 //    cinque o sei giri, cioè il tipo di rosso che si archivia come «flake» e
 //    non si guarda più. Si aspetta il marcatore `data-livelli`, che
-//    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto.
+//    `sincronizzaLivelli` scrive per ULTIMO, quando tutti i menù sono a posto,
+//    e lo si legge SOLO con `leggiMarcatore` / `attendiMarcatore` (più sotto):
+//    finché non c'è, il menù non è pronto — leggerlo a mano con
+//    `.dataset.livelli.startsWith(…)` esplode proprio in quella finestra.
+//    E l'attesa deve riguardare il ridisegno che l'AZIONE produce: una
+//    condizione che era già vera prima del tocco non aspetta niente. Il
+//    pulsante di «Rimanda» dice «Rimanda corretta» già all'apertura, quando la
+//    fase dell'invio è stata tolta dall'elenco: aspettare quel testo dopo la
+//    scelta leggeva il disegno di prima (collaudo 16, pagata il 26/10/2026).
+//    Si aspetta il marcatore con la coppia nuova.
 // 6. **«Arrivata al flow» non vuol dire «invio finito».** Il flow riceve la
 //    richiesta prima che la pagina abbia registrato la risposta, e in quella
 //    finestra il record è ancora su `invio`. Chi RICARICA la pagina lì dentro
@@ -53,6 +62,9 @@
 //    nei collaudi che le inviano si è visto solo quando un caso ha mandato un
 //    video. Chi manda un video in un collaudo parte, nei casi dopo, da una coda
 //    vuota (23-palazzina-parti-comuni.js azzera il database delle foto).
+// 8. **La guardia sui duplicati del flow finto resta accesa** da un collaudo
+//    all'altro: `esegui.js` non la spegne. Chi ha bisogno di un flow che
+//    rifiuti anche un ritentativo la spegne da sé (vedi 24-contatori-avviso.js).
 // 5. `node --check` su un file dell'app NON prova che il browser lo accetti:
 //    lo controlla come script CommonJS e lascia passare errori che in un
 //    modulo ES sono fatali. Il controllo giusto è
@@ -189,11 +201,51 @@ async function apriBrowser() {
 // `opzioni` si passa a Playwright così com'è: serve per esempio a fissare il
 // fuso del telefono (`timezoneId`), senza il quale un collaudo sulle ore
 // darebbe risultati diversi a seconda di dove gira.
+//
+// **CPU rallentata** (dal 26/10/2026): `node collaudi/esegui.js --cpu=4` fa
+// girare ogni telefono con la CPU del browser rallentata quattro volte (CDP,
+// `Emulation.setCPUThrottlingRate`). Serve a riprodurre i rossi che compaiono
+// solo quando tutto è più lento — la suite completa, un PC carico — invece di
+// aspettare che capitino: un collaudo che legge il risultato prima che sia
+// assestato diventa rosso qui in modo ripetibile. Senza l'argomento non cambia
+// niente.
+//
+// **Letture della coda ritardate**: `--ritardo-letture=300` fa arrivare
+// all'app con 300 ms di ritardo il risultato di ogni lettura da IndexedDB
+// (transazioni `readonly`: è così che `elenca()` delle due code legge). La CPU
+// rallentata non basta per questo tipo di rosso: la lettura la fa il processo
+// del browser, non la pagina, e il ritardo che conta — fra un tocco e il
+// ridisegno che lo riflette, che passa da `elenca()` — resta di pochi
+// millisecondi anche a ×20. È la leva con cui si è provata la causa del rosso
+// del collaudo 16 il 26/10/2026. Il codice dell'app non si tocca: cambia solo
+// QUANDO le arriva la risposta, come su un telefono lento.
+const argomento = (nome, predefinito) =>
+  Number((process.argv.find(a => a.startsWith(`--${nome}=`)) || '').split('=')[1]) || predefinito;
+const RALLENTAMENTO_CPU = argomento('cpu', 1);
+const RITARDO_LETTURE_MS = argomento('ritardo-letture', 0);
+
 async function nuovoTelefono(browser, opzioni = {}) {
   const contesto = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opzioni,
   });
+  if (RITARDO_LETTURE_MS > 0) {
+    await contesto.addInitScript(ms => {
+      const originale = Object.getOwnPropertyDescriptor(IDBTransaction.prototype, 'oncomplete');
+      Object.defineProperty(IDBTransaction.prototype, 'oncomplete', {
+        configurable: true,
+        get() { return originale.get.call(this); },
+        set(funzione) {
+          const ritarda = funzione && this.mode === 'readonly';
+          originale.set.call(this, ritarda ? evento => setTimeout(() => funzione.call(this, evento), ms) : funzione);
+        },
+      });
+    }, RITARDO_LETTURE_MS);
+  }
   const pagina = await contesto.newPage();
+  if (RALLENTAMENTO_CPU > 1) {
+    const cdp = await contesto.newCDPSession(pagina);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: RALLENTAMENTO_CPU });
+  }
   const errori = [];
   pagina.on('console', m => { if (m.type() === 'error') errori.push(m.text()); });
   pagina.on('pageerror', e => errori.push('pageerror: ' + e.message));
@@ -257,11 +309,39 @@ async function configura(pagina, indirizzoApp, impostazioni = {}) {
 // si invia. `Bonifica` non pretende livelli: è il percorso più corto, e i
 // livelli hanno il loro collaudo (15-livelli.js).
 async function scegliFase(pagina, fase = 'Bonifica', limite = 10000) {
-  await attendi(pagina, () => {
-    const menu = document.querySelector('#fase');
-    return Boolean(menu && menu.dataset.livelli !== undefined && menu.querySelectorAll('option').length > 1);
-  }, 'menù della fase pronto', limite);
+  await attendiMarcatore(pagina, () => true, 'menù della fase pronto', { limite });
   await pagina.selectOption('#fase', fase);
+}
+
+// --- Il marcatore dei menù (trappola 4ter) ----------------------------------
+// `data-livelli` sul menù della fase dice per quale coppia `commessa|fase` la
+// shell ha costruito i menù; lo scrive per ULTIMO, quando sono a posto. Si
+// legge SOLO da qui, in tutti i collaudi: fino al 26/10/2026 c'erano 21 letture
+// scritte a mano come `….dataset.livelli.startsWith(…)`, e con il marcatore non
+// ancora scritto davano un TypeError che fermava tutto il collaudo (visto sul 16
+// a CPU ×10 e con le letture ritardate). **Assente vuol dire «non ancora
+// pronto»**, non un errore: si aspetta ancora. `prefisso` è quello dei menù del
+// riquadro «Rimanda» (`r-`).
+function leggiMarcatore(pagina, prefisso = '') {
+  return pagina.evaluate(p => {
+    const menu = document.querySelector(`#${p}fase`);
+    if (!menu || menu.dataset.livelli === undefined || menu.querySelectorAll('option').length < 2) return null;
+    return menu.dataset.livelli;
+  }, prefisso);
+}
+
+// Aspetta che il marcatore ci sia e soddisfi `condizione`, che si scrive in
+// Node e riceve la stringa: `m => m.startsWith('MNG|')`, `m => m === 'MNG|Cantiere'`,
+// `() => true` per «pronto, comunque sia».
+async function attendiMarcatore(pagina, condizione, descrizione, { prefisso = '', limite = 10000 } = {}) {
+  const fine = Date.now() + limite;
+  let ultimo = null;
+  while (Date.now() < fine) {
+    ultimo = await leggiMarcatore(pagina, prefisso);
+    if (ultimo !== null && condizione(ultimo)) return ultimo;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  throw new Error(`Attesa scaduta (${descrizione}; marcatore ${ultimo === null ? 'assente' : `«${ultimo}»`})`);
 }
 
 // Riparte pulito: contatori del giorno e code svuotati (trappola 4).
@@ -314,5 +394,6 @@ function materiale(nome) {
 module.exports = {
   RADICE, MATERIALE, PORTA_APP, PORTA_FLOW,
   avviaStatico, avviaFlow, apriBrowser, nuovoTelefono,
-  attendi, attendiInstallazione, configura, scegliFase, puliscine, creaRegistro, materiale,
+  attendi, attendiInstallazione, configura, scegliFase, leggiMarcatore, attendiMarcatore,
+  puliscine, creaRegistro, materiale,
 };

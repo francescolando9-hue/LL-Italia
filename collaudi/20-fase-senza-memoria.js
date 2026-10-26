@@ -67,11 +67,8 @@ module.exports = {
       const dati = JSON.parse(localStorage.getItem(k) || '{}');
       return dati.ultimaFase === undefined ? '(assente)' : dati.ultimaFase;
     }, chiave);
-    const attendiMenu = async (commessa = '') => aiuto.attendi(pagina, c => {
-      const menu = document.querySelector('#fase');
-      return Boolean(menu && menu.dataset.livelli !== undefined && menu.dataset.livelli.startsWith(`${c}|`)
-        && menu.querySelectorAll('option').length > 1);
-    }, `menù della fase pronto per «${commessa}»`, 10000, commessa);
+    const attendiMenu = async (commessa = '') => aiuto.attendiMarcatore(pagina,
+      m => m.startsWith(`${commessa}|`), `menù della fase pronto per «${commessa}»`);
     // Si aspetta «Inviata» e non l'arrivo al flow (trappola 6 di aiuto.js):
     // questo collaudo ricarica la pagina dopo gli invii.
     const attendiInviate = (quante, descrizione) => aiuto.attendi(pagina,
