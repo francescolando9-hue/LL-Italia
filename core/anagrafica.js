@@ -636,6 +636,31 @@ export function valoreFaseAmmesso(codiceCommessa, codice) {
   return vociSelettoreFase(codiceCommessa).some(v => v.codice === codice);
 }
 
+// **La fase di una bolla non si perde in silenzio** (dalla 0.41.1, decisione di
+// Francesco del 27/10/2026). Nei riquadri con cui si rimanda una bolla inviata
+// il menù della fase parte dalla fase della bolla; se quella fase NON è fra le
+// voci per il cantiere scelto — tolta dal master (`Interrato`), esclusa dalle
+// app (`Marketing`), o che il cantiere non prevede (`Strutture` su SNU, dove ci
+// sono i lotti) — il menù sta sul segnaposto, e fino alla 0.41.0 il pulsante
+// restava acceso: un tocco e la bolla ripartiva con `fase: ""` senza che
+// nessuno l'avesse deciso. Questo è il punto solo in cui si decide il caso; la
+// frase che lo dice sta in `core/errori.js` (`fraseFaseDaRivedere`).
+//
+// Restituisce `null` se la fase è vuota o si può scegliere per quel cantiere,
+// altrimenti i dati per la frase: l'etichetta (il codice com'è per una fase
+// tolta, che un'etichetta non l'ha più), se è un lotto, e se il menù del
+// cantiere scelto offre lotti invece di fasi.
+export function faseDaRivedere(codiceCommessa, codiceFase) {
+  const fase = String(codiceFase || '');
+  if (!fase || valoreFaseAmmesso(codiceCommessa, fase)) return null;
+  return {
+    codice: fase,
+    etichetta: etichettaFaseOLotto(fase),
+    lotto: /^Lotto\d+$/.test(fase),
+    menuLotti: eUrbanizzazione(codiceCommessa),
+  };
+}
+
 // Il segnaposto dice la verità sul campo (dalla 0.37.9). Dove la fase è
 // FACOLTATIVA — le bolle — la prima voce è «— nessuna fase —» ed è una
 // scelta valida: il vuoto in raccolta è un'informazione. Dove è
@@ -739,7 +764,7 @@ export function opzioniScala(voci, scelto, scappaHtml) {
 // fatte le opzioni: finché non cambia, il menù si lascia stare — rifarlo a
 // ogni ridisegno butterebbe la scelta appena fatta dall'operatore, e i
 // ridisegni qui sono continui (ne parte uno per ogni foto preparata).
-function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true) {
+function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true, sempreIniziale = false) {
   if (!menu || menu.dataset.chiave === chiave) return;
   // `iniziale` vale SOLO alla prima costruzione: è l'ultima scelta salvata,
   // o il valore del record che si sta rimandando. Riapplicarlo dopo
@@ -758,12 +783,21 @@ function rifaiSeServe(menu, chiave, iniziale, costruisci, portaDietro = true) {
   // scelta per MNG. Alla PRIMA costruzione vale solo `iniziale`, che arriva
   // vuoto ovunque tranne nel riquadro di «Rimanda», dove è il valore del
   // record da correggere — un dato da rivedere, non un suggerimento.
+  //
+  // `sempreIniziale` (dalla 0.41.1) vale per la fase nei riquadri con cui si
+  // rimanda una bolla inviata: a OGNI ricostruzione — cioè a ogni cambio di
+  // cantiere — il menù torna al valore della bolla, se il cantiere nuovo lo
+  // offre. Spostare una bolla da MAR a MNG non le toglie la fase; una fase
+  // scelta a mano prima del cambio non si porta dietro, si torna a quella della
+  // bolla. Senza, da MAR a MNG il menù ripartiva dal segnaposto e la bolla
+  // partiva con `fase: ""`.
   const automatico = menu.dataset.automatico === '1';
   delete menu.dataset.automatico;
   const primaVolta = menu.dataset.chiave === undefined;
   const precedente = automatico ? ''
-    : primaVolta ? (menu.value || iniziale || '')
-      : portaDietro ? menu.value : '';
+    : sempreIniziale ? (iniziale || '')
+      : primaVolta ? (menu.value || iniziale || '')
+        : portaDietro ? menu.value : '';
   menu.dataset.chiave = chiave;
   menu.innerHTML = costruisci(precedente);
   // Se il valore di prima non è più fra le opzioni, `value` resta vuoto da
@@ -819,6 +853,9 @@ function mostraVoceUnica(radice, prefisso, livello, menu, voce, fase, scappaHtml
 // `opzioni.faseObbligatoria` cambia solo il segnaposto del menù della fase
 // («— scegli la fase —» invece di «— nessuna fase —»): che senza fase non si
 // invii lo decide il modulo, come prima.
+// `opzioni.faseDallaBolla` (dalla 0.41.1) è per i riquadri che rimandano una
+// bolla inviata: a ogni cambio di cantiere la fase torna a `iniziali.fase`, il
+// valore della bolla, se il cantiere nuovo lo offre (vedi `rifaiSeServe`).
 export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso = '', iniziali = {}, conLivelli = true, opzioni = {}) {
   const menuFase = radice.querySelector(`#${prefisso}fase`);
   if (!menuFase) return { fase: '', piano: null, unita: null, prospetto: null, scala: null, mancanti: [] };
@@ -832,7 +869,7 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   const daNessunCantiere = menuFase.dataset.chiave === 'fase:';
   rifaiSeServe(menuFase, `fase:${codiceCommessa}`, iniziali.fase,
     precedente => opzioniFaseOLotto(codiceCommessa, precedente, scappaHtml, Boolean(opzioni.faseObbligatoria)),
-    daNessunCantiere);
+    daNessunCantiere, Boolean(opzioni.faseDallaBolla));
   const etichetta = radice.querySelector(`#etichetta-${prefisso}fase`);
   if (etichetta) etichetta.textContent = etichettaSelettoreFase(codiceCommessa);
 

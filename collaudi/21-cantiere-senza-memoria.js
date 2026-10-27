@@ -20,7 +20,9 @@
 //     proprio la voce «— scegli il cantiere —», e tornare a «nessuno» era
 //     impossibile;
 //  4. la CORREZIONE dallo storico («Cantiere sbagliato?»), che apriva un menù
-//     senza segnaposto col primo degli altri cantieri già selezionato.
+//     senza segnaposto col primo degli altri cantieri già selezionato. Dalla
+//     0.41.1 («Cantiere o fase sbagliati?») parte dal cantiere della bolla,
+//     col pulsante spento finché non si cambia qualcosa.
 //
 // Il caso è scelto perché possa fallire: in memoria c'è un cantiere (`BRU`)
 // diverso da tutti quelli che si scelgono durante la prova.
@@ -121,21 +123,27 @@ module.exports = {
     await pagina.waitForSelector('#cantiere');
     registro.controlla('dopo la ricarica il cantiere è da scegliere', (await statoMenu('#cantiere')).valore === '');
 
-    registro.titolo('Bolle, storico: «Cantiere sbagliato?» parte da «scegli»');
+    // Dalla 0.41.1 il riquadro è «Cantiere o fase sbagliati?» e il menù parte
+    // dal cantiere DELLA BOLLA (decisione di Francesco del 27/10/2026), non da
+    // un altro: non è una preselezione da confermare, perché il pulsante resta
+    // spento finché non si cambia qualcosa. Il difetto della 0.37.9 era un menù
+    // che partiva dal primo degli ALTRI cantieri col pulsante già acceso.
+    registro.titolo('Bolle, storico: «Cantiere o fase sbagliati?» parte dal cantiere della bolla, pulsante spento');
     await pagina.goto(app.indirizzo + '/index.html#/bolle/storico');
     await pagina.waitForSelector('.bolle-riga', { timeout: 20000 });
     await pagina.click('.bolle-riga');
     await pagina.waitForSelector('#cantiere-corretto', { timeout: 20000 });
     stato = await statoMenu('#cantiere-corretto');
-    registro.dice('menù della correzione', `«${stato.testo}» · ${stato.voci} voci`);
-    registro.controlla('il menù della correzione parte da «— scegli il cantiere —»',
-      stato.valore === '' && stato.segnaposto,
-      'prima partiva dal primo degli altri cantieri: «Rimanda» lo mandava lì senza che nessuno l’avesse scelto');
-    registro.controlla('e «Rimanda» è spento finché non si sceglie',
+    const cantiereBolla = await pagina.$eval('.bolle-riga-testa .cantiere', e => e.textContent);
+    registro.dice('menù della correzione', `«${stato.testo}» · ${stato.voci} voci · bolla «${cantiereBolla.replace(/\s+/g, ' ').trim()}»`);
+    registro.controlla('il menù della correzione parte dal cantiere della bolla, con tutti gli otto cantieri',
+      stato.valore !== '' && cantiereBolla.includes(stato.testo) && stato.voci === 8 && !stato.segnaposto,
+      `«${stato.testo}»`);
+    registro.controlla('e «Rimanda corretta» è spento finché non si cambia qualcosa',
       await pagina.$eval('#rimanda', e => e.disabled));
-    const altro = await pagina.$eval('#cantiere-corretto', e => [...e.options].find(o => o.value).value);
+    const altro = await pagina.$eval('#cantiere-corretto', e => [...e.options].find(o => o.value && !o.selected).value);
     await pagina.selectOption('#cantiere-corretto', altro);
-    registro.controlla('scelto un cantiere, «Rimanda» si accende',
+    registro.controlla('scelto un altro cantiere, «Rimanda corretta» si accende',
       !(await pagina.$eval('#rimanda', e => e.disabled)));
 
     // ===================================================================

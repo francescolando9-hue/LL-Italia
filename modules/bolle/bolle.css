@@ -250,14 +250,16 @@
 }
 
 /* Dalla 0.41.0 il visore è una colonna: in cima la riga della bolla con la
-   posizione («3 di 12»), al centro l'immagine, in fondo il messaggio dei capi
-   e le due frecce grandi, che restano a portata di pollice (anche coi guanti)
-   mentre si scorre in verticale. */
+   posizione («3 di 12») e, ai capi dell'elenco, la frase che lo dice; sotto
+   l'immagine e il riquadro «Cantiere o fase sbagliati?». Dalla 0.41.1 non ci
+   sono più le frecce né il piede fisso in basso: si scorre col gesto, e il
+   piede copriva i comandi del riquadro. Nessun elemento del visore è fisso o
+   sticky, tranne la ✕ in alto a destra. */
 .bolle-visore {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  padding-bottom: 0;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
   /* Pieno, non trasparente: con la riga della bolla in cima, il calendario
      che traspariva sotto la rendeva difficile da leggere. */
   background: rgb(10, 14, 30);
@@ -290,33 +292,6 @@
   text-align: center;
   margin: 0;
 }
-.bolle-visore-capo span { display: block; }
-/* Il piede resta fermo in basso mentre si scorre: il messaggio dei capi e le
-   frecce si vedono anche quando sotto la bolla c'è «Cantiere sbagliato?». */
-.bolle-visore-piede {
-  position: sticky;
-  bottom: 0;
-  margin-top: 8px;
-  padding: 8px 0 calc(12px + env(safe-area-inset-bottom));
-  background: rgb(10, 14, 30);
-}
-.bolle-visore-frecce {
-  display: flex;
-  gap: 12px;
-  margin-top: 6px;
-}
-.bolle-freccia-grande {
-  flex: 1;
-  min-height: 64px;
-  border: none;
-  border-radius: var(--raggio);
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-  font-size: 2.4rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.bolle-freccia-grande:disabled { opacity: 0.3; cursor: default; }
 
 .bolle-visore-messaggio {
   color: #fff;

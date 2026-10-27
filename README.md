@@ -38,7 +38,7 @@ Dalla schermata del modulo, il pulsante **Bolle inviate** apre il registro degli
 - **Calendario del mese**, con i giorni che hanno bolle evidenziati e il numero sopra ciascuno. Si tocca un giorno per vederne l'elenco, lo si ritocca (o si usa *Tutto il mese*) per tornare al mese intero; le frecce spostano di mese. All'apertura il calendario si posiziona sul mese dell'ultimo invio.
 - **Elenco** raggruppato per giorno, con ora, cantiere e operatore. **Toccando una riga la bolla si apre a schermo intero.**
 - **Filtro cantiere** e totale del periodo con il dettaglio per commessa.
-- **Scorrimento fra le bolle** (dalla 0.41.0). Nel dettaglio di una bolla si passa alla **successiva** (quella sotto nell'elenco) **scorrendo il dito verso sinistra**, alla **precedente** verso destra, oppure con le **due frecce grandi in basso**, ‹ e ›, che si usano coi guanti. Si scorre dentro l'elenco che si sta guardando — giorno o mese, col filtro del cantiere —, nell'ordine in cui le righe sono mostrate, una riga alla volta: le pagine di una bolla di più pagine si scorrono una per una. **Ai due capi ci si ferma**: la freccia di quel lato è spenta e si legge «È la prima bolla di questo elenco» o «È l'ultima bolla di questo elenco». In cima c'è la riga della bolla (ora, n. progressivo, pagina, cantiere, fase, operatore) e la posizione, «3 di 12». **Non cambiano bolla** uno scorrimento verticale, un gesto che parte dal bordo dello schermo (il gesto «indietro» di Android) e il dito sulla pagina ingrandita, che sposta l'immagine. «Cantiere sbagliato?» riparte da «— scegli il cantiere —» a ogni bolla: una scelta non mandata si perde cambiando bolla, senza conferme. Le soglie del gesto (60 px, orizzontale almeno il doppio del verticale, fascia di 32 px ai bordi) sono scritte col motivo in `modules/bolle/storico.js` e vanno verificate sul telefono. Il modulo Foto non ha una pagina delle inviate, ed è voluto.
+- **Scorrimento fra le bolle** (dalla 0.41.0). Nel dettaglio di una bolla si passa alla **successiva** (quella sotto nell'elenco) **scorrendo il dito verso sinistra**, alla **precedente** verso destra, e basta: **dalla 0.41.1 le frecce non ci sono più** (decisione di Francesco del 27/10/2026), perché il gesto si capisce da solo e il piede fisso che le conteneva copriva il riquadro dove si sceglie il cantiere. Si scorre dentro l'elenco che si sta guardando — giorno o mese, col filtro del cantiere —, nell'ordine in cui le righe sono mostrate, una riga alla volta: le pagine di una bolla di più pagine si scorrono una per una. In cima c'è la riga della bolla (ora, n. progressivo, pagina, cantiere, fase, operatore) e la posizione, «3 di 12». **Ai due capi ci si ferma** e, sotto la posizione, una frase sola lo dice: «È la prima bolla di questo elenco», «È l’ultima bolla di questo elenco» o, con una bolla sola, «È l’unica bolla di questo elenco». **Non cambiano bolla** uno scorrimento verticale, un gesto che parte dal bordo dello schermo (il gesto «indietro» di Android) e il dito sulla pagina ingrandita, che sposta l'immagine. «Cantiere o fase sbagliati?» riparte dai valori della bolla nuova: una scelta non mandata si perde cambiando bolla, senza conferme. Le soglie del gesto (60 px, orizzontale almeno il doppio del verticale, fascia di 32 px ai bordi) sono scritte col motivo in `modules/bolle/storico.js` e vanno verificate sul telefono. Il modulo Foto non ha una pagina delle inviate, ed è voluto.
 
 Delle foto inviate il telefono conserva l'originale solo per le ultime N (impostazione del modulo, default 20); di tutte conserva invece una **miniatura a 800 px** (~70 KB), fino a 300 bolle. Aprendo una riga si vede l'originale se c'è ancora, altrimenti la miniatura, che basta a riconoscere la bolla ma non a leggerne le righe — per quello c'è la raccolta. Oltre le 300, la riga resta nell'elenco senza immagine.
 
@@ -83,11 +83,24 @@ Dalla 0.36.0, sotto **ogni** elemento inviato — foto e bolle — c'è **Rimand
 
 Serve che la foto sia ancora sul telefono: rimandare una miniatura al posto dell'originale consegnerebbe all'ufficio una foto peggiore.
 
-## Cantiere sbagliato
+**La fase di una bolla non si perde in silenzio** (dalla 0.41.1, decisione di Francesco del 27/10/2026). Vale nei due riquadri con cui si rimanda una bolla inviata: «Rimanda questa bolla» nella Coda invii e «Cantiere o fase sbagliati?» nelle bolle inviate.
+- Il menù della fase parte dalla fase della bolla. Se quella fase **non è fra le voci** per il cantiere scelto — tolta dal master (`Interrato`), esclusa dalle app (`Marketing`), o che il cantiere non prevede (`Strutture` portata su SNU, dove il menù offre i lotti) — il menù sta su «— nessuna fase —» (su SNU e BRU «— nessun lotto —»), **il pulsante resta spento finché non si sceglie una voce**, e sotto si legge il caso: «La fase «Interrato» non è fra quelle che si possono scegliere per questo cantiere: scegli la fase per rimandarla.» (con un lotto «Il lotto «Lotto 1» non è fra quelli…», e su un'urbanizzazione «scegli il lotto»). Fino alla 0.41.0 il pulsante era acceso su «Rimanda corretta» e la bolla ripartiva con la fase vuota.
+- **Cambiando il cantiere la fase torna a quella della bolla**, se il cantiere nuovo la offre: una bolla `Strutture` spostata da MAR a MNG resta `Strutture`. Una fase scelta a mano prima del cambio non si porta dietro. Fino alla 0.41.0 il menù ripartiva da «— nessuna fase —» e la bolla partiva senza fase.
 
-Nello storico, aprendo una bolla si può **rimandarla su un altro cantiere** — capitava di inviare col picker rimasto sull'ultimo cantiere usato, e capita ancora di sceglierne uno sbagliato. Il menù del cantiere giusto parte da «— scegli il cantiere —» e *Rimanda* resta spento finché non lo si sceglie (dalla 0.38.0: prima partiva dal primo degli altri cantieri). Possibile solo se la foto originale è ancora sul dispositivo: rimandare la miniatura significherebbe consegnare al magazzino una bolla meno leggibile.
+La condizione sta in `core/anagrafica.js` (`faseDaRivedere`), la frase in `core/errori.js` (`fraseFaseDaRivedere`): un punto solo per i due riquadri. **Prova da telefono:** una bolla inviata con una fase, «Rimanda», cantiere cambiato in un altro edificio → la fase resta quella; cambiato in SNU → «— nessun lotto —», pulsante spento e la frase, finché non si sceglie un lotto.
 
-**È una bolla nuova con la stessa foto**: identificativo e progressivo nuovi, file identico byte per byte (l'app non ricodifica: manda la foto conservata così com'era), stessa bolla (`idBolla`, pagina) e stessa fase dell'invio originale. Provato il 07/10/2026. La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va annullata dall'ufficio; a valle la correzione si riconosce dallo stesso file, senza cambiare il contratto. È un limite della scelta capture-only, non un difetto.
+## Cantiere o fase sbagliati
+
+Nelle bolle inviate, aprendo una bolla si può **rimandarla perché è sbagliato il cantiere, la fase, o tutti e due** (dalla 0.41.1; fino alla 0.41.0 era «Cantiere sbagliato?», col solo cantiere). Possibile solo se la foto originale è ancora sul dispositivo: rimandare la miniatura significherebbe consegnare al magazzino una bolla meno leggibile.
+
+- **Due menù, che partono dai valori della bolla**: il cantiere, con tutti i cantieri dell'app compreso quello della bolla, e la fase, costruita come nella Coda invii (lotti su SNU e BRU, fasi escluse non offerte, e la regola qui sopra sulla fase che non si perde). Solo se il cantiere della bolla non è più nel menù si parte da «— scegli il cantiere —»: altrimenti il menù mostrerebbe la prima voce come se fosse quella della bolla.
+- Il pulsante **«Rimanda corretta» si accende solo se è cambiato almeno uno dei due valori**: con niente di cambiato resta spento, e la riga sotto dice «Cambia il cantiere o la fase per rimandarla.»; quando qualcosa cambia la riga lo dice («Cambia: cantiere MNG, fase Murature. Invio nuovo, con un identificativo nuovo.»). Partire dai valori della bolla non è una preselezione da confermare senza guardare — il difetto che la 0.38.0 aveva tolto col segnaposto — perché a pulsante acceso qualcuno ha cambiato qualcosa.
+- **La conferma dice solo cosa cambia**: «Rimandare questa bolla su MNG?», «Rimandare questa bolla con fase Murature?», «Rimandare questa bolla su MNG, fase Murature?», «Rimandare questa bolla su SNU, Lotto 1?», o «Rimandare questa bolla senza fase?» quando la si toglie apposta; sotto, l'avvertenza che quella già inviata resta in magazzino e va annullata dall'ufficio.
+- A ogni bolla il riquadro riparte dai valori di quella bolla: una scelta non mandata si perde cambiando bolla, senza conferme.
+
+**È una bolla nuova con la stessa foto**: identificativo e progressivo nuovi, file identico byte per byte (l'app non ricodifica: manda la foto conservata così com'era), stessa bolla (`idBolla`, pagina), col cantiere e la fase scelti. Provato il 07/10/2026 per il cantiere. La bolla già inviata **resta in raccolta**: l'app lo dice esplicitamente e va annullata dall'ufficio; a valle la correzione si riconosce dallo stesso file, senza cambiare il contratto. È un limite della scelta capture-only, non un difetto.
+
+**Prova da telefono:** «Bolle inviate», una bolla con la foto ancora sul telefono → il riquadro mostra il suo cantiere e la sua fase, pulsante spento; cambiata la fase il pulsante si accende e la conferma dice «Rimandare questa bolla con fase …?». Scorrendo fino in fondo, nessuna barra copre i menù.
 
 ## Informazioni e aggiornamenti
 
@@ -198,7 +211,7 @@ Collaudato in locale: un video da 28,9 MB passa in 16 blocchi e arriva **intero*
 
 Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~2,0 MB di corpo; archivio da fotocamera nativa 4,39 MB → ~5,9 MB. L'ipotesi «foto d'archivio da 12 MB, corpo da 16 MB» **non si è verificata**: un telefono non produce JPEG da 12 MB, e per l'archivio l'app spedisce i byte originali senza ricodificarli. Quindi **per le foto l'invio in una richiesta basta**, con margine largo dentro la finestra di 120 secondi del trigger. Se il flow rifiuta un corpo, l'app lo dice e la foto resta in coda.
 
-Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (rev. 5). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
+Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (la revisione corrente è in testa al file). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
 
 ## Collaudi
 
@@ -212,7 +225,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Venticinque collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, otto commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria**, **cantiere senza memoria**, **riservatezza**, **palazzina e parti comuni**, **contatori in fondo e avviso in cima** e **scorrimento fra le bolle inviate**.
+Ventisette collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, otto commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria**, **cantiere senza memoria**, **riservatezza**, **palazzina e parti comuni**, **contatori in fondo e avviso in cima**, **scorrimento fra le bolle inviate**, **Rimanda di una bolla che non perde la fase** e **cantiere o fase da correggere nelle bolle inviate**.
 
 Due leve, dal 26/10/2026, per riprodurre a comando i rossi che compaiono solo quando tutto è più lento: `node collaudi/esegui.js --cpu=4` rallenta quattro volte la CPU del browser di prova, `--ritardo-letture=300` consegna all'app con 300 ms di ritardo le letture della coda. L'app non si tocca; le leve usate si leggono in testa all'uscita.
 
@@ -261,6 +274,7 @@ core/dispositivo.js   identità dell'installazione, una per telefono, condivisa
 core/informazioni.js  pagina per il supporto: i numeri li dichiarano i moduli
 core/errori.js        messaggi d'errore verso l'operatore, una sola verità,
                       comprese le frasi dell'avviso in cima (0.41.0)
+                      e della fase di una bolla da rivedere (0.41.1)
 core/coda-invio.js    motore della coda: retry, backoff, «esce solo a conferma»;
                       accodatoIl e la soglia dei 10 minuti dell'avviso (0.41.0)
 core/configurazione-link.js  link e QR che configurano un altro telefono, condivisi
@@ -274,11 +288,11 @@ collaudi/riservatezza.js  controllo di riservatezza (vedi sopra), senza browser
 docs/                 7 documenti, tutti correnti:
                       INDICE.md                         indice a nome stabile: i nomi completi
                                                         degli altri, per chi legge da fuori
-                      AppBolleSpecificaFunzionale….md   specifica ufficiale, rev. 2 (prevale su tutto)
+                      AppBolleSpecificaFunzionale….md   specifica ufficiale (prevale su tutto)
                       AppBolleFlowRicezione….md         flow di ricezione e raccolta BolleInArrivo
                       AppBolleContinuita….md            cosa arriva dall'app e con quali garanzie
                       AppBolleLeggibilita….md           metodo e taratura del controllo di leggibilità
-                      AppFotoCantiereSpecifica….md      modulo Foto cantiere, rev. 5
+                      AppFotoCantiereSpecifica….md      modulo Foto cantiere
                       FotoCantiereBriefingRicevente.md  stato reale misurato sul tenant (prevale
                                                         sulla specifica dove divergono)
 ```
