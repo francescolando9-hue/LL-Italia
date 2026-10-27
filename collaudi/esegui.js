@@ -47,9 +47,19 @@ async function principale() {
     if (collaudo.descrizione) console.log(collaudo.descrizione);
     const avvio = Date.now();
     try {
+      // Il flow finto riparte com'è all'accensione: ogni collaudo trova le
+      // stesse condizioni, che giri da solo o nella suite. Fino alla 0.41.0 si
+      // azzeravano solo ricevuti, stato e risposte, e le guardie restavano
+      // come le aveva lasciate il collaudo prima: dal 17 al 24 si partiva con
+      // `deduplica` accesa, lasciata dal 16, e dal 17 in poi `giaPresenti` non
+      // era mai a zero (trappola 9 di aiuto.js; misurato il 27/10/2026, nessun
+      // controllo cambia esito).
       flow.azzera();
       flow.stato.stato = 200;
       flow.stato.risposte = null;
+      flow.stato.deduplica = false;
+      flow.stato.nonRispondere = false;
+      flow.stato.giaPresenti = 0;
       await collaudo.esegui({ browser, app, flow, registro, aiuto });
       esiti.push({ file, falliti: registro.falliti, secondi: (Date.now() - avvio) / 1000 });
     } catch (errore) {
