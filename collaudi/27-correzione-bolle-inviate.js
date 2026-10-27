@@ -83,13 +83,21 @@ module.exports = {
     // ------------------------------------------------------------- strumenti
     const attendiContenuto = () => aiuto.attendi(pagina,
       () => !/Apertura/.test(document.querySelector('#visore-contenuto').textContent), 'bolla caricata', 10000);
-    const attendiRiquadro = cantiere => aiuto.attendiMarcatore(pagina, m => m.startsWith(`${cantiere}|`),
-      `riquadro pronto per «${cantiere}»`, { prefisso: 'c-' });
-    const apri = async (id, cantiere) => {
+    // Il riquadro nasce a ogni bolla aperta: il suo marcatore, qualunque sia,
+    // dice che i menù sono costruiti. Quale cantiere mostra lo controllano i
+    // casi, non l'attesa: un'attesa sul cantiere giusto, con un guasto,
+    // fermerebbe il collaudo invece di farlo diventare rosso.
+    const apri = async id => {
       await pagina.click(`.bolle-riga[data-id="${idClient(id)}"]`);
       await attendiContenuto();
       await pagina.waitForSelector('#riquadro-correzione');
-      await attendiRiquadro(cantiere);
+      await aiuto.attendiMarcatore(pagina, () => true, `riquadro di ${id} pronto`, { prefisso: 'c-' });
+    };
+    // Cambiando il cantiere si aspetta il marcatore del cantiere nuovo: la
+    // fase che ne esce la controllano i casi.
+    const scegliCantiere = async codice => {
+      await pagina.selectOption('#cantiere-corretto', codice);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${codice}|`), `riquadro su ${codice}`, { prefisso: 'c-' });
     };
     const chiudi = async () => {
       await pagina.click('#chiudi-visore');
@@ -156,36 +164,60 @@ module.exports = {
     registro.titolo('Caso 17 · 390×844: i comandi del riquadro non sono coperti, sulla 1ª, 3ª e 5ª bolla');
     const misura = await pagina.evaluate(() => ({ larghezza: window.innerWidth, altezza: window.innerHeight }));
     registro.dice('schermo', `${misura.larghezza}×${misura.altezza}`);
-    for (const [id, cantiere] of [['b1', 'MAR'], ['b3', 'MAR'], ['b5', '']]) {
-      await pagina.click(`.bolle-riga[data-id="${idClient(id)}"]`);
-      await attendiContenuto();
-      await pagina.waitForSelector('#riquadro-correzione');
-      await attendiRiquadro(cantiere);
-      const coperti = await pagina.evaluate(() => {
+    for (const id of ['b1', 'b3', 'b5']) {
+      await apri(id);
+      // L'immagine si aspetta caricata: è lei a spingere il riquadro in basso,
+      // e senza le sue misure il visore non scorre e non c'è niente da coprire.
+      await aiuto.attendi(pagina, () => {
+        const img = document.querySelector('#visore-contenuto img');
+        return Boolean(img) && img.complete && img.naturalHeight > 0;
+      }, 'immagine della bolla caricata', 10000);
+      const misure = await pagina.evaluate(() => {
+        const visore = document.querySelector('#visore');
         const esiti = [];
-        for (const sel of ['#cantiere-corretto', '#c-fase', '#rimanda']) {
+        let prove = 0;
+        // Un comando è libero se al centro del suo rettangolo visibile c'è lui.
+        const prova = (sel, come) => {
+          const el = document.querySelector(sel);
+          const r = el.getBoundingClientRect();
+          const alto = Math.max(r.top, 0);
+          const basso = Math.min(r.bottom, window.innerHeight);
+          if (basso - alto < r.height / 2) return; // fuori schermo in questa posizione: niente da misurare
+          prove += 1;
+          const sopra = document.elementFromPoint(r.left + r.width / 2, (alto + basso) / 2);
+          if (!(sopra && (sopra === el || el.contains(sopra)))) {
+            esiti.push(`${sel} (${come}) coperto da ${sopra ? (sopra.id ? `#${sopra.id}` : sopra.className || sopra.tagName) : 'niente'}`);
+          }
+        };
+        const comandi = ['#cantiere-corretto', '#c-fase', '#rimanda'];
+        // All'apertura, come la vede chi tocca la bolla, e poi a ogni passo di
+        // scorrimento di 40 px fino in fondo: ogni posizione in cui un comando
+        // è sullo schermo.
+        const corsa = visore.scrollHeight - visore.clientHeight;
+        for (let y = 0; y <= corsa + 40; y += 40) {
+          visore.scrollTop = Math.min(y, corsa);
+          for (const sel of comandi) prova(sel, `scorso di ${visore.scrollTop} px`);
+        }
+        for (const sel of comandi) {
           for (const blocco of ['end', 'start', 'center']) {
-            const el = document.querySelector(sel);
-            el.scrollIntoView({ block: blocco });
-            const r = el.getBoundingClientRect();
-            const x = r.left + r.width / 2;
-            const y = r.top + r.height / 2;
-            const sopra = document.elementFromPoint(x, y);
-            const libero = Boolean(sopra) && (sopra === el || el.contains(sopra));
-            if (!libero) esiti.push(`${sel} (${blocco}) coperto da ${sopra ? (sopra.id ? `#${sopra.id}` : sopra.className || sopra.tagName) : 'niente'}`);
+            document.querySelector(sel).scrollIntoView({ block: blocco });
+            prova(sel, blocco);
           }
         }
-        return esiti;
+        visore.scrollTop = 0;
+        return { esiti, prove, corsa };
       });
       const posizione = await pagina.$eval('.bolle-visore-posizione', e => e.textContent);
-      registro.controlla(`caso 17 · ${id} (${posizione}): menù del cantiere, menù della fase e pulsante liberi in fondo, in cima e al centro`,
-        coperti.length === 0, coperti.join(' | ') || '9 misure su 9 libere');
+      registro.dice(`${id}`, `il visore scorre di ${misure.corsa} px · ${misure.prove} misure`);
+      registro.controlla(`caso 17 · ${id} (${posizione}): menù del cantiere, menù della fase e pulsante mai coperti, in ogni posizione di scorrimento`,
+        misure.corsa > 0 && misure.prove > 0 && misure.esiti.length === 0,
+        misure.esiti.slice(0, 3).join(' | ') || `${misure.prove} misure libere su ${misure.prove}`);
       await chiudi();
     }
 
     // ================================================================ caso 7
     registro.titolo('Caso 7 · bolla MAR «Strutture» con la foto sul telefono');
-    await apri('b1', 'MAR');
+    await apri('b1');
     let s = await riquadro();
     registro.dice('riquadro', s);
     registro.controlla('caso 7 · il riquadro si chiama «Cantiere o fase sbagliati?»', s.titolo === 'Cantiere o fase sbagliati?', s.titolo);
@@ -216,8 +248,8 @@ module.exports = {
 
     // ================================================================ caso 9
     registro.titolo('Caso 9 · cambia solo il cantiere, in MNG');
-    await apri('b1', 'MAR');
-    await scegli('#cantiere-corretto', 'MNG', 'MNG|Strutture');
+    await apri('b1');
+    await scegliCantiere('MNG');
     s = await riquadro();
     registro.controlla('caso 9 · la fase resta «Strutture» e il pulsante si accende', s.fase === 'Strutture' && s.spento === false, descrivi(s));
     registro.controlla('caso 9 · la riga: «Cambia: cantiere MNG. …»', s.riga === 'Cambia: cantiere MNG. Invio nuovo, con un identificativo nuovo.', `«${s.riga}»`);
@@ -230,8 +262,8 @@ module.exports = {
 
     // ================================================================ caso 10
     registro.titolo('Caso 10 · cambiano tutti e due');
-    await apri('b1', 'MAR');
-    await scegli('#cantiere-corretto', 'MNG', 'MNG|Strutture');
+    await apri('b1');
+    await scegliCantiere('MNG');
     await scegli('#c-fase', 'Murature', 'MNG|Murature');
     s = await riquadro();
     registro.controlla('caso 10 · la riga: «Cambia: cantiere MNG, fase Murature. …»',
@@ -246,7 +278,7 @@ module.exports = {
 
     // ================================================================ caso 13
     registro.titolo('Caso 13 · conferma annullata');
-    await apri('b1', 'MAR');
+    await apri('b1');
     await scegli('#c-fase', 'Murature', 'MAR|Murature');
     const inCodaPrima = await contaInCoda();
     const richiestePrima = flow.stato.ricevuti.length;
@@ -273,12 +305,12 @@ module.exports = {
 
     // ================================================================ caso 11
     registro.titolo('Caso 11 · bolla con fase «Interrato» (tolta dal master)');
-    await apri('b2', 'MAR');
+    await apri('b2');
     s = await riquadro();
     registro.dice('riquadro', s);
     registro.controlla('caso 11 · fase su «— nessuna fase —», pulsante spento, la frase del caso',
       s.fase === '' && s.voceFase === '— nessuna fase —' && s.spento === true && s.riga === fraseCaso('Interrato', 'la fase'), descrivi(s));
-    await scegli('#cantiere-corretto', 'MNG', 'MNG|');
+    await scegliCantiere('MNG');
     s = await riquadro();
     registro.controlla('caso 11 · cambiato il cantiere, ancora spento e con la frase',
       s.fase === '' && s.spento === true && s.riga === fraseCaso('Interrato', 'la fase'), descrivi(s));
@@ -289,8 +321,8 @@ module.exports = {
 
     // ================================================================ caso 12
     registro.titolo('Caso 12 · bolla MAR «Strutture», cantiere cambiato in SNU');
-    await apri('b3', 'MAR');
-    await scegli('#cantiere-corretto', 'SNU', 'SNU|');
+    await apri('b3');
+    await scegliCantiere('SNU');
     s = await riquadro();
     registro.controlla('caso 12 · il menù sta su «— nessun lotto —», pulsante spento, la frase chiede il lotto',
       s.fase === '' && s.voceFase === '— nessun lotto —' && s.spento === true && s.riga === fraseCaso('Strutture', 'il lotto'), descrivi(s));
@@ -309,8 +341,8 @@ module.exports = {
     // La scelta non mandata è diversa dai valori della bolla dopo (MNG ·
     // Murature): se il riquadro se la portasse dietro, si vedrebbe.
     registro.titolo('Caso 14 · scelta non mandata, poi gesto alla bolla successiva');
-    await apri('b3', 'MAR');
-    await scegli('#cantiere-corretto', 'SNZ2.2', 'SNZ2.2|Strutture');
+    await apri('b3');
+    await scegliCantiere('SNZ2.2');
     await scegli('#c-fase', 'Cantiere', 'SNZ2.2|Cantiere');
     const conferme14 = conferme.length;
     const richieste14 = flow.stato.ricevuti.length;
@@ -326,7 +358,7 @@ module.exports = {
     await aiuto.attendi(pagina, () => /4 di 5/.test(document.querySelector('.bolle-visore-posizione').textContent), 'bolla successiva', 10000);
     await attendiContenuto();
     await pagina.waitForSelector('#riquadro-correzione');
-    await attendiRiquadro('MNG');
+    await aiuto.attendiMarcatore(pagina, () => true, 'riquadro della bolla dopo pronto', { prefisso: 'c-' });
     s = await riquadro();
     registro.controlla('caso 14 · il riquadro riparte dai valori della bolla nuova (MNG · Murature), pulsante spento',
       s.cantiere === 'MNG' && s.fase === 'Murature' && s.spento === true, descrivi(s));
@@ -337,14 +369,14 @@ module.exports = {
 
     // ======================================== D4: cantiere della bolla non nel menù
     registro.titolo('D4 · bolla con un cantiere che non è più nel menù (XX9, inventato)');
-    await apri('b5', '');
+    await apri('b5');
     s = await riquadro();
     registro.dice('riquadro', s);
     registro.controlla('D4 · il menù parte da «— scegli il cantiere —», non dalla prima voce',
       s.cantiere === '' && s.voceCantiere === '— scegli il cantiere —' && s.vociCantiere.length === 9, `«${s.voceCantiere}» · ${s.vociCantiere.length} voci`);
     registro.controlla('D4 · pulsante spento, e la riga chiede il cantiere',
       s.spento === true && s.riga === 'Scegli il cantiere per rimandarla.', descrivi(s));
-    await scegli('#cantiere-corretto', 'MAR', 'MAR|Strutture');
+    await scegliCantiere('MAR');
     s = await riquadro();
     registro.controlla('D4 · scelto MAR, la fase della bolla resta e il pulsante si accende',
       s.fase === 'Strutture' && s.spento === false, descrivi(s));

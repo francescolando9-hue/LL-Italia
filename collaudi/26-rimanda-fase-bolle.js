@@ -92,6 +92,13 @@ module.exports = {
       await pagina.selectOption(selettore, valore);
       await aiuto.attendiMarcatore(pagina, m => m === marcatore, `riquadro su ${marcatore}`, { prefisso: 'r-' });
     };
+    // Cambiando il cantiere si aspetta il marcatore del cantiere nuovo; la
+    // fase che ne esce la controllano i casi (un'attesa sulla fase giusta, con
+    // un guasto, fermerebbe il collaudo invece di farlo diventare rosso).
+    const scegliCantiere = async codice => {
+      await pagina.selectOption('#r-cantiere', codice);
+      await aiuto.attendiMarcatore(pagina, m => m.startsWith(`${codice}|`), `riquadro su ${codice}`, { prefisso: 'r-' });
+    };
 
     // ================================================================ caso 1
     registro.titolo('Caso 1 · bolla MAR inviata con fase «Interrato» (tolta dal master)');
@@ -156,7 +163,7 @@ module.exports = {
 
     // ================================================================ caso 5
     registro.titolo('Caso 5 · la stessa bolla, cantiere cambiato in SNU (lotti)');
-    await scegli('#r-cantiere', 'SNU', 'SNU|');
+    await scegliCantiere('SNU');
     const s5 = await statoRiquadro();
     registro.dice('dopo il cambio di cantiere', s5);
     registro.controlla('caso 5 · il menù sta sul segnaposto («— nessun lotto —» su SNU) e il pulsante è spento',
@@ -193,7 +200,7 @@ module.exports = {
     registro.titolo('D1 · bolla MAR «Strutture», cantiere cambiato in MNG');
     const idA = await iniettaInviata('MAR', 'Strutture');
     await apriRimanda(idA, 'MAR');
-    await scegli('#r-cantiere', 'MNG', 'MNG|Strutture');
+    await scegliCantiere('MNG');
     const sA = await statoRiquadro();
     registro.dice('dopo il cambio di cantiere', sA);
     registro.controlla('D1 · la fase resta «Strutture», «Rimanda corretta» acceso',
@@ -211,7 +218,7 @@ module.exports = {
     const idB = await iniettaInviata('MAR', 'Strutture');
     await apriRimanda(idB, 'MAR');
     await scegli('#r-fase', 'Murature', 'MAR|Murature');
-    await scegli('#r-cantiere', 'MNG', 'MNG|Strutture');
+    await scegliCantiere('MNG');
     const sB = await statoRiquadro();
     registro.dice('dopo il cambio di cantiere', sB);
     registro.controlla('D1 · la scelta a mano non si porta dietro: si torna a «Strutture», la fase della bolla',
