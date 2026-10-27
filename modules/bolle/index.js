@@ -4,12 +4,12 @@
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js';
 import { naviga } from '../../core/router.js';
-import { messaggioSalvataggio, memoriaPiena, righeAvvisoRitardo } from '../../core/errori.js';
+import { messaggioSalvataggio, memoriaPiena, righeAvvisoRitardo, fraseFaseDaRivedere } from '../../core/errori.js';
 import { elementiInRitardo, CONTROLLO_RITARDO_MS } from '../../core/coda-invio.js';
 import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, azzeraFase } from '../../core/anagrafica.js';
+import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, azzeraFase, faseDaRivedere } from '../../core/anagrafica.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 import { vistaImpostazioniBolle } from './vista-impostazioni.js';
@@ -540,14 +540,25 @@ async function ridisegna() {
 // originale: lo leggono sia il ridisegno, per l'etichetta del pulsante, sia
 // l'azione — una sola lettura, così il pulsante non può dire una cosa e farne
 // un'altra.
+//
+// Dalla 0.41.1 la fase della bolla non si perde in silenzio (decisione di
+// Francesco del 27/10/2026). Due cose:
+// - cambiando il cantiere il menù della fase torna alla fase della bolla, se
+//   il cantiere nuovo la offre (`faseDallaBolla`): prima ripartiva dal
+//   segnaposto, e da MAR a MNG la bolla partiva con `fase: ""`;
+// - se la fase della bolla non è fra le voci per il cantiere scelto, il menù
+//   sta sul segnaposto e il pulsante resta spento finché non si sceglie una
+//   voce, con la frase del caso (`daRivedere`). Prima il pulsante era acceso
+//   su «Rimanda corretta» e la bolla ripartiva senza fase.
 function lettureRimando(riquadro, record) {
   const cantiere = riquadro.querySelector('#r-cantiere').value;
   const livelli = sincronizzaLivelli(riquadro, cantiere, scappaHtml, 'r-',
-    { fase: record.fase || '' }, false);
+    { fase: record.fase || '' }, false, { faseDallaBolla: true });
   const uguale = (a, b) => (a || '') === (b || '');
   const cambiato = !uguale(cantiere, record.cantiere) || !uguale(livelli.fase, record.fase);
   const mancanti = [!cantiere && 'il cantiere'].filter(Boolean);
-  return { cantiere, livelli, cambiato, mancanti };
+  const daRivedere = livelli.fase ? null : faseDaRivedere(cantiere, record.fase);
+  return { cantiere, livelli, cambiato, mancanti, daRivedere };
 }
 
 function disegnaRimando(tutti) {
@@ -585,10 +596,11 @@ function disegnaRimando(tutti) {
 
   const letture = lettureRimando(riquadro, record);
   const pulsante = riquadro.querySelector('#r-manda');
-  pulsante.disabled = letture.mancanti.length > 0;
+  pulsante.disabled = letture.mancanti.length > 0 || Boolean(letture.daRivedere);
   pulsante.textContent = letture.cambiato ? 'Rimanda corretta' : 'Rimanda la stessa';
   riquadro.querySelector('#r-spiegazione').textContent = letture.mancanti.length > 0
     ? `Scegli ${letture.mancanti.join(' e ')} per rimandarla.`
+    : letture.daRivedere ? fraseFaseDaRivedere(letture.daRivedere)
     : letture.cambiato
       ? 'Invio nuovo, con un identificativo nuovo: quella già mandata resta in magazzino e va annullata dall’ufficio.'
       : 'Stesso identificativo: se era già arrivata non si crea un doppione, e l’app te lo dice.';
@@ -599,7 +611,9 @@ async function eseguiRimando(id) {
   const record = (await coda.elenca()).find(r => r.id === id);
   if (!riquadro || !record) return;
   const letture = lettureRimando(riquadro, record);
-  if (letture.mancanti.length > 0) return;
+  // La guardia anche qui, non solo sul pulsante: lo si può premere
+  // nell'istante fra due ridisegni.
+  if (letture.mancanti.length > 0 || letture.daRivedere) return;
   riquadro.querySelector('#r-manda').disabled = true;
   riquadro.querySelector('#r-esito').textContent = 'In coda…';
   try {

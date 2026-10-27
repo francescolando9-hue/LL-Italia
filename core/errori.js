@@ -38,6 +38,22 @@ export function righeAvvisoRitardo(conti, nome) {
     .map(caso => ({ caso, testo: FRASI_AVVISO_RITARDO[caso](conti[caso], nome) }));
 }
 
+// La fase di una bolla da rimandare che il menù non offre per il cantiere
+// scelto (dalla 0.41.1). Il caso lo decide `faseDaRivedere` in
+// core/anagrafica.js, che passa qui i suoi dati: la frase dice la fase (o il
+// lotto) della bolla con la sua etichetta, e cosa scegliere nel menù che si ha
+// davanti — la fase, o il lotto su un'urbanizzazione. Quattro combinazioni,
+// quattro frasi: il collaudo 26 le lega una per una al loro caso.
+//   «La fase «Interrato» non è fra quelle che si possono scegliere per questo
+//    cantiere: scegli la fase per rimandarla.»
+export function fraseFaseDaRivedere(caso) {
+  const soggetto = caso.lotto
+    ? `Il lotto «${caso.etichetta}» non è fra quelli`
+    : `La fase «${caso.etichetta}» non è fra quelle`;
+  return `${soggetto} che si possono scegliere per questo cantiere: `
+    + `scegli ${caso.menuLotti ? 'il lotto' : 'la fase'} per rimandarla.`;
+}
+
 // Perché il flow ha rifiutato: il numero da solo non dice a chi guarda cosa
 // fare. Il 502 in particolare non è un problema di rete — è il flow che è
 // terminato senza eseguire nessuna azione Response: il file non è stato
