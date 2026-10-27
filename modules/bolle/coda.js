@@ -201,15 +201,16 @@ export async function confermaBozze(cantiere, autore, unaSolaBolla = false, fase
 // `bolla` porta l'appartenenza dell'originale: una pagina corretta deve
 // restare la stessa pagina della stessa bolla, altrimenti la correzione
 // spezzerebbe in due una bolla di più pagine.
-export async function confermaSingola(id, cantiere, autore, bolla = null) {
+export async function confermaSingola(id, cantiere, autore, bolla = null, fase = undefined) {
   const record = (await elenca()).find(r => r.id === id && r.stato === 'bozza');
   if (!record) return false;
   record.stato = 'in_coda';
   segnaIngressoInCoda(record);
   record.cantiere = cantiere;
-  // La fase resta quella dell'invio originale: si corregge il cantiere, non
-  // l'attribuzione.
-  record.fase = (bolla && bolla.fase) || '';
+  // La fase: quella scelta nel riquadro «Cantiere o fase sbagliati?» (dalla
+  // 0.41.1, dove si corregge anche la fase), anche vuota se la si è tolta
+  // apposta; se chi chiama non la passa, quella dell'invio originale.
+  record.fase = fase !== undefined ? (fase || '') : ((bolla && bolla.fase) || '');
   record.autore = autore;
   record.progressivo = await riservaProgressivi(1);
   record.idBolla = (bolla && bolla.idBolla) || crypto.randomUUID();

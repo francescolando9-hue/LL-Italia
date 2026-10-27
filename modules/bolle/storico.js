@@ -3,7 +3,8 @@
 // sopravvive alla potatura delle immagini a piena risoluzione.
 import { impostazioniApp, scappaHtml } from '../../core/impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
-import { etichettaFaseOLotto } from '../../core/anagrafica.js';
+import { etichettaFaseOLotto, sincronizzaLivelli, campiLivelli, faseDaRivedere } from '../../core/anagrafica.js';
+import { fraseFaseDaRivedere } from '../../core/errori.js';
 import * as coda from './coda.js';
 import * as invio from './invio.js';
 
@@ -82,15 +83,11 @@ export async function vistaStorico(el) {
     <a class="btn btn-secondario" href="#/bolle">Torna a Bolle</a>
     <div id="visore" class="bolle-visore nascosto">
       <button id="chiudi-visore" class="bolle-chiudi" aria-label="Chiudi">&#10005;</button>
-      <div id="visore-testa" class="bolle-visore-testa"></div>
-      <div id="visore-contenuto" class="bolle-visore-contenuto"></div>
-      <div class="bolle-visore-piede">
+      <div id="visore-testa" class="bolle-visore-testa">
+        <div id="visore-riga"></div>
         <p id="visore-capo" class="bolle-visore-capo" aria-live="polite"></p>
-        <div class="bolle-visore-frecce">
-          <button id="bolla-prec" class="bolle-freccia-grande" type="button" aria-label="Bolla precedente">&#8249;</button>
-          <button id="bolla-succ" class="bolle-freccia-grande" type="button" aria-label="Bolla successiva">&#8250;</button>
-        </div>
       </div>
+      <div id="visore-contenuto" class="bolle-visore-contenuto"></div>
     </div>
   `;
 
@@ -101,8 +98,6 @@ export async function vistaStorico(el) {
     disegna();
   });
   el.querySelector('#chiudi-visore').addEventListener('click', chiudiVisore);
-  el.querySelector('#bolla-prec').addEventListener('click', () => vaiA(aperta - 1));
-  el.querySelector('#bolla-succ').addEventListener('click', () => vaiA(aperta + 1));
   collegaGesto(el.querySelector('#visore'));
 
   // Apre il calendario sul mese dell'ultimo invio: se non si manda nulla da
@@ -274,7 +269,8 @@ async function mostraBolla(indice) {
   disegnaTesta();
   // La bolla di prima si toglie e la sua immagine si rilascia dalla memoria:
   // scorrendo una giornata intera le immagini non si accumulano. Con lei se ne
-  // va una scelta nel riquadro «Cantiere sbagliato?» non mandata.
+  // va una scelta nel riquadro «Cantiere o fase sbagliati?» non mandata, e il
+  // riquadro della bolla nuova riparte dai suoi valori.
   liberaImmagini();
   contenuto.innerHTML = '<p class="bolle-visore-messaggio">Apertura&hellip;</p>';
   visore.scrollTop = 0;
@@ -299,20 +295,20 @@ async function mostraBolla(indice) {
   if (record) collegaCorrezione(record, riga);
 }
 
-// In cima la riga della bolla, con la posizione nell'elenco; in fondo le due
-// frecce, spente al capo del loro lato, e la frase che lo dice.
+// La testa del visore: la riga della bolla, la posizione nell'elenco e, ai
+// capi, UNA frase che lo dice. Dalla 0.41.1 (decisione di Francesco del
+// 27/10/2026) non ci sono più le frecce né il piede fisso che le conteneva: il
+// gesto si capisce da solo, e il piede copriva la parte del riquadro dove si
+// sceglie il cantiere. La frase dei capi sta qui, in un elemento che scorre
+// con la pagina, e non in un elemento fisso. Con una bolla sola è la prima e
+// l'ultima insieme: fino alla 0.41.0 si leggevano le due frasi una sotto
+// l'altra, ora una sola.
 function disegnaTesta() {
-  const testa = radice.querySelector('#visore-testa');
-  testa.innerHTML = `<div class="bolle-riga bolle-riga-testa">${contenutoRiga(mostrate[aperta])}</div>
+  radice.querySelector('#visore-riga').innerHTML = `<div class="bolle-riga bolle-riga-testa">${contenutoRiga(mostrate[aperta])}</div>
     <p class="bolle-visore-posizione">${aperta + 1} di ${mostrate.length}</p>`;
-  const prima = aperta === 0;
-  const ultima = aperta === mostrate.length - 1;
-  radice.querySelector('#bolla-prec').disabled = prima;
-  radice.querySelector('#bolla-succ').disabled = ultima;
-  radice.querySelector('#visore-capo').innerHTML = [
-    prima ? 'È la prima bolla di questo elenco' : '',
-    ultima ? 'È l’ultima bolla di questo elenco' : '',
-  ].filter(Boolean).map(testo => `<span>${testo}</span>`).join('');
+  radice.querySelector('#visore-capo').textContent = mostrate.length === 1 ? 'È l’unica bolla di questo elenco'
+    : aperta === 0 ? 'È la prima bolla di questo elenco'
+      : aperta === mostrate.length - 1 ? 'È l’ultima bolla di questo elenco' : '';
 }
 
 // Il gesto: dito verso sinistra → bolla successiva (quella sotto
@@ -343,43 +339,108 @@ function collegaGesto(visore) {
   }, { passive: true });
 }
 
-// Correzione del cantiere: possibile solo se la foto originale è ancora sul
-// dispositivo, perché rimandare la miniatura significherebbe consegnare al
-// magazzino una bolla meno leggibile dell'originale.
+// «Cantiere o fase sbagliati?» (dalla 0.41.1; era «Cantiere sbagliato?»):
+// possibile solo se la foto originale è ancora sul dispositivo, perché
+// rimandare la miniatura significherebbe consegnare al magazzino una bolla meno
+// leggibile dell'originale.
+//
+// Decisione di Francesco del 27/10/2026: si rimanda la bolla perché è
+// sbagliata la fase, o il cantiere, o tutti e due. I due menù **partono dai
+// valori della bolla** — il suo cantiere, che quindi è fra le voci, e la sua
+// fase — e il pulsante si accende solo quando almeno uno dei due è cambiato:
+// non c'è niente di preselezionato da confermare senza guardare (era il
+// difetto che la 0.38.0 aveva tolto col segnaposto), perché a pulsante acceso
+// qualcuno ha cambiato qualcosa. Il segnaposto «— scegli il cantiere —» resta
+// solo per una bolla il cui cantiere non è più nel menù: senza, il menù
+// mostrerebbe la prima voce come se fosse quella della bolla.
+// Il menù della fase è lo stesso del riquadro «Rimanda questa bolla» della
+// Coda invii (`sincronizzaLivelli`, prefisso `c-`): lotti su SNU e BRU, fasi
+// escluse non offerte, e la regola della fase che non si perde in silenzio.
 function riquadroCorrezione(riga) {
   const attuale = riga ? riga.commessa : '';
-  const altri = CANTIERI.filter(c => c.codice !== attuale);
-  if (altri.length === 0) return '';
+  const nelMenu = CANTIERI.some(c => c.codice === attuale);
   return `
-    <div class="bolle-correzione">
-      <p class="titolo">Cantiere sbagliato?</p>
-      <p class="tenue">Rimanda la stessa foto sul cantiere giusto.</p>
-      <select id="cantiere-corretto">
-        <option value="" selected>— scegli il cantiere —</option>
-        ${altri.map(c => `<option value="${scappaHtml(c.codice)}">${scappaHtml(c.etichetta)}</option>`).join('')}
-      </select>
-      <button id="rimanda" class="btn btn-secondario btn-piccolo" disabled>Rimanda</button>
+    <div class="bolle-correzione" id="riquadro-correzione">
+      <p class="titolo">Cantiere o fase sbagliati?</p>
+      <p class="tenue">Rimanda la stessa foto col cantiere e la fase giusti.</p>
+      <div class="campo">
+        <label for="cantiere-corretto">Cantiere</label>
+        <select id="cantiere-corretto">
+          ${nelMenu ? '' : '<option value="" selected>— scegli il cantiere —</option>'}
+          ${CANTIERI.map(c => `<option value="${scappaHtml(c.codice)}"${c.codice === attuale ? ' selected' : ''}>${scappaHtml(c.etichetta)}</option>`).join('')}
+        </select>
+      </div>
+      ${campiLivelli('c-', false)}
+      <button id="rimanda" class="btn btn-secondario btn-piccolo" type="button" disabled>Rimanda corretta</button>
+      <p id="spiegazione-correzione" class="tenue"></p>
       <p id="esito-correzione" class="tenue"></p>
     </div>
   `;
 }
 
-// Il menù parte da «— scegli il cantiere —» e «Rimanda» resta spento finché
-// non si sceglie (dalla 0.38.0). Prima il menù non aveva segnaposto e partiva
-// dal primo degli altri cantieri: «Rimanda» mandava la bolla lì anche se
-// nessuno l'aveva scelto, e la conferma che segue si impara a dare senza
-// leggerla.
+const eLotto = codice => /^Lotto\d+$/.test(String(codice || ''));
+
+// Quello che c'è scritto nel riquadro adesso, confrontato con la bolla. Una
+// lettura sola per il pulsante, la riga sotto e la conferma: il pulsante non
+// può dire una cosa e mandarne un'altra.
+function letturaCorrezione(riquadro, riga) {
+  const cantiereBolla = riga ? riga.commessa : '';
+  const faseBolla = (riga && riga.fase) || '';
+  const cantiere = riquadro.querySelector('#cantiere-corretto').value;
+  const fase = sincronizzaLivelli(riquadro, cantiere, scappaHtml, 'c-',
+    { fase: faseBolla }, false, { faseDallaBolla: true }).fase;
+  const daRivedere = cantiere && !fase ? faseDaRivedere(cantiere, faseBolla) : null;
+  const cambiaCantiere = Boolean(cantiere) && cantiere !== cantiereBolla;
+  const cambiaFase = fase !== faseBolla;
+  return {
+    cantiere, fase, faseBolla, daRivedere, cambiaCantiere, cambiaFase,
+    pronta: Boolean(cantiere) && !daRivedere && (cambiaCantiere || cambiaFase),
+  };
+}
+
+// La fase a parole: «fase Murature», «Lotto 1», oppure «senza fase» quando la
+// si toglie apposta.
+function testoFase(fase, faseBolla) {
+  if (fase) return eLotto(fase) ? etichettaFaseOLotto(fase) : `fase ${etichettaFaseOLotto(fase)}`;
+  return eLotto(faseBolla) ? 'senza lotto' : 'senza fase';
+}
+
+// La domanda della conferma, con le sole parti che cambiano: il cantiere col
+// codice, la fase con l'etichetta.
+function domandaCorrezione(l) {
+  const fase = l.cambiaFase ? testoFase(l.fase, l.faseBolla) : '';
+  if (l.cambiaCantiere) return `Rimandare questa bolla su ${l.cantiere}${fase ? `, ${fase}` : ''}?`;
+  return `Rimandare questa bolla ${fase.startsWith('senza') ? fase : `con ${fase}`}?`;
+}
+
+// La riga sotto il pulsante: cosa manca, o cosa cambierà.
+function rigaCorrezione(l) {
+  if (!l.cantiere) return 'Scegli il cantiere per rimandarla.';
+  if (l.daRivedere) return fraseFaseDaRivedere(l.daRivedere);
+  if (!l.cambiaCantiere && !l.cambiaFase) return 'Cambia il cantiere o la fase per rimandarla.';
+  const parti = [l.cambiaCantiere && `cantiere ${l.cantiere}`, l.cambiaFase && testoFase(l.fase, l.faseBolla)];
+  return `Cambia: ${parti.filter(Boolean).join(', ')}. Invio nuovo, con un identificativo nuovo.`;
+}
+
 function collegaCorrezione(record, riga) {
-  const pulsante = radice.querySelector('#rimanda');
-  if (!pulsante) return;
-  const menu = radice.querySelector('#cantiere-corretto');
-  menu.addEventListener('change', () => { pulsante.disabled = !menu.value; });
+  const riquadro = radice.querySelector('#riquadro-correzione');
+  if (!riquadro) return;
+  const pulsante = riquadro.querySelector('#rimanda');
+  const aggiorna = () => {
+    const l = letturaCorrezione(riquadro, riga);
+    pulsante.disabled = !l.pronta;
+    riquadro.querySelector('#spiegazione-correzione').textContent = rigaCorrezione(l);
+    return l;
+  };
+  riquadro.querySelector('#cantiere-corretto').addEventListener('change', aggiorna);
+  riquadro.querySelector('#c-fase').addEventListener('change', aggiorna);
+  aggiorna();
   pulsante.addEventListener('click', async () => {
-    const scelto = menu.value;
-    if (!scelto) return;
-    const esito = radice.querySelector('#esito-correzione');
+    const l = aggiorna();
+    if (!l.pronta) return;
+    const esito = riquadro.querySelector('#esito-correzione');
     const conferma = window.confirm(
-      `Rimandare questa bolla su ${scelto}?\n\n`
+      `${domandaCorrezione(l)}\n\n`
       + `Attenzione: quella già inviata${riga ? ` su ${riga.commessa}` : ''} resta in magazzino `
       + 'e va annullata dall\'ufficio.');
     if (!conferma) return;
@@ -390,10 +451,10 @@ function collegaCorrezione(record, riga) {
         record.foto, record.nome, record.miniatura, record.impronta, record.qualita, record.motivoQualita);
       // La pagina corretta resta la stessa pagina della stessa bolla:
       // altrimenti correggere il cantiere spezzerebbe una bolla di più pagine.
-      await coda.confermaSingola(nuova.id, scelto, impostazioniApp.autore || record.autore, riga);
+      await coda.confermaSingola(nuova.id, l.cantiere, impostazioniApp.autore || record.autore, riga, l.fase);
       coda.incrementaScattate(1);
       invio.avvia();
-      esito.textContent = `In coda per ${scelto}: la trovi nella coda invii, dove diventa verde a consegna avvenuta.`
+      esito.textContent = `In coda per ${l.cantiere}: la trovi nella coda invii, dove diventa verde a consegna avvenuta.`
         + ' Avvisa l\'ufficio di annullare quella sbagliata.';
     } catch {
       esito.textContent = 'Non è stato possibile rimandarla: riprova.';
@@ -406,8 +467,8 @@ function chiudiVisore() {
   aperturaInCorso += 1;
   aperta = -1;
   radice.querySelector('#visore').classList.add('nascosto');
-  radice.querySelector('#visore-testa').innerHTML = '';
-  radice.querySelector('#visore-capo').innerHTML = '';
+  radice.querySelector('#visore-riga').innerHTML = '';
+  radice.querySelector('#visore-capo').textContent = '';
   liberaImmagini();
 }
 
