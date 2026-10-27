@@ -3,10 +3,18 @@
 // Decisione di Francesco del 26/10/2026, su segnalazione di Paolo Sanzarello:
 // nel dettaglio di una bolla aperta da «Bolle inviate» si passa alla
 // successiva (quella sotto nell'elenco) scorrendo il dito verso sinistra, alla
-// precedente verso destra, e con due frecce grandi in basso. Si scorre dentro
-// l'elenco che si sta guardando, nel suo ordine, una riga alla volta; ai capi
-// ci si ferma e lo si dice; in cima c'è la riga della bolla e «3 di 12».
-// Casi 11–21 della tabella della specifica, con la stessa numerazione.
+// precedente verso destra. Si scorre dentro l'elenco che si sta guardando, nel
+// suo ordine, una riga alla volta; ai capi ci si ferma e lo si dice; in cima
+// c'è la riga della bolla e «3 di 12». Casi 11–21 della tabella della
+// specifica del 26/10/2026, con la stessa numerazione.
+//
+// **Dalla 0.41.1** (decisione di Francesco del 27/10/2026) le due frecce e il
+// piede fisso che le conteneva non ci sono più: il gesto si capisce da solo, e
+// il piede copriva il riquadro dove si sceglie il cantiere. La frase dei capi
+// sta nella testa, una alla volta, e con una bolla sola è «È l’unica bolla di
+// questo elenco» (prima si leggevano tutte e due). Qui i casi 15 e 16 della
+// specifica del 27/10/2026; dove la prova andava avanti con la freccia ›, ora
+// va avanti col gesto.
 //
 // I dati: un ottobre di otto righe scritte direttamente nel database del
 // telefono — lo storico, le miniature e, per quattro righe, la foto intera —
@@ -102,14 +110,22 @@ module.exports = {
         riga: testa ? [...testa.querySelectorAll('.ora, .cantiere, .tenue')].map(x => x.textContent.replace(/\s+/g, ' ').trim()).join(' | ') : '',
         posizione: (document.querySelector('.bolle-visore-posizione') || {}).textContent || '',
         capo: document.querySelector('#visore-capo').textContent.trim(),
-        precSpenta: document.querySelector('#bolla-prec').disabled,
-        succSpenta: document.querySelector('#bolla-succ').disabled,
+        // La frase dei capi sta nella testa, e la testa non è fissa né sticky.
+        capoNellaTesta: Boolean(document.querySelector('#visore-testa #visore-capo')),
+        testaFissa: ['fixed', 'sticky'].includes(getComputedStyle(document.querySelector('#visore-testa')).position)
+          || ['fixed', 'sticky'].includes(getComputedStyle(document.querySelector('#visore-capo')).position),
+        // Le frecce non ci sono più: nessun elemento, né nascosto né spento.
+        frecce: document.querySelectorAll('#bolla-prec, #bolla-succ, .bolle-freccia-grande, .bolle-visore-piede').length,
         contenuto: document.querySelector('#visore-contenuto').textContent.replace(/\s+/g, ' ').trim(),
         immagine: Boolean(document.querySelector('#visore-contenuto img')),
         menu: (document.querySelector('#cantiere-corretto') || {}).value,
+        fase: (document.querySelector('#c-fase') || {}).value,
         rimandaSpento: (document.querySelector('#rimanda') || {}).disabled,
       };
     });
+    const UNICA = 'È l’unica bolla di questo elenco';
+    const PRIMA = 'È la prima bolla di questo elenco';
+    const ULTIMA = 'È l’ultima bolla di questo elenco';
     // Il contenuto arriva dopo una lettura del database: si aspetta che il
     // visore non dica più «Apertura…».
     const attendiContenuto = () => aiuto.attendi(pagina,
@@ -162,24 +178,24 @@ module.exports = {
     await versoDestra();
     await controllaTesta('caso 12 · poi verso destra', 'r4', '3 di 5');
 
-    await pagina.click('#bolla-succ');
-    await attendiContenuto();
-    await pagina.click('#bolla-succ');
-    await attendiContenuto();
-    let s = await controllaTesta('caso 13 · freccia › fino in fondo', 'r7', '5 di 5');
-    registro.controlla('caso 13 · alla 5ª la freccia › è spenta e compare «È l’ultima bolla di questo elenco»',
-      s.succSpenta && !s.precSpenta && s.capo === 'È l’ultima bolla di questo elenco', `${s.capo}`);
+    let s = await statoVisore();
+    registro.controlla('0.41.1 caso 16 · nel mezzo dell’elenco nessuna frase dei capi', s.capo === '', `«${s.capo}»`);
+    registro.controlla('0.41.1 caso 16 · nessuna freccia nella pagina (#bolla-prec e #bolla-succ non esistono), niente piede',
+      s.frecce === 0, `${s.frecce} elementi`);
     await versoSinistra();
-    await pagina.click('#bolla-succ', { force: true });
-    await pagina.waitForTimeout(200);
+    await versoSinistra();
+    s = await controllaTesta('caso 13 · col gesto fino in fondo', 'r7', '5 di 5');
+    registro.controlla('caso 13 · alla 5ª, una frase sola: «È l’ultima bolla di questo elenco», nella testa',
+      s.capo === ULTIMA && s.capoNellaTesta && !s.testaFissa, `«${s.capo}»`);
+    await versoSinistra();
     s = await statoVisore();
-    registro.controlla('caso 13 · un altro gesto (e la freccia spenta) non cambia niente: niente giro dall’inizio',
+    registro.controlla('caso 13 · un altro gesto non cambia niente: niente giro dall’inizio',
       s.posizione === '5 di 5' && s.riga === await testoRiga(`.bolle-riga[data-id="${idDi('r7')}"]`), s.posizione);
 
     for (let i = 0; i < 4; i += 1) await versoDestra();
     s = await controllaTesta('caso 14 · alla 1ª', 'r1', '1 di 5');
-    registro.controlla('caso 14 · freccia ‹ spenta, «È la prima bolla di questo elenco»',
-      s.precSpenta && !s.succSpenta && s.capo === 'È la prima bolla di questo elenco', s.capo);
+    registro.controlla('caso 14 · una frase sola: «È la prima bolla di questo elenco», nella testa',
+      s.capo === PRIMA && s.capoNellaTesta && !s.testaFissa, `«${s.capo}»`);
     await versoDestra();
     s = await statoVisore();
     registro.controlla('caso 14 · un altro gesto verso destra non cambia niente', s.posizione === '1 di 5', s.posizione);
@@ -252,9 +268,12 @@ module.exports = {
       pagineViste.join(', '));
 
     // ================================================================ 20
-    registro.titolo('Caso 20 · «Cantiere sbagliato?» con una scelta non mandata, poi la bolla dopo');
+    // Dalla 0.41.1 il riquadro è «Cantiere o fase sbagliati?» e parte dai
+    // valori della bolla: la bolla dopo ritrova il SUO cantiere e la SUA fase,
+    // col pulsante spento finché non si cambia qualcosa.
+    registro.titolo('Caso 20 · «Cantiere o fase sbagliati?» con una scelta non mandata, poi la bolla dopo');
     for (let i = 0; i < 2; i += 1) await versoDestra();
-    await aiuto.attendi(pagina, () => Boolean(document.querySelector('#cantiere-corretto')), 'riquadro Cantiere sbagliato', 10000);
+    await aiuto.attendi(pagina, () => Boolean(document.querySelector('#cantiere-corretto')), 'riquadro di correzione', 10000);
     const primaDellaScelta = flow.stato.ricevuti.length;
     let dialoghi = 0;
     pagina.on('dialog', () => { dialoghi += 1; });
@@ -264,17 +283,37 @@ module.exports = {
     registro.dice('prima di cambiare bolla', `menù ${s.menu} · Rimanda ${s.rimandaSpento ? 'spento' : 'acceso'}`);
     await versoSinistra();
     await aiuto.attendi(pagina, () => Boolean(document.querySelector('#cantiere-corretto')), 'riquadro della bolla dopo', 10000);
-    s = await statoVisore();
-    registro.controlla('caso 20 · il menù riparte da «— scegli il cantiere —» e Rimanda è spento',
-      s.menu === '' && s.rimandaSpento === true, `menù «${s.menu}» · Rimanda ${s.rimandaSpento ? 'spento' : 'acceso'}`);
+    await aiuto.attendiMarcatore(pagina, () => true, 'menù della fase del riquadro pronto', { prefisso: 'c-' });
+    const dopo = await quale();
+    const rigaDopo = RIGHE.find(r => idClient(r.id) === dopo.id) || {};
+    registro.controlla(`caso 20 · il riquadro riparte dai valori della bolla nuova (${nomeDi(dopo.id)}: ${rigaDopo.commessa} · ${rigaDopo.fase}) e Rimanda è spento`,
+      dopo.menu === rigaDopo.commessa && dopo.fase === rigaDopo.fase && dopo.rimandaSpento === true,
+      `menù «${dopo.menu}» · fase «${dopo.fase}» · Rimanda ${dopo.rimandaSpento ? 'spento' : 'acceso'}`);
     registro.controlla('caso 20 · la scelta non mandata si perde senza conferme e senza invii',
       dialoghi === 0 && flow.stato.ricevuti.length === primaDellaScelta,
       `${dialoghi} conferme · ${flow.stato.ricevuti.length - primaDellaScelta} invii`);
     await chiudi();
 
+    // ============================================ 0.41.1 caso 15
+    // Un elenco di una bolla sola: il filtro SNZ2.2 lascia la sola r6.
+    registro.titolo('0.41.1 caso 15 · elenco di una bolla sola');
+    await pagina.click('#tutto-mese');
+    await pagina.selectOption('#commessa', 'SNZ2.2');
+    await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-riga[data-id]').length === 1, 'elenco di SNZ2.2', 10000);
+    await apri('r6');
+    s = await controllaTesta('0.41.1 caso 15', 'r6', '1 di 1');
+    registro.controlla('0.41.1 caso 15 · una frase sola, «È l’unica bolla di questo elenco», nella testa',
+      s.capo === UNICA && s.capoNellaTesta && !s.testaFissa, `«${s.capo}»`);
+    registro.controlla('0.41.1 caso 15 · nessuna freccia nella pagina', s.frecce === 0, `${s.frecce} elementi`);
+    await versoSinistra();
+    await versoDestra();
+    s = await statoVisore();
+    registro.controlla('0.41.1 caso 15 · il gesto, nei due versi, non cambia niente',
+      s.posizione === '1 di 1' && s.capo === UNICA, `${s.posizione} · «${s.capo}»`);
+    await chiudi();
+
     // ================================================================ 21
     registro.titolo('Caso 21 · bolle senza la foto intera sul telefono');
-    await pagina.click('#tutto-mese');
     await pagina.selectOption('#commessa', '');
     await aiuto.attendi(pagina, () => document.querySelectorAll('.bolle-riga[data-id]').length === 8, 'elenco del mese', 10000);
     await pagina.evaluate(() => { window.__url = { creati: 0, revocati: 0 }; });
