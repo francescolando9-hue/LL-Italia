@@ -119,6 +119,11 @@ module.exports = {
     registro.controlla('anche nella coda, inviata, la miniatura è il riquadro',
       await pagina.$$eval('#lista-coda .foto-voce', v => v.length === 1
         && Boolean(v[0].querySelector('.foto-miniatura.foto-heic')) && !v[0].querySelector('img')));
+    const rigaCoda = await pagina.$eval('#lista-coda .foto-voce', v => v.textContent.replace(/\s+/g, ' ').trim());
+    registro.dice('riga in coda', rigaCoda);
+    registro.controlla('e la riga dice nome e ora dello scatto',
+      rigaCoda.includes('20261117_110303.heic') && rigaCoda.includes('scatto 17/11/2026 11:03:03'),
+      'la miniatura dice solo «HEIC»: due HEIC inviati si distinguono da qui');
 
     // --- H12 ----------------------------------------------------------------
     registro.titolo('H12 · «Rimanda corretta» di un HEIC inviato');
@@ -160,14 +165,36 @@ module.exports = {
     registro.controlla('non entra in coda: avviso di data mancante', fermataH4,
       'un’ora stimata in silenzio è il difetto del 17/09/2026');
     if (fermataH4) {
+      const avviso = await pagina.$eval('#avviso-senza-data', e => e.textContent.replace(/\s+/g, ' ').trim());
       const righe = await pagina.$$eval('.foto-perche li', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+      registro.dice('avviso', avviso);
       righe.forEach(r => registro.dice('riga', r));
+      registro.controlla('la frase in testa è quella dell’HEIC',
+        /foto HEIC l’app non è riuscita a leggere l’ora/.test(avviso),
+        'non «copia ridotta»: un HEIC integro con l’Exif dove l’app non lo cerca è l’originale');
+      registro.controlla('e non dice «quasi certamente una copia ridotta»', !/copia ridotta/.test(avviso));
       registro.controlla('la riga dice il caso preciso', righe.some(r => /HEIC senza blocco Exif/.test(r)));
       registro.controlla('e non dice «non è una foto JPEG»', righe.every(r => !/non è una foto JPEG/.test(r)),
         'l’HEIC adesso si legge: quella frase sarebbe falsa');
-      await pagina.click('#senza-data-scarta');
+      registro.controlla('al flow non è ancora partito niente', flow.stato.ricevuti.length === primaH4);
+
+      // «Aggiungi comunque»: la foto parte coi SUOI byte, `.heic`, con l'ora
+      // dichiarata stimata — non convertita, che su Chrome fallirebbe.
+      registro.titolo('H4 · …mandata comunque: byte originali, .heic, ora stimata');
+      await pagina.click('#senza-data-comunque');
+      await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
+      await aiuto.attendi(pagina, () => !document.querySelector('#invia').disabled, 'Invia acceso', 10000);
+      await pagina.click('#invia');
+      const arrivataH4 = await nuovoDopo(primaH4, 'H4 comunque');
+      const byteH4 = Buffer.from(arrivataH4.contenutoBase64, 'base64');
+      registro.dice('arrivati', `${byteH4.length} byte · ${arrivataH4.estensione} · ${arrivataH4.mimeType} · ${arrivataH4.dataScatto} · stimato ${arrivataH4.scattoStimato}`);
+      registro.controlla('i byte sono identici all’originale', impronta(byteH4) === impronta(h4));
+      registro.controlla('estensione heic e MIME image/heic',
+        arrivataH4.estensione === 'heic' && arrivataH4.mimeType === 'image/heic');
+      registro.controlla('l’ora è dichiarata stimata', arrivataH4.scattoStimato === 'SI', arrivataH4.scattoStimato);
+    } else {
+      registro.controlla('e al flow non è partito niente', flow.stato.ricevuti.length === primaH4);
     }
-    registro.controlla('e al flow non è partito niente', flow.stato.ricevuti.length === primaH4);
 
     // --- H3, H5, H6, H7: la lettura, direttamente ------------------------------
     // Si chiama `dataScattoDaFoto` con un file che CONTA i byte che gli vengono
@@ -225,7 +252,7 @@ module.exports = {
     const h4d = await leggi(heicFinto({ senzaExif: true }));
     const nuovi = [h4d, h5, h6];
     nuovi.forEach(v => registro.dice(v.motivo, `${v.gruppo} · ${v.frase}`));
-    registro.controlla('finiscono in un gruppo mandabile («copia»)', nuovi.every(v => v.gruppo === 'copia'),
+    registro.controlla('finiscono nel gruppo «heic», mandabile e con frasi sue', nuovi.every(v => v.gruppo === 'heic'),
       nuovi.map(v => v.gruppo).join(' '));
     registro.controlla('con tre frasi diverse', new Set(nuovi.map(v => v.frase)).size === 3);
 
