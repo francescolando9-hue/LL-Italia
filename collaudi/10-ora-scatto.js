@@ -93,8 +93,7 @@ module.exports = {
     // ricompressione: un JPEG parte com'è. Non è un controllo che si è deciso
     // di togliere, è un controllo rimasto senza oggetto — e va detto, invece
     // di sostituirlo con uno che passa comunque. L'unica ricodifica rimasta è
-    // HEIC/PNG → JPEG, che questo Chromium non sa produrre: registrato fra le
-    // cose che i collaudi NON dimostrano.
+    // PNG → JPEG (dalla 0.42.0 l'HEIC parte com'è, collaudo 28).
     const avanzamento = await manda('scatto-exif-mm.jpg');
     const byte = Buffer.from(avanzamento.contenutoBase64, 'base64');
     registro.dice('dataScatto ricevuta dal flow', avanzamento.dataScatto);
@@ -161,7 +160,11 @@ module.exports = {
       const m = await import('./core/exif.js');
       return m.spiegazioneMotivo('motivo che non esiste');
     });
-    registro.controlla('i casi sono dieci', motivi.length === 10, `trovati ${motivi.length}`);
+    // Dalla 0.42.0 sono tredici: i tre nuovi sono dell'HEIC («HEIC senza
+    // blocco Exif», «Exif dell’HEIC fuori dal file», «struttura HEIC non
+    // leggibile»). Il numero resta scritto a mano di proposito, come quello
+    // degli operatori nel collaudo 09: un caso sparito deve far fallire.
+    registro.controlla('i casi sono tredici', motivi.length === 13, `trovati ${motivi.length}`);
     registro.controlla('ogni motivo ha la sua frase in italiano',
       frasi.every(f => f && f !== ripiego),
       `senza frase: ${motivi.filter((_, i) => !frasi[i] || frasi[i] === ripiego).join(', ') || 'nessuno'}`);
@@ -186,7 +189,7 @@ module.exports = {
       diLettura.length === 2 && diLettura.every(v => v.gruppo === 'lettura'),
       diLettura.map(v => `${v.motivo} → ${v.gruppo}`).join(' | '));
     registro.controlla('e ogni altro motivo ha un gruppo',
-      gruppi.every(g => ['lettura', 'copia', 'formato', 'senzaOra', 'orologio'].includes(g)),
+      gruppi.every(g => ['lettura', 'copia', 'formato', 'heic', 'senzaOra', 'orologio'].includes(g)),
       gruppi.join(' '));
     registro.controlla('la foto NON è ancora in coda',
       (await pagina.$$('.foto-anteprima')).length === 0,
@@ -262,7 +265,7 @@ module.exports = {
       righe.some(r => /copia-whatsapp/.test(r) && /non ci sono i dati della fotocamera/.test(r)));
     registro.controlla('il PNG dice invece che il formato non è JPEG',
       righe.some(r => /schermata\.png/.test(r) && /non è una foto JPEG/.test(r)),
-      'a chi manda un HEIC dire «non ci sono i dati della fotocamera» è falso: ci sono, è l’app che non li legge');
+      'a chi manda un PNG dire «non ci sono i dati della fotocamera» confonde due cause: è il formato che l’app non legge');
     registro.controlla('e le due righe non dicono la stessa cosa',
       righe.length === 2 && righe[0] !== righe[1]);
     // Si scartano: questo blocco prova l'avviso, non l'invio.

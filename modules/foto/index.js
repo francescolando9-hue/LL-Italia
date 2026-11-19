@@ -21,7 +21,7 @@ import {
   etichettaScala, codicePartiComuni,
 } from '../../core/anagrafica.js';
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
-import { preparaImmagine, creaAnteprima } from './immagini.js';
+import { preparaImmagine, creaAnteprima, creaAnteprimaHeic, formatoFoto } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
 import { impostazioniFoto } from './impostazioni.js';
 import * as coda from './coda.js';
@@ -94,11 +94,27 @@ const GRUPPI = {
     spiegazione: una => `${una ? 'È' : 'Sono'} quasi certamente ${una ? 'una copia ridotta' : 'copie ridotte'} `
       + '(Google Foto, WhatsApp): nel file non c’è nessun dato della fotocamera.',
   },
+  // HEIC (dalla 0.42.0): l'HEIC si legge, e se l'ora non esce la causa è nel
+  // file — senza dati della fotocamera, incompleto, o scritto in un modo che
+  // l'app non conosce. Le frasi di `copia` («quasi certamente una copia
+  // ridotta», «lì la data c'è») qui sarebbero false: un HEIC integro con
+  // l'Exif dove l'app non lo cerca È l'originale.
+  heic: {
+    mandabile: true,
+    titolo: una => una
+      ? 'Di questa foto HEIC l’app non è riuscita a leggere l’ora dello scatto.'
+      : 'Di queste foto HEIC l’app non è riuscita a leggere l’ora dello scatto.',
+    seguito: una => `Se ${una ? 'è una copia modificata' : 'sono copie modificate'}, cerca `
+      + `${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>; `
+      + `altrimenti ${una ? 'mandala' : 'mandale'} lo stesso.`,
+    spiegazione: una => `La riga sotto dice il caso. Se ${una ? 'la mandi' : 'le mandi'} comunque, `
+      + `${una ? 'parte' : 'partono'} coi byte del telefono, ma con l’ora dichiarata stimata.`,
+  },
   formato: {
     mandabile: true,
     titolo: una => una ? 'Questo file non è una foto JPEG.' : 'Questi file non sono foto JPEG.',
     seguito: una => `Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>, oppure usa <strong>Scatta</strong>.`,
-    spiegazione: () => 'Da un HEIC o da un PNG l’app non sa leggere l’ora dello scatto. '
+    spiegazione: () => 'Da un PNG o da un formato che non riconosce l’app non sa leggere l’ora dello scatto. '
       + 'La foto si può mandare lo stesso — viene convertita in JPEG — ma con l’ora stimata.',
   },
   senzaOra: {
@@ -126,7 +142,7 @@ const GRUPPI = {
 // letto, e quel valore serve nella riga di diagnosi.
 // Una riga per file: nome, peso, tipo DICHIARATO dal selettore, il motivo in
 // italiano e quello tecnico. Sono i fatti che da uno screenshot non si
-// indovinano, e che decidono quale dei dieci casi è.
+// indovinano, e che decidono quale dei tredici casi è.
 function rigaPerche(voce) {
   const tipo = voce.file.type || 'tipo non dichiarato';
   return `<li><strong>${scappaHtml(voce.file.name || 'file')}</strong>
@@ -147,11 +163,14 @@ export function gruppoDiMotivo(motivo) {
     || testo.startsWith('lettura dei byte non riuscita')
     || testo.startsWith('file non leggibile')) return 'lettura';
   if (testo.startsWith('non è un JPEG')) return 'formato';
+  if (testo.startsWith('HEIC senza blocco Exif') || testo.startsWith('Exif dell’HEIC fuori dal file')
+    || testo.startsWith('struttura HEIC non leggibile')) return 'heic';
   if (testo.startsWith('EXIF presente ma senza') || testo.startsWith('DateTimeOriginal')) return 'senzaOra';
   if (testo.startsWith('data assurda') || testo.startsWith('data nel futuro')) return 'orologio';
   // Restano «nessun blocco EXIF» e la lettura EXIF finita male su byte
   // arrivati: in tutti e due i casi nel file non c'è niente da leggere, e la
-  // via d'uscita è la stessa.
+  // via d'uscita è la stessa. (I tre casi dell'HEIC hanno il loro gruppo, qui
+  // sopra, dalla 0.42.0.)
   return 'copia';
 }
 
@@ -179,6 +198,39 @@ function urlFoto(blob) {
 function revocaUrl() {
   for (const url of urlAperti) URL.revokeObjectURL(url);
   urlAperti = [];
+}
+
+// Un HEIC che il browser non sa disegnare (dalla 0.42.0). Al posto di
+// `<img src=foto>`, che sarebbe un'immagine rotta, un riquadro che la fa
+// riconoscere: il formato, il nome del file e l'ora dello scatto — il peso lo
+// dice già il marchio in basso. Sul modello del riquadro del video.
+function eHeicSenzaAnteprima(r) {
+  return !r.anteprima && r.genere !== 'video' && /^hei[cf]$/.test(String(r.estensione || ''));
+}
+
+// L'ora dello scatto come si legge: «17/11/2026 11:03:03», con «(stimata)» se
+// non è misurata.
+function quandoHeic(r) {
+  const d = String(r.dataScatto || '');
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(d)
+    ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)} ${d.slice(11, 19)}${r.scattoStimato === 'NO' ? '' : ' (stimata)'}`
+    : 'ora non letta';
+}
+
+function riquadroHeic(r) {
+  return `<span class="foto-senza-anteprima foto-heic">
+      <strong>${scappaHtml(String(r.estensione).toUpperCase())}</strong>
+      <span class="foto-heic-nome">${scappaHtml(r.nome || 'foto')}</span>
+      <span>${scappaHtml(quandoHeic(r))}</span>
+    </span>`;
+}
+
+// Nella coda la miniatura è di 56 px e porta solo il formato: nome e ora dello
+// scatto vanno nella riga, perché due HEIC inviati si distinguano senza aprirli.
+function rigaHeic(r) {
+  return eHeicSenzaAnteprima(r)
+    ? `<div class="tenue foto-heic-riga">${scappaHtml(r.nome || 'foto')} &middot; scatto ${scappaHtml(quandoHeic(r))}</div>`
+    : '';
 }
 
 // Il comando sta in fondo allo schermo, il messaggio in cima alla scheda: se
@@ -484,9 +536,16 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         troppoGrandi.push(pesoLeggibile(preparata.size));
         continue;
       }
-      const anteprima = await creaAnteprima(leggibile);
+      // Estensione e MIME dai byte di quello che parte (dalla 0.42.0): un HEIC
+      // parte com'è e si chiama `.heic`, tutto il resto è JPEG. E l'anteprima
+      // di un HEIC che il browser non sa disegnare è `null`, non un errore: la
+      // foto entra lo stesso, e a video c'è il riquadro.
+      const formato = await formatoFoto(preparata, singolo.name);
+      const anteprima = formato.heic
+        ? await creaAnteprimaHeic(leggibile)
+        : await creaAnteprima(leggibile);
       await coda.aggiungiBozza(preparata, anteprima, singolo.name, TIPO_ARCHIVIO, {
-        genere: 'foto', estensione: 'jpg',
+        genere: 'foto', estensione: formato.estensione, mime: formato.mime,
         dataScatto: quando.dataScatto, scattoStimato: quando.scattoStimato,
       });
     } catch (errore) {
@@ -644,7 +703,11 @@ async function ridisegna() {
     // è comparsa sopra una foto che la data ce l'aveva: non si era potuta
     // leggere, l'originale era già quello, e la frase mandava a cercare una
     // cosa che non esisteva.
-    const ordine = ['lettura', 'copia', 'formato', 'senzaOra', 'orologio'];
+    // L'ordine è quello di `GRUPPI`, non un secondo elenco scritto a mano: fino
+    // alla 0.41.1 lo era, e un gruppo nuovo che mancasse qui non comparirebbe a
+    // video — niente avviso, niente «Aggiungi comunque», e la foto ferma senza
+    // un perché (è successo scrivendo il gruppo `heic`, 0.42.0).
+    const ordine = Object.keys(GRUPPI);
     const presenti = ordine.filter(nome => senzaData.some(voce => voce.gruppo === nome));
     const mandabili = senzaData.filter(voce => GRUPPI[voce.gruppo].mandabile);
     const ultimoMandabile = presenti.filter(nome => GRUPPI[nome].mandabile).pop();
@@ -699,7 +762,8 @@ async function ridisegna() {
     // un'immagine rotta.
     const immagine = r.anteprima
       ? `<img src="${urlFoto(r.anteprima)}" alt="Anteprima">`
-      : video ? '<span class="foto-senza-anteprima">&#127909;</span>' : `<img src="${urlFoto(r.foto)}" alt="Anteprima">`;
+      : video ? '<span class="foto-senza-anteprima">&#127909;</span>'
+        : eHeicSenzaAnteprima(r) ? riquadroHeic(r) : `<img src="${urlFoto(r.foto)}" alt="Anteprima">`;
     return `
     <div class="foto-anteprima${video ? ' e-video' : ''}">
       ${immagine}
@@ -789,7 +853,9 @@ async function ridisegna() {
             ? `<img class="foto-miniatura" src="${urlFoto(r.anteprima)}" alt="">`
             : r.genere === 'video'
               ? '<span class="foto-miniatura foto-senza-anteprima">&#127909;</span>'
-              : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
+              : eHeicSenzaAnteprima(r)
+                ? '<span class="foto-miniatura foto-senza-anteprima foto-heic">HEIC</span>'
+                : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
           <div class="foto-dettagli">
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}
@@ -799,6 +865,7 @@ async function ridisegna() {
               ${scappaHtml(etichettaCantiere(r.commessa))}${r.fase ? ` &middot; ${scappaHtml(etichettaFaseOLotto(r.fase))}` : ''}${scappaHtml(scritturaLivelli(r))} &middot; ${ora}
             </div>
             <div class="tenue">${scappaHtml(r.autore)} &middot; ${pesoLeggibile(r.byte)}</div>
+            ${rigaHeic(r)}
             ${nota}
             ${giaPresente}
             ${ripreso}

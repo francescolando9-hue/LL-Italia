@@ -131,6 +131,42 @@
   font-size: 1.6rem;
 }
 
+/* HEIC che il browser non disegna (dalla 0.42.0): formato, nome e ora dello
+   scatto al posto dell'immagine. Testo piccolo, a capo dove serve: il riquadro
+   è quello dell'anteprima, e il nome di un file di telefono è lungo. */
+.foto-senza-anteprima.foto-heic {
+  place-items: center;
+  align-content: center;
+  gap: 0;
+  /* In alto lo spazio del ✕ di rimozione (30 px): a 360 px di schermo la
+     scritta «HEIC» ci finiva sotto; in basso quello della fascia del peso, che
+     a 360 px toccava l'ora (collaudo da telefono del 19/11/2026). */
+  padding: 30px 4px 24px;
+  box-sizing: border-box;
+  font-size: 0.65rem;
+  line-height: 1.15;
+  text-align: center;
+  overflow: hidden;
+}
+
+.foto-senza-anteprima.foto-heic strong { font-size: 0.95rem; letter-spacing: 0.05em; }
+
+.foto-heic-nome { overflow-wrap: anywhere; }
+
+/* Il nome di un file di telefono è una parola sola e lunga: senza, a 360 px
+   usciva dalla colonna verso i pulsanti. */
+.foto-heic-riga { overflow-wrap: anywhere; }
+
+/* La misura va ripetuta: `.foto-senza-anteprima`, scritta dopo `.foto-miniatura`,
+   la porterebbe al 100% della riga e coprirebbe i pulsanti della coda. */
+.foto-miniatura.foto-senza-anteprima.foto-heic {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 /* Numero progressivo sulla riga della coda. Stesse regole di .bolle-progressivo
    nel modulo Bolle: i due fogli si caricano uno per volta, quindi la classe va
    ripetuta qui. Serve a leggere il numero a voce quando l'ufficio segnala un
