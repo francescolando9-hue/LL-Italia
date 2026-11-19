@@ -21,7 +21,7 @@ import {
   etichettaScala, codicePartiComuni,
 } from '../../core/anagrafica.js';
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
-import { preparaImmagine, creaAnteprima } from './immagini.js';
+import { preparaImmagine, creaAnteprima, creaAnteprimaHeic, formatoFoto } from './immagini.js';
 import { eVideo, estensioneDi, anteprimaVideo, durataLeggibile } from './video.js';
 import { impostazioniFoto } from './impostazioni.js';
 import * as coda from './coda.js';
@@ -96,9 +96,9 @@ const GRUPPI = {
   },
   formato: {
     mandabile: true,
-    titolo: una => una ? 'Questo file non è una foto JPEG.' : 'Questi file non sono foto JPEG.',
+    titolo: una => una ? 'Questo file non è una foto JPEG né HEIC.' : 'Questi file non sono foto JPEG né HEIC.',
     seguito: una => `Cerca ${una ? 'l’originale' : 'gli originali'} nell’album <strong>Fotocamera</strong>, oppure usa <strong>Scatta</strong>.`,
-    spiegazione: () => 'Da un HEIC o da un PNG l’app non sa leggere l’ora dello scatto. '
+    spiegazione: () => 'Da un PNG o da un formato che non riconosce l’app non sa leggere l’ora dello scatto. '
       + 'La foto si può mandare lo stesso — viene convertita in JPEG — ma con l’ora stimata.',
   },
   senzaOra: {
@@ -179,6 +179,26 @@ function urlFoto(blob) {
 function revocaUrl() {
   for (const url of urlAperti) URL.revokeObjectURL(url);
   urlAperti = [];
+}
+
+// Un HEIC che il browser non sa disegnare (dalla 0.42.0). Al posto di
+// `<img src=foto>`, che sarebbe un'immagine rotta, un riquadro che la fa
+// riconoscere: il formato, il nome del file e l'ora dello scatto — il peso lo
+// dice già il marchio in basso. Sul modello del riquadro del video.
+function eHeicSenzaAnteprima(r) {
+  return !r.anteprima && r.genere !== 'video' && /^hei[cf]$/.test(String(r.estensione || ''));
+}
+
+function riquadroHeic(r) {
+  const d = String(r.dataScatto || '');
+  const quando = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(d)
+    ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)} ${d.slice(11, 19)}${r.scattoStimato === 'NO' ? '' : ' (stimata)'}`
+    : 'ora non letta';
+  return `<span class="foto-senza-anteprima foto-heic">
+      <strong>${scappaHtml(String(r.estensione).toUpperCase())}</strong>
+      <span class="foto-heic-nome">${scappaHtml(r.nome || 'foto')}</span>
+      <span>${scappaHtml(quando)}</span>
+    </span>`;
 }
 
 // Il comando sta in fondo allo schermo, il messaggio in cima alla scheda: se
@@ -484,9 +504,16 @@ async function aggiungiFile(file, provenienza = 'galleria') {
         troppoGrandi.push(pesoLeggibile(preparata.size));
         continue;
       }
-      const anteprima = await creaAnteprima(leggibile);
+      // Estensione e MIME dai byte di quello che parte (dalla 0.42.0): un HEIC
+      // parte com'è e si chiama `.heic`, tutto il resto è JPEG. E l'anteprima
+      // di un HEIC che il browser non sa disegnare è `null`, non un errore: la
+      // foto entra lo stesso, e a video c'è il riquadro.
+      const formato = await formatoFoto(preparata, singolo.name);
+      const anteprima = formato.heic
+        ? await creaAnteprimaHeic(leggibile)
+        : await creaAnteprima(leggibile);
       await coda.aggiungiBozza(preparata, anteprima, singolo.name, TIPO_ARCHIVIO, {
-        genere: 'foto', estensione: 'jpg',
+        genere: 'foto', estensione: formato.estensione, mime: formato.mime,
         dataScatto: quando.dataScatto, scattoStimato: quando.scattoStimato,
       });
     } catch (errore) {
@@ -699,7 +726,8 @@ async function ridisegna() {
     // un'immagine rotta.
     const immagine = r.anteprima
       ? `<img src="${urlFoto(r.anteprima)}" alt="Anteprima">`
-      : video ? '<span class="foto-senza-anteprima">&#127909;</span>' : `<img src="${urlFoto(r.foto)}" alt="Anteprima">`;
+      : video ? '<span class="foto-senza-anteprima">&#127909;</span>'
+        : eHeicSenzaAnteprima(r) ? riquadroHeic(r) : `<img src="${urlFoto(r.foto)}" alt="Anteprima">`;
     return `
     <div class="foto-anteprima${video ? ' e-video' : ''}">
       ${immagine}
@@ -789,7 +817,9 @@ async function ridisegna() {
             ? `<img class="foto-miniatura" src="${urlFoto(r.anteprima)}" alt="">`
             : r.genere === 'video'
               ? '<span class="foto-miniatura foto-senza-anteprima">&#127909;</span>'
-              : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
+              : eHeicSenzaAnteprima(r)
+                ? '<span class="foto-miniatura foto-senza-anteprima foto-heic">HEIC</span>'
+                : `<img class="foto-miniatura" src="${urlFoto(r.foto)}" alt="">`}
           <div class="foto-dettagli">
             <div class="riga">
               ${Number.isInteger(r.progressivo) ? `<span class="foto-progressivo">n. ${r.progressivo}</span>` : ''}

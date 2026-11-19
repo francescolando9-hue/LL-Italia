@@ -89,7 +89,11 @@ export function aggiungiBozza(fotoBlob, anteprima, nomeOriginale, tipo, extra = 
     // dichiarato il selettore del sistema. Dichiarare quel tipo manderebbe in
     // raccolta un `.jpg` con un MIME che non è il suo. Per il VIDEO invece il
     // tipo del file è l'unica fonte, e va rispettato.
-    mime: extra.genere === 'video' ? (fotoBlob.type || 'video/mp4') : 'image/jpeg',
+    //
+    // Dalla 0.42.0 una foto può essere anche un HEIC partito com'è: chi accoda
+    // lo dichiara in `extra.mime`, deciso dai byte (`formatoFoto`). Senza, resta
+    // `image/jpeg`, per il motivo qui sopra.
+    mime: extra.genere === 'video' ? (fotoBlob.type || 'video/mp4') : (extra.mime || 'image/jpeg'),
     durata: extra.durata || 0,
     commessa: '',
     fase: '',
@@ -317,6 +321,9 @@ export async function rimandaCorretta(id, dati) {
     originale.foto, originale.anteprima, originale.nome, TIPO_ARCHIVIO, {
       genere: originale.genere,
       estensione: originale.estensione,
+      // Il MIME va con l'estensione (dalla 0.42.0): senza, un HEIC rimandato
+      // con modifiche partirebbe come `.heic` dichiarato `image/jpeg`.
+      mime: originale.mime,
       durata: originale.durata,
       // L'ora dello scatto è della FOTO, non dell'invio: rimandarla non la
       // cambia, e non cambia nemmeno se era misurata o stimata.
