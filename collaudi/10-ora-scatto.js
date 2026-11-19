@@ -161,7 +161,11 @@ module.exports = {
       const m = await import('./core/exif.js');
       return m.spiegazioneMotivo('motivo che non esiste');
     });
-    registro.controlla('i casi sono dieci', motivi.length === 10, `trovati ${motivi.length}`);
+    // Dalla 0.42.0 sono tredici: i tre nuovi sono dell'HEIC («HEIC senza
+    // blocco Exif», «Exif dell’HEIC fuori dal file», «struttura HEIC non
+    // leggibile»). Il numero resta scritto a mano di proposito, come quello
+    // degli operatori nel collaudo 09: un caso sparito deve far fallire.
+    registro.controlla('i casi sono tredici', motivi.length === 13, `trovati ${motivi.length}`);
     registro.controlla('ogni motivo ha la sua frase in italiano',
       frasi.every(f => f && f !== ripiego),
       `senza frase: ${motivi.filter((_, i) => !frasi[i] || frasi[i] === ripiego).join(', ') || 'nessuno'}`);

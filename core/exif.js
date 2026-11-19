@@ -28,11 +28,17 @@
 //    su una foto ritagliata o ri-salvata è l'ora del ritaglio, e finirebbe in
 //    raccolta come ora di scatto senza che nessuno possa accorgersene;
 //  - non legge `lastModified` del file, che per una foto copiata o scaricata è
-//    l'ora della copia;
-//  - non legge l'EXIF dentro HEIC/HEIF, che non è in un APP1 ma in una scatola
-//    del contenitore ISO-BMFF: lì servirebbe un parser vero.
-// In tutti e tre i casi il dato *sembrerebbe* un'ora di scatto. Meglio dire
+//    l'ora della copia.
+// In tutti e due i casi il dato *sembrerebbe* un'ora di scatto. Meglio dire
 // «stimata» che dire un'ora precisa e sbagliata.
+//
+// HEIC (dalla 0.42.0). Fino alla 0.41.1 l'EXIF dentro un HEIC non si leggeva:
+// non sta in un APP1 ma in un elemento del contenitore ISO-BMFF. Il 17/11/2026
+// cinque foto HEIC di un Samsung, scelte dalla galleria, sono state rifiutate
+// — «non è un JPEG», poi la conversione in JPEG che Chrome su Android non sa
+// fare. Ora il contenitore si percorre (`exifDaHeic`, sotto) fino al blocco
+// Exif, e da lì la lettura è quella del JPEG: stesso TIFF, stesse IFD, stessi
+// tag. Decisione di Francesco del 18/11/2026: l'app accetta l'HEIC.
 
 import { timestampDispositivo, timestampConOffset } from './orario.js';
 
@@ -72,18 +78,31 @@ export async function dataScattoDaFoto(file) {
     const testa = await primiByte(file, TESTA);
     if (!testa) return esito(null, 'file non leggibile', '');
     const vista = new DataView(testa);
-    // Non è nemmeno un JPEG: HEIC, PNG, un file rinominato. Caso a sé, e va
-    // detto a sé: «nel file non ci sono i dati della fotocamera» a chi ha
-    // mandato un HEIC è falso — i dati ci sono, è l'app che da quel formato
-    // non li legge. Due cause diverse, due cose diverse da fare.
-    if (!eJpegDaiByte(vista)) {
-      return esito(null, 'non è un JPEG', `primi byte ${primiDue(vista)} · ${letti(vista)}`);
+    // Dove sta il TIFF dell'EXIF, e la riga dei fatti visti: le due strade —
+    // HEIC e JPEG — arrivano allo stesso punto, e da lì la lettura è una sola.
+    let blocco;
+    let inizioTiff;
+    let fatti;
+    if (eHeicDaiByte(vista)) {
+      const trovato = await exifDaHeic(file, vista);
+      if (trovato.esito) return trovato.esito;
+      ({ blocco, inizioTiff, fatti } = trovato);
+    } else {
+      // Non è un JPEG e nemmeno un HEIC: PNG, AVIF, un file rinominato. Caso a
+      // sé, e va detto a sé: «nel file non ci sono i dati della fotocamera» a
+      // chi ha mandato un formato che l'app non legge è falso — i dati ci
+      // possono essere, è l'app che da quel formato non li legge.
+      if (!eJpegDaiByte(vista)) {
+        return esito(null, 'non è un JPEG', `primi byte ${primiDue(vista)} · ${letti(vista)}`);
+      }
+      blocco = vista;
+      inizioTiff = trovaExif(vista, visti);
+      if (inizioTiff < 0) return esito(null, 'nessun blocco EXIF nel file', descrivi(vista, visti));
+      fatti = descrivi(vista, visti);
     }
-    const inizioTiff = trovaExif(vista, visti);
-    if (inizioTiff < 0) return esito(null, 'nessun blocco EXIF nel file', descrivi(vista, visti));
-    const tag = leggiTag(vista, inizioTiff);
+    const tag = leggiTag(blocco, inizioTiff);
     if (!tag.dataOriginale) {
-      return esito(null, 'EXIF presente ma senza DateTimeOriginal', descrivi(vista, visti));
+      return esito(null, 'EXIF presente ma senza DateTimeOriginal', fatti);
     }
     return interpreta(tag.dataOriginale, tag.offsetOriginale);
   } catch (errore) {
@@ -142,6 +161,294 @@ export async function eJpeg(file) {
   }
 }
 
+// --- La firma di un HEIC ----------------------------------------------------
+//
+// Stessa regola del JPEG: **dai byte**, in un posto solo, interrogato da tutti
+// i punti che se lo chiedono — la lettura dell'ora (qui), la preparazione
+// dell'immagine e la scelta di estensione e MIME (`modules/foto`).
+//
+// Un HEIC comincia col box `ftyp` (dimensione in 4 byte, poi «ftyp»), che
+// elenca il brand maggiore e i brand compatibili. È HEIC se fra i brand c'è
+// uno di quelli dell'HEVC in HEIF. **`mif1` e `msf1` da soli NON bastano:**
+// sono i brand generici dell'HEIF, e li porta anche l'AVIF (`avif`, `mif1`,
+// `miaf`), che resta fuori (specifica del 18/11/2026, §2.6). I telefoni li
+// scrivono sempre insieme a `heic`: Samsung `heic` + `mif1 heic`, iPhone
+// `heic` + `mif1 MiHE miaf MiHB heic`.
+const BRAND_HEIC = ['heic', 'heix', 'heim', 'heis'];
+// `ftyp` sta in testa e con pochi brand è di poche decine di byte: 4 KiB
+// bastano anche a un elenco lungo.
+const TESTA_FIRMA = 4096;
+
+export function eHeicDaiByte(vista) {
+  if (!vista || vista.byteLength < 16) return false;
+  if (quattroLettere(vista, 4) !== 'ftyp') return false;
+  const dimensione = vista.getUint32(0);
+  if (dimensione < 16) return false;
+  const fine = Math.min(dimensione, vista.byteLength);
+  // Il brand maggiore all'offset 8; a 12 la versione minore, che non conta;
+  // da 16 in poi i compatibili, quattro lettere ciascuno.
+  const brand = [quattroLettere(vista, 8)];
+  for (let posizione = 16; posizione + 4 <= fine; posizione += 4) {
+    brand.push(quattroLettere(vista, posizione));
+  }
+  return brand.some(b => BRAND_HEIC.includes(b));
+}
+
+// Come `eJpeg`: dal file, legge solo la testa, e non solleva.
+export async function eHeic(file) {
+  try {
+    const testa = await primiByte(file, TESTA_FIRMA);
+    return eHeicDaiByte(testa ? new DataView(testa) : null);
+  } catch {
+    return false;
+  }
+}
+
+function quattroLettere(vista, dove) {
+  if (dove + 4 > vista.byteLength) return '';
+  let testo = '';
+  for (let i = 0; i < 4; i += 1) testo += String.fromCharCode(vista.getUint8(dove + i));
+  return testo;
+}
+
+// --- Dal contenitore HEIC al blocco Exif -----------------------------------
+//
+// La strada (ISO/IEC 14496-12 e 23008-12):
+//   box di primo livello → `meta` (full box: 4 byte di versione e flag)
+//     → `iinf`: l'elenco degli elementi; quello con tipo «Exif» è il nostro
+//     → `iloc`: dove sta ogni elemento nel file — offset e lunghezza
+//   → il blocco Exif: 4 byte di scostamento, poi l'intestazione TIFF.
+//
+// **Si legge a pezzi** (`Blob.slice`): la testa del file per `meta`, che sta
+// quasi sempre subito dopo `ftyp`, poi SOLO il tratto che `iloc` indica, che
+// può stare in `mdat` anche a megabyte dall'inizio. Il file intero non si
+// legge per sei byte di data — la regola di `TESTA`, qui sopra.
+//
+// Restituisce `{ blocco, inizioTiff, fatti }` se il blocco c'è, oppure
+// `{ esito }` con il caso preciso. I casi sono tre, e ognuno è scritto UNA
+// volta sola: il collaudo 10 legge i motivi dal sorgente, e due righe con lo
+// stesso motivo sarebbero due casi con la stessa frase.
+const MASSIMO_META = 4 * 1048576;
+const MASSIMO_EXIF = 1048576;
+const GIRI_MASSIMI = 64;
+
+function strutturaNonLeggibile(dettaglio) {
+  return { esito: esito(null, 'struttura HEIC non leggibile', dettaglio) };
+}
+
+async function exifDaHeic(file, testa) {
+  const dimensioneFile = file.size;
+  const visti = [];
+  let box = 'primo livello';
+  try {
+    // 1. `meta` fra i box di primo livello.
+    let meta = null;
+    let posizione = 0;
+    for (let giro = 0; giro < GIRI_MASSIMI && posizione + 8 <= dimensioneFile; giro += 1) {
+      const intestazione = await intestazioneBox(file, testa, posizione, dimensioneFile);
+      visti.push(`${intestazione.tipo}(${intestazione.dimensione})`);
+      if (intestazione.tipo === 'meta') { meta = { posizione, ...intestazione }; break; }
+      if (intestazione.dimensione < 8) break;
+      posizione += intestazione.dimensione;
+    }
+    if (!meta) return strutturaNonLeggibile(`box meta assente · box ${visti.join(' ')}`);
+    box = 'meta';
+    if (meta.dimensione > MASSIMO_META || meta.posizione + meta.dimensione > dimensioneFile) {
+      return strutturaNonLeggibile(`box meta troncato: dichiarati ${meta.dimensione} byte da ${meta.posizione}, `
+        + `il file ne ha ${dimensioneFile} · box ${visti.join(' ')}`);
+    }
+    const vistaMeta = await tratto(file, testa, meta.posizione, meta.dimensione);
+
+    // 2. Dentro `meta`: `iinf` e `iloc`. I figli cominciano dopo l'intestazione
+    // e i 4 byte di versione e flag.
+    const figli = {};
+    let cursore = meta.testa + 4;
+    while (cursore + 8 <= vistaMeta.byteLength) {
+      const dimensione = vistaMeta.getUint32(cursore);
+      const tipo = quattroLettere(vistaMeta, cursore + 4);
+      if (dimensione < 8 || cursore + dimensione > vistaMeta.byteLength) {
+        return strutturaNonLeggibile(`box ${tipo || '?'} dentro meta: ${dimensione} byte a ${cursore}, meta ne ha ${vistaMeta.byteLength}`);
+      }
+      figli[tipo] = { inizio: cursore, dimensione };
+      cursore += dimensione;
+    }
+    const contenuto = Object.keys(figli).join(' ');
+    if (!figli.iinf || !figli.iloc) {
+      return strutturaNonLeggibile(`in meta mancano ${['iinf', 'iloc'].filter(t => !figli[t]).join(' e ')} · box ${contenuto}`);
+    }
+
+    // 3. `iinf`: l'elemento di tipo «Exif».
+    box = 'iinf';
+    const elementi = leggiIinf(vistaMeta, figli.iinf);
+    const exif = elementi.find(e => e.tipo === 'Exif');
+    if (!exif) {
+      return {
+        esito: esito(null, 'HEIC senza blocco Exif',
+          `elementi ${elementi.length}: ${elementi.map(e => e.tipo || '?').join(' ') || 'nessuno'} · box ${visti.join(' ')}`),
+      };
+    }
+
+    // 4. `iloc`: dove sta.
+    box = 'iloc';
+    const posto = leggiIloc(vistaMeta, figli.iloc).find(p => p.id === exif.id);
+    if (!posto) return strutturaNonLeggibile(`l'elemento Exif (id ${exif.id}) non è in iloc`);
+    if (posto.metodo !== 0) {
+      return strutturaNonLeggibile(`elemento Exif con construction_method ${posto.metodo}: si legge solo lo 0, offset nel file`);
+    }
+    const lunghezza = posto.tratti.reduce((s, t) => s + t.lunghezza, 0);
+    const fuori = posto.tratti.find(t => t.lunghezza === 0 || t.inizio + t.lunghezza > dimensioneFile);
+    if (fuori) {
+      return {
+        esito: esito(null, `Exif dell’HEIC fuori dal file`,
+          `blocco a ${fuori.inizio}, ${fuori.lunghezza} byte · il file ne ha ${dimensioneFile}`),
+      };
+    }
+    if (lunghezza < 12 || lunghezza > MASSIMO_EXIF) {
+      return strutturaNonLeggibile(`blocco Exif di ${lunghezza} byte`);
+    }
+
+    // 5. Il blocco, a pezzi: solo i tratti indicati.
+    box = 'Exif';
+    const unito = new Uint8Array(lunghezza);
+    let scritti = 0;
+    for (const t of posto.tratti) {
+      const pezzo = await primiByte(file, t.lunghezza, t.inizio);
+      unito.set(new Uint8Array(pezzo), scritti);
+      scritti += t.lunghezza;
+    }
+    const blocco = new DataView(unito.buffer);
+    // I primi 4 byte dicono quanto c'è fra loro e l'intestazione TIFF (di
+    // solito 6: «Exif\0\0», come nell'APP1 del JPEG).
+    const inizioTiff = 4 + blocco.getUint32(0);
+    if (inizioTiff + 8 > lunghezza) {
+      return strutturaNonLeggibile(`blocco Exif di ${lunghezza} byte, intestazione TIFF dichiarata a ${inizioTiff}`);
+    }
+    return {
+      blocco,
+      inizioTiff,
+      fatti: `HEIC sì · box ${visti.join(' ')} · Exif di ${lunghezza} byte a ${posto.tratti[0].inizio}`,
+    };
+  } catch (errore) {
+    // Una lettura negata non è un problema del file: esce com'è, e
+    // `dataScattoDaFoto` la riconosce.
+    if (eLetturaNegata(errore)) throw errore;
+    // Un offset che punta fuori da un box (RangeError della DataView) è un
+    // file costruito male o troncato: si dice in quale box.
+    return strutturaNonLeggibile(`box ${box}: ${errore.message} · box ${visti.join(' ')}`);
+  }
+}
+
+// Dimensione e tipo di un box di primo livello. `dimensione` 1 vuol dire
+// «64 bit, subito dopo il tipo»; 0 vuol dire «fino alla fine del file».
+async function intestazioneBox(file, testa, posizione, dimensioneFile) {
+  const quanti = Math.min(16, dimensioneFile - posizione);
+  const vista = await tratto(file, testa, posizione, quanti);
+  let dimensione = vista.getUint32(0);
+  const tipo = quattroLettere(vista, 4);
+  let lunghezzaTesta = 8;
+  if (dimensione === 1) {
+    dimensione = numeroLungo(vista, 8);
+    lunghezzaTesta = 16;
+  } else if (dimensione === 0) {
+    dimensione = dimensioneFile - posizione;
+  }
+  return { tipo, dimensione, testa: lunghezzaTesta };
+}
+
+// Un tratto del file: dalla testa già letta se ci sta, altrimenti con una
+// lettura sola di quel tratto.
+async function tratto(file, testa, inizio, quanti) {
+  if (inizio + quanti <= testa.byteLength) {
+    return new DataView(testa.buffer, testa.byteOffset + inizio, quanti);
+  }
+  return new DataView(await primiByte(file, quanti, inizio));
+}
+
+// `iinf`: full box; il numero delle voci è a 16 bit nella versione 0, a 32
+// nelle altre; poi una `infe` per elemento. Dalla versione 2 di `infe` c'è il
+// tipo dell'elemento («hvc1», «Exif», «mime»…); le versioni 0 e 1 il tipo
+// non ce l'hanno, e l'Exif lì non si riconosce.
+function leggiIinf(vista, { inizio, dimensione }) {
+  const fine = inizio + dimensione;
+  const versione = vista.getUint8(inizio + 8);
+  let cursore = inizio + 12;
+  const quante = versione === 0 ? vista.getUint16(cursore) : vista.getUint32(cursore);
+  cursore += versione === 0 ? 2 : 4;
+  const elementi = [];
+  for (let i = 0; i < quante && cursore + 8 <= fine; i += 1) {
+    const lung = vista.getUint32(cursore);
+    if (lung < 8 || cursore + lung > fine) break;
+    if (quattroLettere(vista, cursore + 4) === 'infe') {
+      const v = vista.getUint8(cursore + 8);
+      if (v >= 2) {
+        const id = v === 2 ? vista.getUint16(cursore + 12) : vista.getUint32(cursore + 12);
+        const dopoId = cursore + 12 + (v === 2 ? 2 : 4);
+        elementi.push({ id, tipo: quattroLettere(vista, dopoId + 2) });
+      } else {
+        elementi.push({ id: vista.getUint16(cursore + 12), tipo: '' });
+      }
+    }
+    cursore += lung;
+  }
+  return elementi;
+}
+
+// `iloc`: full box. Le dimensioni dei campi (0, 4 o 8 byte) le dichiara il
+// box stesso; dalla versione 1 ci sono il metodo di costruzione e, se
+// dichiarato, un indice per ogni tratto. Offset assoluto = base + offset.
+function leggiIloc(vista, { inizio }) {
+  const versione = vista.getUint8(inizio + 8);
+  let cursore = inizio + 12;
+  const dimensioni = vista.getUint8(cursore);
+  const altre = vista.getUint8(cursore + 1);
+  const dimOffset = dimensioni >> 4;
+  const dimLunghezza = dimensioni & 0x0F;
+  const dimBase = altre >> 4;
+  const dimIndice = versione === 1 || versione === 2 ? altre & 0x0F : 0;
+  cursore += 2;
+  const quanti = versione < 2 ? vista.getUint16(cursore) : vista.getUint32(cursore);
+  cursore += versione < 2 ? 2 : 4;
+  const posti = [];
+  for (let i = 0; i < quanti; i += 1) {
+    const id = versione < 2 ? vista.getUint16(cursore) : vista.getUint32(cursore);
+    cursore += versione < 2 ? 2 : 4;
+    let metodo = 0;
+    if (versione === 1 || versione === 2) {
+      metodo = vista.getUint16(cursore) & 0x0F;
+      cursore += 2;
+    }
+    cursore += 2; // data_reference_index
+    const base = numero(vista, cursore, dimBase);
+    cursore += dimBase;
+    const quantiTratti = vista.getUint16(cursore);
+    cursore += 2;
+    const tratti = [];
+    for (let j = 0; j < quantiTratti; j += 1) {
+      cursore += dimIndice;
+      const offset = numero(vista, cursore, dimOffset);
+      cursore += dimOffset;
+      const lunghezza = numero(vista, cursore, dimLunghezza);
+      cursore += dimLunghezza;
+      tratti.push({ inizio: base + offset, lunghezza });
+    }
+    posti.push({ id, metodo, tratti });
+  }
+  return posti;
+}
+
+function numero(vista, dove, quanti) {
+  if (quanti === 0) return 0;
+  if (quanti === 4) return vista.getUint32(dove);
+  if (quanti === 8) return numeroLungo(vista, dove);
+  throw new Error(`campo di ${quanti} byte`);
+}
+
+function numeroLungo(vista, dove) {
+  const valore = vista.getBigUint64(dove);
+  if (valore > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('offset oltre 2^53');
+  return Number(valore);
+}
+
 function esito(dati, motivo, dettaglio = '') {
   return dati ? { ...dati, motivo: '', dettaglio: '' } : { dataScatto: '', motivo, dettaglio };
 }
@@ -181,8 +488,10 @@ function nomeMarcatore(marcatore, exif) {
   return `FF${marcatore.toString(16).toUpperCase().padStart(2, '0')}`;
 }
 
-function primiByte(file, quanti) {
-  const fetta = typeof file.slice === 'function' ? file.slice(0, quanti) : file;
+// I byte da `inizio` (di solito 0) per `quanti`: SOLO quel tratto, mai il file
+// intero — tranne su un oggetto che `slice` non ce l'ha, dove si legge tutto.
+function primiByte(file, quanti, inizio = 0) {
+  const fetta = typeof file.slice === 'function' ? file.slice(inizio, inizio + quanti) : file;
   if (typeof fetta.arrayBuffer === 'function') return fetta.arrayBuffer();
   return new Promise((risolvi, rifiuta) => {
     const lettore = new FileReader();
@@ -339,6 +648,8 @@ function leggiOffset(testo) {
 // entrambe — la frase per chi deve decidere cosa fare, il motivo tecnico
 // perché uno screenshot arrivi in ufficio già diagnostico.
 //
+// Dalla 0.42.0 i casi sono tredici: i tre nuovi sono dell'HEIC.
+//
 // La corrispondenza si fa sul PREFISSO: quattro dei nove motivi portano in
 // coda il valore che hanno letto, e quel valore serve.
 export function spiegazioneMotivo(motivo) {
@@ -350,7 +661,16 @@ export function spiegazioneMotivo(motivo) {
     return 'il telefono non ha lasciato leggere il file all’app';
   }
   if (testo.startsWith('non è un JPEG')) {
-    return 'il file non è una foto JPEG: da questo formato l’app non legge l’ora dello scatto';
+    return 'il file non è una foto JPEG né HEIC: da questo formato l’app non legge l’ora dello scatto';
+  }
+  if (testo.startsWith('HEIC senza blocco Exif')) {
+    return 'la foto HEIC non contiene i dati della fotocamera';
+  }
+  if (testo.startsWith('Exif dell’HEIC fuori dal file')) {
+    return 'il file HEIC è incompleto: i dati della fotocamera dovrebbero stare oltre la sua fine';
+  }
+  if (testo.startsWith('struttura HEIC non leggibile')) {
+    return 'il file HEIC è danneggiato o incompleto: l’app non ne riesce a leggere la struttura';
   }
   if (testo.startsWith('nessun blocco EXIF')) {
     return 'nel file non ci sono i dati della fotocamera';
