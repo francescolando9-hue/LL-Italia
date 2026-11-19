@@ -171,9 +171,11 @@ export async function eJpeg(file) {
 // elenca il brand maggiore e i brand compatibili. È HEIC se fra i brand c'è
 // uno di quelli dell'HEVC in HEIF. **`mif1` e `msf1` da soli NON bastano:**
 // sono i brand generici dell'HEIF, e li porta anche l'AVIF (`avif`, `mif1`,
-// `miaf`), che resta fuori (specifica del 18/11/2026, §2.6). I telefoni li
-// scrivono sempre insieme a `heic`: Samsung `heic` + `mif1 heic`, iPhone
-// `heic` + `mif1 MiHE miaf MiHB heic`.
+// `miaf`), che resta fuori (specifica rev. del 19/11/2026, §2.6 e caso H7).
+// Di norma i telefoni li scrivono insieme a `heic` — Samsung `heic` +
+// `mif1 heic`, iPhone `heic` + `mif1 MiHE miaf MiHB heic` —, ma è una
+// previsione, non una misura: un HEIF HEVC con il solo `mif1` avrebbe il
+// trattamento di prima. Lo dirà il primo HEIC vero.
 const BRAND_HEIC = ['heic', 'heix', 'heim', 'heis'];
 // `ftyp` sta in testa e con pochi brand è di poche decine di byte: 4 KiB
 // bastano anche a un elenco lungo.
@@ -294,6 +296,10 @@ async function exifDaHeic(file, testa) {
     if (!posto) return strutturaNonLeggibile(`l'elemento Exif (id ${exif.id}) non è in iloc`);
     if (posto.metodo !== 0) {
       return strutturaNonLeggibile(`elemento Exif con construction_method ${posto.metodo}: si legge solo lo 0, offset nel file`);
+    }
+    // Lunghezza 0, per la norma, vuol dire «fino alla fine del file».
+    for (const t of posto.tratti) {
+      if (t.lunghezza === 0 && t.inizio < dimensioneFile) t.lunghezza = dimensioneFile - t.inizio;
     }
     const lunghezza = posto.tratti.reduce((s, t) => s + t.lunghezza, 0);
     const fuori = posto.tratti.find(t => t.lunghezza === 0 || t.inizio + t.lunghezza > dimensioneFile);
@@ -661,7 +667,7 @@ export function spiegazioneMotivo(motivo) {
     return 'il telefono non ha lasciato leggere il file all’app';
   }
   if (testo.startsWith('non è un JPEG')) {
-    return 'il file non è una foto JPEG né HEIC: da questo formato l’app non legge l’ora dello scatto';
+    return 'il file non è una foto JPEG (PNG o formato non riconosciuto): da questo formato l’app non legge l’ora dello scatto';
   }
   if (testo.startsWith('HEIC senza blocco Exif')) {
     return 'la foto HEIC non contiene i dati della fotocamera';
@@ -670,7 +676,7 @@ export function spiegazioneMotivo(motivo) {
     return 'il file HEIC è incompleto: i dati della fotocamera dovrebbero stare oltre la sua fine';
   }
   if (testo.startsWith('struttura HEIC non leggibile')) {
-    return 'il file HEIC è danneggiato o incompleto: l’app non ne riesce a leggere la struttura';
+    return 'l’app non sa leggere la struttura di questo file HEIC: può essere danneggiato, o scritto in un modo che l’app non conosce';
   }
   if (testo.startsWith('nessun blocco EXIF')) {
     return 'nel file non ci sono i dati della fotocamera';

@@ -138,7 +138,9 @@
   place-items: center;
   align-content: center;
   gap: 2px;
-  padding: 6px 6px 22px;
+  /* In alto lo spazio del ✕ di rimozione (30 px): a 360 px di schermo la
+     scritta «HEIC» ci finiva sotto (collaudo da telefono del 19/11/2026). */
+  padding: 32px 6px 22px;
   box-sizing: border-box;
   font-size: 0.7rem;
   line-height: 1.25;
