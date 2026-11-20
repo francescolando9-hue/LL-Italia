@@ -3,7 +3,8 @@
 // regole (src/regole.js) con l'archivio SharePoint, rispondere. Le regole non
 // stanno qui perché devono girare uguali nei collaudi.
 //
-//   POST /api/segnalazioni          apertura, passaggio, chiusura, riapertura
+//   POST /api/segnalazioni          apertura, passaggio, chiusura, riapertura,
+//                                   e dalla 0.44.0 le foto, una per richiesta
 //   POST /api/segnalazioni-elenco   elenco, o storia di una segnalazione
 //
 // Due serrature, come per i flow: la chiave della funzione nell'indirizzo

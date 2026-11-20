@@ -18,6 +18,8 @@ const CAMPI_SEGNALAZIONE = [
   'ApertaDa', 'ApertaIl', 'Stato', 'ToccaA', 'UltimoIntervento', 'UltimoOperatore', 'UltimaNota',
   'ChiusaDa', 'ChiusaIl', 'NumeroFoto', 'Modified',
 ];
+// Dalla 0.44.0 la storia restituisce anche IdClient (c'era già fra i campi
+// letti) e, per le righe `foto`, l'idPasso che sta in Testo: nessun campo nuovo.
 const CAMPI_INTERVENTO = ['ID', 'IdSegnalazione', 'IdClient', 'Azione', 'Operatore', 'PassaA', 'Testo', 'DataIntervento', 'NumeroFoto'];
 
 let tokenInCache = null;
