@@ -333,12 +333,14 @@ async function ridisegna() {
   }));
   el.querySelectorAll('[data-togli]').forEach(b => b.addEventListener('click', async () => {
     const ids = b.dataset.togli.split(',');
-    // Un passo rifiutato si toglie insieme alle sue foto non ancora partite:
-    // senza, la foto non troverebbe più il passo e partirebbe da sola (su una
-    // segnalazione che non c'è, o su una già chiusa). Restano fra i «Non
-    // registrati», da togliere a loro volta: non si perdono in silenzio.
+    // Un'apertura rifiutata si toglie insieme alle sue foto non ancora partite:
+    // senza, la foto non troverebbe più il passo e partirebbe da sola verso una
+    // segnalazione che non c'è. Restano fra i «Non registrati», da togliere a
+    // loro volta: non si perdono in silenzio. Le foto degli altri passi
+    // rifiutati partono lo stesso (invio.fotoScartateConIlPasso).
     const elementi = await coda.elenca();
-    for (const f of elementi.filter(x => invio.eFoto(x) && ids.includes(x.idPasso) && x.stato !== 'inviata')) {
+    const aperture = elementi.filter(x => ids.includes(x.id) && !invio.eFoto(x) && invio.fotoScartateConIlPasso(x)).map(x => x.id);
+    for (const f of elementi.filter(x => invio.eFoto(x) && aperture.includes(x.idPasso) && x.stato !== 'inviata')) {
       f.stato = 'inviata';
       f.esitoServer = 'passo_non_registrato';
       f.inviatoIl = Date.now();
@@ -398,13 +400,27 @@ function dicituraFoto(p) {
   return `Foto${DEL_PASSO[p.azionePasso] ? ` ${DEL_PASSO[p.azionePasso]}` : ''} · ${scappaHtml(p.commessa || '')}`;
 }
 
+// Una foto che aspetta il suo passo non è un guasto: il motore la segna in
+// errore col messaggio dell'attesa, ma a video sta con le foto in coda dello
+// stesso passo, senza «Riprova» (riparte da sola dopo il passo). Senza, una
+// stessa infornata si spezzava fra «In coda» ed «Errore» secondo il momento in
+// cui si guarda.
+const inAttesa = p => p.stato !== 'errore' || p.ultimoErrore === invio.MESSAGGIO_ATTESA_PASSO;
+
 export function righeCoda(elementi) {
-  return raggruppaFoto(elementi, p => `${p.idPasso}|${p.stato}|${p.stato === 'errore' ? p.ultimoErrore : ''}`)
-    .map(({ p, ids }) => (!invio.eFoto(p) ? rigaPasso(p) : `
+  return raggruppaFoto(elementi, p => `${p.idPasso}|${inAttesa(p) ? 'attesa' : `errore|${p.ultimoErrore}`}`)
+    .map(({ p, ids }) => {
+      if (!invio.eFoto(p)) return rigaPasso(p);
+      const gruppo = elementi.filter(x => ids.includes(x.id));
+      const badge = !inAttesa(p) ? badgeStato(p, ids)
+        : gruppo.some(x => x.stato === 'invio') ? '<span class="badge badge-invio">Invio in corso</span>'
+          : '<span class="badge badge-coda">In coda</span>';
+      return `
     <li class="segn-passo segn-foto-coda" data-id="${p.id}" data-passo="${scappaHtml(p.idPasso || '')}">
       <span class="segn-dove">${dicituraFoto(p)}</span>
-      <span class="segn-meta">${badgeStato(p, ids)} · <span class="segn-quante">${ids.length}</span> foto</span>
-    </li>`));
+      <span class="segn-meta">${badge} · <span class="segn-quante">${ids.length}</span> foto</span>
+    </li>`;
+    });
 }
 
 // Fra i «Non registrati» le foto di uno stesso passo stanno in una riga sola, e

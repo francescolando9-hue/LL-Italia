@@ -477,63 +477,93 @@ module.exports = {
       await aiuto.attendi(d, () => /aggiornato/.test(document.querySelector('#segn-lettura').innerText), 'elenco di Domenico');
       await d.goto(`${app.indirizzo}/index.html#/segnalazioni/scheda?id=${comune.IdSegnalazione}`);
       await d.waitForSelector('#segn-azioni');
-      // Con una foto: un passo rifiutato si porta dietro la sua foto, che non parte.
+      // Con una foto. Decisione di Francesco del 20/11/2026 («Sì, i consigli»): con
+      // «già chiusa» la segnalazione esiste, e la foto di chi ha lavorato si manda
+      // lo stesso; fino a questa correzione restava fra i «Non registrati».
       await d.setInputFiles('#a-galleria', [materiale('foto-cantiere.jpg')]);
       await aiuto.attendi(d, () => document.querySelectorAll('#a-anteprime img').length === 1, 'anteprima della foto della chiusura', 60000);
       const richiestePrimaRifiuto = flow.stato.ricevuti.length;
+      const fotoPrimaRifiuto = server.segnalazione(comune.IdSegnalazione).NumeroFoto;
       await d.click('#chiudi');
       await d.waitForSelector('#segn-rifiutati', { timeout: 60000 });
-      await aiuto.attendi(d, () => document.querySelectorAll('#segn-rifiutati li').length === 2, 'passo e foto fra i non registrati', 60000);
+      // Con un guasto la foto non arriva: l'attesa scade e lo dicono i controlli qui sotto,
+      // invece di fermare il collaudo.
+      await attendiServer(() => server.interventi.at(-1).Azione === 'foto' && server.segnalazione(comune.IdSegnalazione).NumeroFoto === fotoPrimaRifiuto + 1,
+        'la foto della chiusura rifiutata arrivata', 20000).catch(() => {});
+      await d.goto(`${app.indirizzo}/index.html#/home`);
+      await d.waitForSelector('.griglia-moduli');
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await d.waitForSelector('#segn-rifiutati');
       const rifiutati = await d.innerText('#segn-rifiutati');
+      const dopoRifiuto = flow.stato.ricevuti.slice(richiestePrimaRifiuto).filter(x => x && x.azione);
+      const chiusuraRifiutata = dopoRifiuto.find(x => x.azione === 'chiusura');
       registro.controlla('il passo va fra i «Non registrati», con la frase giusta, e non in errore',
         /era già stata chiusa/.test(rifiutati) && (await d.$$('#segn-coda .badge-errore')).length === 0);
-      registro.controlla('e la sua foto con lui, senza partire', /Foto non mandata: il passo a cui apparteneva non è stato registrato/.test(rifiutati)
-        && flow.stato.ricevuti.slice(richiestePrimaRifiuto).filter(x => x && x.azione === 'foto').length === 0, rifiutati.replace(/\s+/g, ' '));
+      registro.controlla('«già chiusa»: la segnalazione esiste, e la foto della chiusura parte lo stesso, dopo il passo, col suo idPasso',
+        dopoRifiuto.map(x => x.azione).join(',') === 'chiusura,foto' && dopoRifiuto[1].idPasso === chiusuraRifiutata.idClient
+        && server.interventi.at(-1).Testo === chiusuraRifiutata.idClient, dopoRifiuto.map(x => x.azione).join(' → '));
+      registro.controlla('fra i «Non registrati» resta solo il passo, non la foto',
+        (await d.$$('#segn-rifiutati li')).length === 1 && !/Foto non mandata/.test(rifiutati), rifiutati.replace(/\s+/g, ' '));
       await d.click('[data-togli]');
       await d.waitForTimeout(300);
-      await d.click('[data-togli]');
-      await d.waitForTimeout(300);
-      registro.controlla('«Ho capito, togli» li toglie', (await d.$$('#segn-rifiutati')).length === 0);
+      registro.controlla('«Ho capito, togli» lo toglie', (await d.$$('#segn-rifiutati')).length === 0);
 
       registro.titolo('Foto in errore e rifiutate: una riga per passo, non una per foto (rilievo del revisore)');
       const righe = await d.evaluate(async () => {
         const m = await import('./modules/segnalazioni/index.js');
         const base = { idSegnalazione: 'seg-x', commessa: 'MNG', azionePasso: 'passaggio', idPasso: 'passo-0000001', autore: 'Enzo Santovito' };
         const passo = { ...base, id: 'passo-0000001', azione: 'passaggio', passaA: 'Rosario Incarbone', stato: 'errore', ultimoErrore: 'Errore del server: 500', foto: [] };
-        const foto = Array.from({ length: 12 }, (_, i) => ({ ...base, id: `foto-${String(i).padStart(7, '0')}`, azione: 'foto', stato: 'errore', ultimoErrore: 'Aspetta il suo passo, che non è ancora arrivato: parte subito dopo.', foto: [] }));
-        const html = m.righeCoda([passo, ...foto]).join('');
+        const { MESSAGGIO_ATTESA_PASSO } = await import('./modules/segnalazioni/invio.js');
+        // 12 foto che aspettano il passo, parte già segnate in errore dal motore e parte ancora in coda,
+        // e 3 con un errore vero.
+        const foto = Array.from({ length: 12 }, (_, i) => ({ ...base, id: `foto-${String(i).padStart(7, '0')}`, azione: 'foto', stato: i < 7 ? 'errore' : 'in_coda', ultimoErrore: i < 7 ? MESSAGGIO_ATTESA_PASSO : '', foto: [] }));
+        const guaste = Array.from({ length: 3 }, (_, i) => ({ ...base, id: `guasta-${String(i).padStart(6, '0')}`, azione: 'foto', stato: 'errore', ultimoErrore: 'Errore del server: 500', foto: [] }));
+        const html = m.righeCoda([passo, ...foto, ...guaste]).join('');
         const rif = m.righeRifiutati(foto.slice(0, 3).map(f => ({ ...f, stato: 'inviata', esitoServer: 'passo_non_registrato' }))).join('');
         const div = document.createElement('div');
         div.innerHTML = `<ul>${html}</ul>`;
         const div2 = document.createElement('div');
         div2.innerHTML = `<ul>${rif}</ul>`;
+        const righeFoto = [...div.querySelectorAll('.segn-foto-coda')];
         return {
           righe: div.querySelectorAll('li').length,
-          quante: div.querySelector('.segn-foto-coda .segn-quante').textContent,
-          riprova: div.querySelector('.segn-foto-coda [data-riprova]').dataset.riprova.split(',').length,
+          quante: righeFoto.map(r => r.querySelector('.segn-quante').textContent).join(','),
+          riprovaAttesa: righeFoto[0].querySelectorAll('[data-riprova]').length,
+          testoAttesa: righeFoto[0].innerText,
+          riprovaGuaste: righeFoto[1].querySelector('[data-riprova]').dataset.riprova.split(',').length,
           rifiutate: div2.querySelectorAll('li').length,
           togli: div2.querySelector('[data-togli]').dataset.togli.split(',').length,
         };
       });
-      registro.controlla('passo e 12 foto in errore: 2 righe, la riga delle foto dice 12 e il suo «Riprova» vale per 12',
-        righe.righe === 2 && righe.quante === '12' && righe.riprova === 12, JSON.stringify(righe));
+      registro.controlla('passo in errore, 12 foto in attesa (7 segnate in errore, 5 in coda) e 3 con un errore vero: 3 righe',
+        righe.righe === 3 && righe.quante === '12,3', JSON.stringify(righe));
+      registro.controlla('le 12 in attesa dicono «In coda» e non hanno «Riprova»; le 3 guaste hanno un «Riprova» per 3',
+        righe.riprovaAttesa === 0 && /In coda/.test(righe.testoAttesa) && !/Errore/.test(righe.testoAttesa) && righe.riprovaGuaste === 3);
       registro.controlla('3 foto rifiutate dello stesso passo: una riga, e «togli» le toglie tutte e 3',
         righe.rifiutate === 1 && righe.togli === 3);
 
-      registro.titolo('«Ho capito, togli» su un passo rifiutato si porta dietro le sue foto ancora in coda');
+      registro.titolo('«Ho capito, togli» su un’apertura rifiutata si porta dietro le sue foto ancora in coda');
+      // Un'apertura rifiutata («nome non ammesso»): la segnalazione non esiste, e le
+      // sue foto non devono partire nemmeno dopo che il passo è stato tolto.
       await d.context().setOffline(true);
-      const idRifiutato = await d.evaluate(async idSeg => {
+      const idRifiutato = await d.evaluate(async () => {
         const m = await import('./modules/segnalazioni/coda.js');
         const ora = Date.now();
-        const comune = { idSegnalazione: idSeg, autore: 'Domenico Caminiti', commessa: 'TN1', dataIntervento: '2026-11-21T10:00:00+01:00', tentativi: 0, ultimoErrore: '', idRiga: null, creatoIl: ora, accodatoIl: ora };
-        const passo = { ...comune, id: crypto.randomUUID(), azione: 'chiusura', passaA: '', testo: '', ambito: '', piano: '', unita: '', parteComune: '', foto: [], stato: 'inviata', esitoServer: 'gia_chiusa', inviatoIl: ora };
+        const comune = { idSegnalazione: crypto.randomUUID(), autore: 'Domenico Caminiti', commessa: 'TN1', dataIntervento: '2026-11-21T10:00:00+01:00', tentativi: 0, ultimoErrore: '', idRiga: null, creatoIl: ora, accodatoIl: ora };
+        const passo = { ...comune, id: crypto.randomUUID(), azione: 'apertura', passaA: '', testo: 'mai registrata', ambito: 'Alloggio', piano: 'P3', unita: '431', parteComune: '', foto: [], stato: 'inviata', esitoServer: 'operatore_non_ammesso', inviatoIl: ora };
         await m.aggiorna(passo);
         const jpeg = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], { type: 'image/jpeg' });
         for (let i = 0; i < 2; i += 1) {
-          await m.aggiorna({ ...comune, id: crypto.randomUUID(), azione: 'foto', idPasso: passo.id, azionePasso: 'chiusura', foto: [jpeg], stato: 'in_coda', esitoServer: '', inviatoIl: null, creatoIl: ora + i + 1 });
+          await m.aggiorna({ ...comune, id: crypto.randomUUID(), azione: 'foto', idPasso: passo.id, azionePasso: 'apertura', foto: [jpeg], stato: 'in_coda', esitoServer: '', inviatoIl: null, creatoIl: ora + i + 1 });
         }
+        // Una seconda apertura rifiutata, con una foto, che nessuno toglie: al
+        // ritorno della rete è il motore a non farla partire.
+        const altra = { ...comune, idSegnalazione: crypto.randomUUID(), id: crypto.randomUUID(), azione: 'apertura', passaA: '', testo: 'nemmeno questa', ambito: 'Alloggio', piano: 'P3', unita: '431', parteComune: '', foto: [], stato: 'inviata', esitoServer: 'operatore_non_ammesso', inviatoIl: ora };
+        await m.aggiorna(altra);
+        await m.aggiorna({ ...comune, idSegnalazione: altra.idSegnalazione, id: crypto.randomUUID(), azione: 'foto', idPasso: altra.id, azionePasso: 'apertura', foto: [jpeg], stato: 'in_coda', esitoServer: '', inviatoIl: null, creatoIl: ora + 5 });
+        window.aperturaNonTolta = altra.id;
         return passo.id;
-      }, comune.IdSegnalazione);
+      });
       const richiestePrimaTogli = flow.stato.ricevuti.length;
       // Un goto allo stesso indirizzo non ridisegna (trappola 6): si passa dalla home.
       await d.goto(`${app.indirizzo}/index.html#/home`);
@@ -550,9 +580,16 @@ module.exports = {
       await d.evaluate(() => window.dispatchEvent(new Event('online')));
       await d.waitForTimeout(1500);
       registro.controlla('e tornata la rete non parte nessuna foto', flow.stato.ricevuti.slice(richiestePrimaTogli).filter(x => x && x.azione === 'foto').length === 0);
-      await aiuto.attendi(d, () => document.querySelectorAll('#segn-rifiutati li').length === 1, 'una riga per le 2 foto', 20000);
-      await d.click('#segn-rifiutati [data-togli]');
-      await d.waitForTimeout(300);
+      const nonTolta = await d.evaluate(async () => (await import('./modules/segnalazioni/coda.js')).elenca()
+        .then(e => e.filter(x => x.idPasso === window.aperturaNonTolta).map(x => `${x.stato}:${x.esitoServer}`)));
+      registro.controlla('l’altra apertura rifiutata, non tolta: la sua foto la ferma il motore, fra i «Non registrati»',
+        nonTolta.join(',') === 'inviata:passo_non_registrato', nonTolta.join(' '));
+      // In «Non registrati»: l'apertura non tolta, la sua foto, e le 2 foto della prima.
+      await aiuto.attendi(d, () => document.querySelectorAll('#segn-rifiutati li').length === 3, 'tre righe fra i non registrati', 20000);
+      for (let i = 0; i < 3; i += 1) {
+        await d.click('#segn-rifiutati [data-togli]');
+        await d.waitForTimeout(300);
+      }
 
       registro.titolo('Un passo rimasto in coda da una 0.43.x parte con le sue foto dentro, come allora');
       const idVecchio = await d.evaluate(async idSeg => {
@@ -573,9 +610,10 @@ module.exports = {
       await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
       await attendiServer(() => server.interventi.length === primaV + 1, 'passo della 0.43.x arrivato', 60000);
       const vecchio = flow.stato.ricevuti.filter(x => x && x.idClient === idVecchio).at(-1);
-      registro.controlla('2 foto dentro il passo, coi nomi «idClient8-1» e «-2», e il server le accetta',
+      // 12 dell'apertura, 1 della chiusura rifiutata con «già chiusa», e queste 2.
+      registro.controlla('2 foto dentro il passo, coi nomi «idClient8-1» e «-2», e il server le accetta (NumeroFoto 15)',
         vecchio.foto.length === 2 && vecchio.foto[0].nome === `${idVecchio.slice(0, 8)}-1` && vecchio.foto[1].nome === `${idVecchio.slice(0, 8)}-2`
-        && server.segnalazione(comune.IdSegnalazione).NumeroFoto === 14,
+        && server.segnalazione(comune.IdSegnalazione).NumeroFoto === 15,
         `${vecchio.foto.map(x => x.nome).join(',')} · NumeroFoto ${server.segnalazione(comune.IdSegnalazione).NumeroFoto}`);
 
       registro.titolo('Pagina Informazioni');

@@ -32,13 +32,24 @@ export const RIFIUTI_DEFINITIVI = {
   // ancora fra i «Non registrati» di un telefono aggiornato.
   troppe_foto: 'Non registrato: la segnalazione aveva già 3 foto.',
   operatore_non_ammesso: 'Non registrato: il tuo nome non può aprire o riaprire segnalazioni.',
-  // Lo decide il telefono, non il server: la foto di un passo che non si
-  // registrerà mai non parte (una foto di un'apertura rifiutata cercherebbe
-  // per sempre una segnalazione che non c'è).
-  passo_non_registrato: 'Foto non mandata: il passo a cui apparteneva non è stato registrato.',
+  // Lo decide il telefono, non il server: la foto di un'apertura rifiutata non
+  // parte, perché cercherebbe per sempre una segnalazione che non c'è.
+  passo_non_registrato: 'Foto non mandata: l’apertura a cui apparteneva non è stata registrata, e la segnalazione non esiste.',
 };
 
 export const eFoto = record => record.azione === coda.AZIONE_FOTO;
+
+// Le foto di un passo rifiutato (decisione di Francesco del 20/11/2026, «Sì, i
+// consigli»). Si scartano SOLO quando la segnalazione non esiste, cioè quando
+// il passo rifiutato è un'apertura (oggi «nome non ammesso»). Per ogni altro
+// passo rifiutato la segnalazione esiste — il server rifiuta passaggio,
+// chiusura e riapertura solo dopo averla trovata, e «sconosciuta» non è un
+// rifiuto definitivo — e le foto si mandano lo stesso: documentano il lavoro
+// fatto, e il server le accetta anche su una chiusa. Vale per tutti i rifiuti
+// di quei passi, non solo per «già chiusa»: «già aperta» su una riapertura e
+// «nome non ammesso» su una riapertura rifiutano il cambio di stato, non la
+// segnalazione. Il rifiuto del passo resta fra i «Non registrati».
+export const fotoScartateConIlPasso = passo => passo.azione === 'apertura';
 
 const motore = creaMotore({
   coda,
@@ -132,11 +143,15 @@ async function leggiEsito(risposta) {
 // la foto arriverebbe prima del passo, e se il passo venisse poi rifiutato
 // («già chiusa») la foto resterebbe attaccata a una segnalazione a cui non
 // appartiene. Un passo che non c'è più nella coda è arrivato ed è stato potato.
+export const MESSAGGIO_ATTESA_PASSO = 'Aspetta il suo passo, che non è ancora arrivato: parte subito dopo.';
+
 export function attesaDelPasso(record, elementi) {
   if (!eFoto(record)) return '';
   const passo = elementi.find(r => r.id === record.idPasso);
   if (!passo) return '';
-  if (passo.stato === 'inviata') return RIFIUTI_DEFINITIVI[passo.esitoServer] ? 'rifiutato' : '';
+  if (passo.stato === 'inviata') {
+    return RIFIUTI_DEFINITIVI[passo.esitoServer] && fotoScartateConIlPasso(passo) ? 'rifiutato' : '';
+  }
   return 'in_attesa';
 }
 
@@ -147,7 +162,7 @@ async function inviaSingola(record) {
   }
   const attesa = attesaDelPasso(record, await coda.elenca());
   if (attesa === 'rifiutato') return { rifiutato: 'passo_non_registrato' };
-  if (attesa === 'in_attesa') throw new Error('Aspetta il suo passo, che non è ancora arrivato: parte subito dopo.');
+  if (attesa === 'in_attesa') throw new Error(MESSAGGIO_ATTESA_PASSO);
   const corpo = await corpoInvio(record, impostazioni, await idDispositivo(), await versioneApp());
   let risposta;
   try {
