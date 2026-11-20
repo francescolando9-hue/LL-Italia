@@ -359,6 +359,26 @@ module.exports = {
       registro.controlla('«Nuova segnalazione» c’è per Francesco', (await f.$$('#nuova')).length === 1);
       await f.click('#nuova');
       await f.waitForSelector('#commessa');
+      // Dalla 0.44.0 (master 202611202113) SNZ2.1 e MRS hanno l'anagrafica:
+      // alloggio e piano dal menù, non più scritti a parole.
+      await f.selectOption('#commessa', 'MRS');
+      await f.check('input[name="ambito"][value="Alloggio"]');
+      await f.waitForSelector('#unita');
+      const unitaMRS = await f.$$eval('#unita option', o => o.filter(x => x.value).map(x => `${x.value}|${x.dataset.piano}`));
+      registro.controlla('MRS · alloggio: menù con 65 alloggi, piano dalla mappa (2.10B → P10), niente testo libero',
+        unitaMRS.length === 65 && unitaMRS.includes('2.10B|P10') && unitaMRS.includes('3.0C|P0')
+        && (await f.$$('#dove-testo')).length === 0, `${unitaMRS.length} voci`);
+      await f.selectOption('#commessa', 'SNZ2.1');
+      await f.check('input[name="ambito"][value="Parte comune"]');
+      await f.waitForSelector('#piano');
+      const pianiSNZ21 = await f.$$eval('#piano option', o => o.map(x => x.value));
+      registro.controlla('SNZ2.1 · parti comuni: piano dal menù (P-1…P11 e Tetto), senza palazzina',
+        pianiSNZ21.join(',') === ',P-1,P0,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,Tetto'
+        && (await f.$$('#scala')).length === 0 && (await f.$$('#dove-testo')).length === 0, pianiSNZ21.join(' '));
+      await f.check('input[name="ambito"][value="Alloggio"]');
+      await f.waitForSelector('#unita');
+      registro.controlla('SNZ2.1 · alloggio: 52 alloggi',
+        (await f.$$eval('#unita option', o => o.filter(x => x.value).length)) === 52);
       await f.selectOption('#commessa', 'MNG');
       await f.check('input[name="ambito"][value="Alloggio"]');
       await f.waitForSelector('#unita');

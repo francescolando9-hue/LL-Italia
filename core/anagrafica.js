@@ -73,16 +73,23 @@
 // giorno che qualcuno numera `10A` — e sbaglierebbe in silenzio, mettendo la
 // foto in una cartella che esiste. Si legge dalla mappa, sempre.
 //
-// Commesse senza anagrafica. SNZ2.1 e MRS sono concluse, e una commessa nuova
-// non ce l'ha ancora. Per loro non c'è nessun livello da offrire, le fasi
-// restano tutte disponibili e i tre campi non viaggiano. A valle la foto
-// finisce nella cartella del mese con un'anomalia — voluto: non blocca chi sta
-// scattando in cantiere per un dato che manca in ufficio.
+// **SNZ2.1 e MRS** (dal master 202611202113, app 0.44.0; anagrafica decisa da
+// Francesco il 20/11/2026): erano senza anagrafica fino alla 0.43.1. Le unità
+// hanno la scala nel codice, `[scala].[piano][lettera]` (`1.1A`, `2.10B`),
+// e al piano terra `1.01`…`2.04` (SNZ2.1) e `2.0A`…`3.0C` (MRS); `P-1` e
+// `Tetto` sono piani delle parti comuni. Le scale stanno nel dato come a MAR:
+// un edificio solo, nessuna scelta della palazzina.
+//
+// Commesse senza anagrafica: una commessa nuova non ce l'ha ancora. Per lei non
+// c'è nessun livello da offrire, le fasi restano tutte disponibili e i tre
+// campi non viaggiano. A valle la foto finisce nella cartella del mese con
+// un'anomalia — voluto: non blocca chi sta scattando in cantiere per un dato
+// che manca in ufficio.
 
 import { FASI, FASI_ESCLUSE_DALLE_APP, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202610261235',
+  versione: '202611202113',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -277,6 +284,92 @@ export const ANAGRAFICA = {
           unita: ['601', '602', '603', '604', '611', '612', '613', '614', '621', '622', '623', '624', '631', '632', '633', '634'] },
         { codice: '7', piani: ['P0', 'P1', 'P2', 'P3', 'Tetto'],
           unita: ['701', '702', '703', '704', '711', '712', '713', '714', '721', '722', '723', '724', '731', '732', '733', '734'] },
+      ],
+      etichetteUnita: {},
+      prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
+    },
+    'SNZ2.1': {
+      tipo: 'edificio',
+      piani: [
+        { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
+        { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',           ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo',         ordine: 2 },
+        { codice: 'P3',    etichetta: 'Piano terzo',           ordine: 3 },
+        { codice: 'P4',    etichetta: 'Piano quarto',          ordine: 4 },
+        { codice: 'P5',    etichetta: 'Piano quinto',          ordine: 5 },
+        { codice: 'P6',    etichetta: 'Piano sesto',           ordine: 6 },
+        { codice: 'P7',    etichetta: 'Piano settimo',         ordine: 7 },
+        { codice: 'P8',    etichetta: 'Piano ottavo',          ordine: 8 },
+        { codice: 'P9',    etichetta: 'Piano nono',            ordine: 9 },
+        { codice: 'P10',   etichetta: 'Piano decimo',          ordine: 10 },
+        { codice: 'P11',   etichetta: 'Piano undicesimo',      ordine: 11 },
+        { codice: 'Tetto', etichetta: 'Tetto',                 ordine: 12 },
+      ],
+      unita: {
+        'P-1':  [],
+        P0:     ['1.01', '1.02', '1.03', '1.04', '2.01', '2.02', '2.03', '2.04'],
+        P1:     ['1.1A', '1.1B', '2.1A', '2.1B'],
+        P2:     ['1.2A', '1.2B', '2.2A', '2.2B'],
+        P3:     ['1.3A', '1.3B', '2.3A', '2.3B'],
+        P4:     ['1.4A', '1.4B', '2.4A', '2.4B'],
+        P5:     ['1.5A', '1.5B', '2.5A', '2.5B'],
+        P6:     ['1.6A', '1.6B', '2.6A', '2.6B'],
+        P7:     ['1.7A', '1.7B', '2.7A', '2.7B'],
+        P8:     ['1.8A', '1.8B', '2.8A', '2.8B'],
+        P9:     ['1.9A', '1.9B', '2.9A', '2.9B'],
+        P10:    ['1.10A', '1.10B', '2.10A', '2.10B'],
+        P11:    ['1.11A', '1.11B', '2.11A', '2.11B'],
+        Tetto:  [],
+      },
+      scale: [
+        { codice: '1', piani: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11'],
+          unita: ['1.01', '1.02', '1.03', '1.04', '1.1A', '1.1B', '1.2A', '1.2B', '1.3A', '1.3B', '1.4A', '1.4B', '1.5A', '1.5B', '1.6A', '1.6B', '1.7A', '1.7B', '1.8A', '1.8B', '1.9A', '1.9B', '1.10A', '1.10B', '1.11A', '1.11B'] },
+        { codice: '2', piani: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11'],
+          unita: ['2.01', '2.02', '2.03', '2.04', '2.1A', '2.1B', '2.2A', '2.2B', '2.3A', '2.3B', '2.4A', '2.4B', '2.5A', '2.5B', '2.6A', '2.6B', '2.7A', '2.7B', '2.8A', '2.8B', '2.9A', '2.9B', '2.10A', '2.10B', '2.11A', '2.11B'] },
+      ],
+      etichetteUnita: {},
+      prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
+    },
+    MRS: {
+      tipo: 'edificio',
+      piani: [
+        { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
+        { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
+        { codice: 'P1',    etichetta: 'Piano primo',           ordine: 1 },
+        { codice: 'P2',    etichetta: 'Piano secondo',         ordine: 2 },
+        { codice: 'P3',    etichetta: 'Piano terzo',           ordine: 3 },
+        { codice: 'P4',    etichetta: 'Piano quarto',          ordine: 4 },
+        { codice: 'P5',    etichetta: 'Piano quinto',          ordine: 5 },
+        { codice: 'P6',    etichetta: 'Piano sesto',           ordine: 6 },
+        { codice: 'P7',    etichetta: 'Piano settimo',         ordine: 7 },
+        { codice: 'P8',    etichetta: 'Piano ottavo',          ordine: 8 },
+        { codice: 'P9',    etichetta: 'Piano nono',            ordine: 9 },
+        { codice: 'P10',   etichetta: 'Piano decimo',          ordine: 10 },
+        { codice: 'Tetto', etichetta: 'Tetto',                 ordine: 11 },
+      ],
+      unita: {
+        'P-1':  [],
+        P0:     ['2.0A', '2.0B', '3.0A', '3.0B', '3.0C'],
+        P1:     ['1.1A', '1.1B', '2.1A', '2.1B', '3.1A', '3.1B'],
+        P2:     ['1.2A', '1.2B', '2.2A', '2.2B', '3.2A', '3.2B'],
+        P3:     ['1.3A', '1.3B', '2.3A', '2.3B', '3.3A', '3.3B'],
+        P4:     ['1.4A', '1.4B', '2.4A', '2.4B', '3.4A', '3.4B'],
+        P5:     ['1.5A', '1.5B', '2.5A', '2.5B', '3.5A', '3.5B'],
+        P6:     ['1.6A', '1.6B', '2.6A', '2.6B', '3.6A', '3.6B'],
+        P7:     ['1.7A', '1.7B', '2.7A', '2.7B', '3.7A', '3.7B'],
+        P8:     ['1.8A', '1.8B', '2.8A', '2.8B', '3.8A', '3.8B'],
+        P9:     ['1.9A', '1.9B', '2.9A', '2.9B', '3.9A', '3.9B'],
+        P10:    ['1.10A', '1.10B', '2.10A', '2.10B', '3.10A', '3.10B'],
+        Tetto:  [],
+      },
+      scale: [
+        { codice: '1', piani: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+          unita: ['1.1A', '1.1B', '1.2A', '1.2B', '1.3A', '1.3B', '1.4A', '1.4B', '1.5A', '1.5B', '1.6A', '1.6B', '1.7A', '1.7B', '1.8A', '1.8B', '1.9A', '1.9B', '1.10A', '1.10B'] },
+        { codice: '2', piani: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+          unita: ['2.0A', '2.0B', '2.1A', '2.1B', '2.2A', '2.2B', '2.3A', '2.3B', '2.4A', '2.4B', '2.5A', '2.5B', '2.6A', '2.6B', '2.7A', '2.7B', '2.8A', '2.8B', '2.9A', '2.9B', '2.10A', '2.10B'] },
+        { codice: '3', piani: ['P0', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],
+          unita: ['3.0A', '3.0B', '3.0C', '3.1A', '3.1B', '3.2A', '3.2B', '3.3A', '3.3B', '3.4A', '3.4B', '3.5A', '3.5B', '3.6A', '3.6B', '3.7A', '3.7B', '3.8A', '3.8B', '3.9A', '3.9B', '3.10A', '3.10B'] },
       ],
       etichetteUnita: {},
       prospetti: ['Nord', 'Sud', 'Est', 'Ovest'],
