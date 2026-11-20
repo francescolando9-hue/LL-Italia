@@ -154,11 +154,22 @@ function avviaFlow(porta = PORTA_FLOW) {
         res.end('{"esito":"gia_presente"}');
         return;
       }
-      // `risposte` permette a un collaudo di decidere invio per invio.
+      // `risposte` permette a un collaudo di decidere invio per invio. Può
+      // restituire lo stato HTTP (un numero, come sempre) oppure, dalla 0.43.0,
+      // `{ stato, corpo }`: serve al modulo Segnalazioni, che LEGGE dal flow e
+      // ha bisogno di un corpo diverso a ogni richiesta. Riceve anche
+      // l'indirizzo chiesto, per distinguere ricevitore ed elenco.
+      // Può anche restituire una Promise: il collaudo 29 risponde con le regole
+      // vere delle funzioni (funzioni/src/regole.js), che sono asincrone.
       const scelta = typeof stato.risposte === 'function'
-        ? stato.risposte(dati, stato.ricevuti.length) : stato.stato;
-      res.writeHead(scelta, { ...cors, 'Content-Type': 'application/json' });
-      res.end(stato.corpo || '{}');
+        ? stato.risposte(dati, stato.ricevuti.length, String(req.url)) : stato.stato;
+      Promise.resolve(scelta).then(valore => {
+        const conCorpo = valore && typeof valore === 'object';
+        res.writeHead(conCorpo ? valore.stato : valore, { ...cors, 'Content-Type': 'application/json' });
+        res.end(conCorpo
+          ? (typeof valore.corpo === 'string' ? valore.corpo : JSON.stringify(valore.corpo || {}))
+          : (stato.corpo || '{}'));
+      }, () => { res.writeHead(500, cors); res.end('{}'); });
     });
   };
   let server = http.createServer(gestore);

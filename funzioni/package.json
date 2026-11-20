@@ -1,0 +1,14 @@
+{
+  "name": "llitalia-segnalazioni-funzioni",
+  "version": "0.43.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "description": "Le due funzioni del modulo Segnalazioni (Azure Functions, modello v4 per Node.js)",
+  "scripts": {
+    "test": "node --test collaudi/"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
+}

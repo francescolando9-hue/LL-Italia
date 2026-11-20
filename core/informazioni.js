@@ -57,7 +57,11 @@ export async function vistaInformazioni(el, moduli = []) {
           <dt>Da inviare (non ancora confermate)</dt><dd>${stato.bozze}</dd>
           <dt>In coda</dt><dd>${stato.inAttesa}</dd>
           <dt>Bloccate</dt>${errore}
-          <dt>Oggi</dt><dd>${(stato.oggi || {}).scattate || 0} scattate, ${(stato.oggi || {}).inviate || 0} inviate</dd>
+          <dt>Oggi</dt><dd>${stato.oggiTesto
+            // Un modulo che non scatta foto (Segnalazioni, dalla 0.43.0) dice
+            // i suoi numeri di oggi con le sue parole.
+            ? scappaHtml(stato.oggiTesto)
+            : `${(stato.oggi || {}).scattate || 0} scattate, ${(stato.oggi || {}).inviate || 0} inviate`}</dd>
           ${extra}
         </dl>
       </section>`;

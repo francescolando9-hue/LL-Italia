@@ -6,9 +6,10 @@ import { vistaInformazioni } from './informazioni.js';
 import { aggiornamentoPronto } from './versione.js';
 import moduloBolle from '../modules/bolle/index.js';
 import moduloFoto from '../modules/foto/index.js';
+import moduloSegnalazioni from '../modules/segnalazioni/index.js';
 
 // Registro dei moduli: aggiungerne uno = importarlo e aggiungerlo qui.
-const moduli = [moduloBolle, moduloFoto];
+const moduli = [moduloBolle, moduloFoto, moduloSegnalazioni];
 
 registraRotta('#/', () => {
   if (!impostazioniApp.autore) {

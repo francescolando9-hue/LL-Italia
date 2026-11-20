@@ -2,7 +2,7 @@
 // Da cambiare a ogni rilascio INSIEME a VERSIONE_CODICE in core/versione.js:
 // quella dice cosa sta girando, questa cosa è installato, e l'app avvisa
 // quando non coincidono.
-const VERSIONE = '0.42.0';
+const VERSIONE = '0.43.0';
 const CACHE = `llitalia-${VERSIONE}`;
 const RISORSE = [
   './',
@@ -49,6 +49,14 @@ const RISORSE = [
   './modules/foto/invio.js',
   './modules/foto/vista-impostazioni.js',
   './modules/foto/configurazione.js',
+  './modules/segnalazioni/index.js',
+  './modules/segnalazioni/segnalazioni.css',
+  './modules/segnalazioni/coda.js',
+  './modules/segnalazioni/invio.js',
+  './modules/segnalazioni/impostazioni.js',
+  './modules/segnalazioni/configurazione.js',
+  './modules/segnalazioni/dettatura.js',
+  './modules/segnalazioni/immagini.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

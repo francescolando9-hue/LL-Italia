@@ -8,3 +8,9 @@ collaudi/materiale/
 # sono la dipendenza di sviluppo, non l'app, che resta senza npm.
 collaudi/package.json
 collaudi/package-lock.json
+
+# Funzioni delle Segnalazioni: le dipendenze si installano al rilascio, e il
+# pacchetto da caricare su Azure si costruisce lì. Mai nel repo.
+funzioni/node_modules
+funzioni/package-lock.json
+funzioni/*.zip
