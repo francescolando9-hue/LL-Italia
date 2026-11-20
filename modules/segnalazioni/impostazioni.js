@@ -1,11 +1,12 @@
 // Impostazioni del modulo Segnalazioni, persistite in localStorage del dispositivo.
 //
-// Il modulo parla con DUE flow, non uno: `SegnalazioniRicevitore`, che riceve
-// aperture, passaggi, chiusure e riaperture, e `SegnalazioniElenco`, che
+// Il modulo parla con DUE funzioni (Azure Functions, decisione di Francesco del
+// 20/11/2026 al posto dei flow): `segnalazioni`, che riceve
+// aperture, passaggi, chiusure e riaperture, e `segnalazioni-elenco`, che
 // restituisce l'elenco. È il primo modulo che LEGGE dal server: Foto e Bolle
-// mandano soltanto. Gli indirizzi contengono la firma di accesso del trigger:
+// mandano soltanto. Gli indirizzi contengono la chiave della funzione (`code=`):
 // non stanno MAI nel repo, arrivano col QR o si scrivono nelle impostazioni.
-// Il token è uno solo, uguale nei due flow.
+// Il token è uno solo, uguale nelle due funzioni.
 import { normalizzaEndpoint } from '../../core/endpoint.js';
 
 export { normalizzaEndpoint };
@@ -16,7 +17,7 @@ const CHIAVE_STORIE = 'llitalia.segnalazioni.storie';
 const STORIE_DA_TENERE = 50;
 
 // Chi apre una segnalazione: decisione di Francesco del 20/11/2026, i cinque
-// che passano negli alloggi e parlano coi clienti. I clienti no. Il flow
+// che passano negli alloggi e parlano coi clienti. I clienti no. Il server
 // rifiuta comunque un'apertura da un altro nome (403): l'elenco sta qui per
 // non mostrare un pulsante che porta a un rifiuto.
 export const POSSONO_APRIRE = [

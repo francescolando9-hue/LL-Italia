@@ -224,10 +224,10 @@ I problemi negli alloggi e nelle parti comuni, dal primo che li vede a chi li ri
 - **Niente fase né attività:** le propone l'IA nel giro serale delle 20:00 sul PC dell'ufficio, Francesco le rivede, e il giro dopo le rende definitive insieme a «a carico di: noi / cliente / altri».
 - **Poi:** chi l'ha in mano la **chiude** («Risolto, chiudi») o la **passa** («Ho fatto la mia parte, deve passare…»). Paolo e Francesco possono agire su tutte e **riaprire** quelle chiuse.
 - **«Tocca a te» in cima all'app:** chi deve intervenire la vede appena apre l'app, sopra le tessere. Niente mail, niente Teams. È il primo modulo che **legge** dal server: alla home si chiede l'elenco al flow `SegnalazioniElenco` (al massimo una volta al minuto), e senza rete resta l'ultimo letto, con la sua ora. Un passo appena fatto si applica subito alla copia del telefono: una segnalazione passata sparisce dalla home di chi l'ha passata senza aspettare il server.
-- **Due flow, un token:** `SegnalazioniRicevitore` riceve i passi (apertura, passaggio, chiusura, riapertura), `SegnalazioniElenco` restituisce l'elenco e la storia di una segnalazione. Il QR del modulo porta **tutti e due gli indirizzi** (`core/configurazione-link.js`, campo `secondoEndpoint`): un link senza il secondo si rifiuta.
+- **Due funzioni, un token** (Azure Functions, decisione di Francesco del 20/11/2026: niente flow): `segnalazioni` riceve i passi (apertura, passaggio, chiusura, riapertura), `segnalazioni-elenco` restituisce l'elenco e la storia di una segnalazione. Il codice sta in `funzioni/`: le regole (chi apre, chi riapre, doppioni, «già chiusa», «troppe foto», invii ripresi dopo un guasto a metà) sono in `funzioni/src/regole.js`, file puro con i suoi collaudi (`node --test funzioni/collaudi/`), e il collaudo 29 le fa girare contro l'app. Scrivono sulle due liste del sito con l'identità gestita della Function App, a cui è concesso il solo sito Cantieri LL. Il QR del modulo porta **tutti e due gli indirizzi** (`core/configurazione-link.js`, campo `secondoEndpoint`): un link senza il secondo si rifiuta.
 - **Coda:** come Foto e Bolle, ogni passo esce dalla coda solo a conferma del server e riparte da solo. Un rifiuto che non cambia ritentando — «già chiusa», «già aperta», «troppe foto», «nome non ammesso» — non resta in errore per sempre: va fra i **«Non registrati»** con la sua frase.
 
-Il contratto esatto e i passi dei due flow stanno nel testo preparato per Francesco il 20/11/2026, fuori da questo repo (nomina il sito e le liste).
+Lo script che crea le risorse su Azure e quello dei rilasci stanno fuori da questo repo, accanto alla configurazione: nominano la sottoscrizione e il sito.
 
 ## Collaudi
 
@@ -298,7 +298,9 @@ core/versione.js      versione in uso, letta dalla cache attiva del service work
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
 modules/segnalazioni/ modulo Segnalazioni (0.43.0): apre, passa, chiude, riapre;
-                      «Tocca a te» in cima alla home (inCima), dettatura, due flow
+                      «Tocca a te» in cima alla home (inCima), dettatura
+funzioni/             le due Azure Functions delle Segnalazioni: regole pure in src/regole.js,
+                      archivio SharePoint in src/sharepoint.js, collaudi con node --test
 collaudi/             prove automatiche su browser vero (node collaudi/esegui.js)
 collaudi/riservatezza.js  controllo di riservatezza (vedi sopra), senza browser
 .githooks/pre-commit  lo stesso controllo prima del commit (git config core.hooksPath .githooks)

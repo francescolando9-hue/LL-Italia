@@ -51,7 +51,7 @@ const io = () => impostazioniApp.autore;
 export const puoAprire = nome => POSSONO_APRIRE.includes(nome);
 export const coordina = nome => COORDINANO.includes(nome);
 
-// Le date dal server sono 14 cifre AAAAMMGGHHMMSS (il flow non passa mai al
+// Le date dal server sono 14 cifre AAAAMMGGHHMMSS (il server non passa mai al
 // connettore un valore che somigli a una data). A video «GG/MM alle HH:MM».
 export function dataLeggibile(cifre) {
   const t = String(cifre || '');

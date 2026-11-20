@@ -1,7 +1,8 @@
-// Invio dei passi al flow `SegnalazioniRicevitore` e lettura dell'elenco dal
-// flow `SegnalazioniElenco`.
+// Invio dei passi alla funzione `segnalazioni` e lettura dell'elenco dalla
+// funzione `segnalazioni-elenco` (Azure Functions, codice in `funzioni/`).
 //
-// Il contratto sta nel testo dei flow preparato per Francesco (20/11/2026) ed
+// Il contratto lo fissano le regole del server (`funzioni/src/regole.js`), che il
+// collaudo 29 fa girare contro l'app; nato col testo dei flow del 20/11/2026, ed
 // è questo: POST JSON, un passo per richiesta, foto JPEG in base64 dentro la
 // stessa richiesta (al massimo 3 per segnalazione). Le risposte:
 //   200 ok / gia_presente           → il passo è registrato
@@ -48,9 +49,9 @@ const motore = creaMotore({
 
 export const { alCambiamento, avvia, riprova } = motore;
 
-// Le foto viaggiano con un nome che il flow usa per l'allegato: le prime otto
+// Le foto viaggiano con un nome che il server usa per l'allegato: le prime otto
 // lettere dell'idClient e il numero della foto. Diverse fra loro nello stesso
-// invio, e fisse fra un tentativo e l'altro: il flow riconosce quelle già
+// invio, e fisse fra un tentativo e l'altro: il server riconosce quelle già
 // caricate da un invio ripreso e non le carica due volte.
 export function nomeFoto(record, indice) {
   return `${String(record.id).slice(0, 8)}-${indice + 1}`;

@@ -5,7 +5,7 @@
 // cantiere.
 //
 // Un file che il telefono non sa disegnare — l'HEIC su Chrome per Android — qui
-// non passa: a differenza del modulo Foto, il flow lo salva come allegato JPEG,
+// non passa: a differenza del modulo Foto, il server lo salva come allegato JPEG,
 // e un HEIC con quel nome sarebbe un allegato che non si apre. Si dice cosa
 // fare invece di accodare una cosa che arriva rotta.
 

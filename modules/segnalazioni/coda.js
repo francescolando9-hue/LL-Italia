@@ -1,7 +1,7 @@
 // Coda offline del modulo Segnalazioni su IndexedDB.
 //
 // Ogni elemento è un PASSO di una segnalazione — apertura, passaggio, chiusura,
-// riapertura — con il suo `id`, che viaggia come `idClient`: il flow ci fa la
+// riapertura — con il suo `id`, che viaggia come `idClient`: il server ci fa la
 // guardia sui doppioni. La segnalazione ha un suo identificativo,
 // `idSegnalazione`, che l'app crea all'apertura e ripete in ogni passo: così un
 // passaggio fatto senza rete, su una segnalazione aperta anche lei senza rete,

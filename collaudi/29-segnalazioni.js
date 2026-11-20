@@ -1,19 +1,21 @@
 // Il modulo Segnalazioni (dalla 0.43.0): apertura, passaggio, chiusura,
-// riapertura, «Tocca a te» in cima all'app, e il contratto coi due flow.
+// riapertura, «Tocca a te» in cima all'app, e il contratto con le due
+// funzioni (Azure Functions, decisione di Francesco del 20/11/2026).
 //
-// Il flow finto qui fa da SERVER VERO in piccolo: tiene le segnalazioni e gli
-// interventi e applica le regole del testo dei flow preparato per Francesco
-// (20/11/2026) — guardia sui doppioni, chi apre, chi riapre, «già chiusa»,
-// «troppe foto», «segnalazione sconosciuta». Senza un server che ricorda, un
-// collaudo di questo modulo proverebbe solo che le richieste partono, e il
-// modulo è il primo che LEGGE: quello che legge deve essere quello che si è
-// scritto.
+// Il flow finto qui risponde con le REGOLE VERE delle funzioni
+// (funzioni/src/regole.js) su un archivio in memoria: guardia sui doppioni,
+// chi apre, chi riapre, «già chiusa», «troppe foto», «segnalazione
+// sconosciuta». Senza un server che ricorda, un collaudo di questo modulo
+// proverebbe solo che le richieste partono, e il modulo è il primo che LEGGE:
+// quello che legge deve essere quello che si è scritto. E con le regole vere,
+// app e server si provano insieme.
 const fs = require('fs');
+const path = require('path');
+const { pathToFileURL } = require('url');
 const { nuovoTelefono, materiale } = require('./aiuto');
 
-const TOKEN = 'LLI-SEGN';
-const POSSONO_APRIRE = ['Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Paolo Sanzarello', 'Rosario Incarbone'];
-const COORDINANO = ['Francesco Lando', 'Paolo Sanzarello'];
+// Almeno 16 caratteri: le regole rifiutano un codice più corto.
+const TOKEN = 'LLI-SEGN-collaudo-0430';
 
 const CAMPI_ATTESI = [
   'token', 'azione', 'idClient', 'idSegnalazione', 'operatore', 'passaA', 'testo',
@@ -21,64 +23,31 @@ const CAMPI_ATTESI = [
   'idDispositivo', 'versioneApp', 'foto',
 ];
 
-function serverFinto() {
-  const s = { segnalazioni: new Map(), interventi: [], prossimo: 1, forza: null, letture: 0 };
-  const cifre = d => String(d).slice(0, 19).replace(/\D/g, '');
-
-  function ricevi(d) {
+// Il server: le REGOLE VERE delle funzioni (funzioni/src/regole.js) su un
+// archivio in memoria (funzioni/src/memoria.js). Fino al 20/11/2026 pomeriggio
+// qui c'era una copia delle regole scritta a mano per il collaudo: due copie
+// della stessa regola divergono, e la copia rimasta indietro è quella che dice
+// verde.
+async function serverVero() {
+  const base = path.join(__dirname, '..', 'funzioni', 'src');
+  const regole = await import(pathToFileURL(path.join(base, 'regole.js')).href);
+  const { creaMemoria } = await import(pathToFileURL(path.join(base, 'memoria.js')).href);
+  const archivio = creaMemoria();
+  const s = {
+    archivio,
+    interventi: archivio.interventi,
+    forza: null,
+    letture: 0,
+    segnalazione: idSegnalazione => [...archivio.segnalazioni.values()].find(x => x.IdSegnalazione === idSegnalazione),
+  };
+  s.risposte = (dati, _n, url) => {
+    if (url.startsWith('/segnalazioni-elenco')) {
+      s.letture += 1;
+      return regole.leggi(dati, archivio, { token: TOKEN });
+    }
     if (s.forza) { const f = s.forza; s.forza = null; return f; }
-    if (!d || d.token !== TOKEN) return { stato: 401, corpo: { esito: 'token_non_valido' } };
-    if (s.interventi.some(i => i.idClient === d.idClient)) return { stato: 200, corpo: { esito: 'gia_presente', idClient: d.idClient } };
-    let seg = s.segnalazioni.get(d.idSegnalazione);
-    const foto = Array.isArray(d.foto) ? d.foto : [];
-    if (d.azione === 'apertura' && !POSSONO_APRIRE.includes(d.operatore)) return { stato: 403, corpo: { esito: 'operatore_non_ammesso' } };
-    if (d.azione === 'riapertura' && !COORDINANO.includes(d.operatore)) return { stato: 403, corpo: { esito: 'operatore_non_ammesso' } };
-    if (!seg && d.azione !== 'apertura') return { stato: 409, corpo: { esito: 'segnalazione_sconosciuta' } };
-    if (seg && d.azione !== 'apertura') {
-      if (['passaggio', 'chiusura'].includes(d.azione) && seg.stato === 'Chiusa') return { stato: 409, corpo: { esito: 'gia_chiusa' } };
-      if (d.azione === 'riapertura' && seg.stato === 'Aperta') return { stato: 409, corpo: { esito: 'gia_aperta' } };
-      if (seg.numeroFoto + foto.length > 3) return { stato: 409, corpo: { esito: 'troppe_foto' } };
-    }
-    const data = cifre(d.dataIntervento);
-    if (!seg) {
-      seg = {
-        id: s.prossimo++, idSegnalazione: d.idSegnalazione, commessa: d.commessa, ambito: d.ambito, piano: d.piano,
-        unita: d.unita, parteComune: d.parteComune, testo: d.testo, apertaDa: d.operatore, apertaIl: data,
-        stato: 'Aperta', toccaA: d.passaA || d.operatore, ultimoIntervento: data, ultimoOperatore: d.operatore,
-        ultimaNota: d.testo, chiusaDa: '', chiusaIl: '', numeroFoto: foto.length,
-      };
-      s.segnalazioni.set(d.idSegnalazione, seg);
-    } else {
-      if (d.azione === 'passaggio') seg.toccaA = d.passaA;
-      if (d.azione === 'chiusura') { seg.stato = 'Chiusa'; seg.toccaA = ''; seg.chiusaDa = d.operatore; seg.chiusaIl = data; }
-      if (d.azione === 'riapertura') { seg.stato = 'Aperta'; seg.toccaA = d.passaA || d.operatore; seg.chiusaDa = ''; seg.chiusaIl = ''; }
-      seg.ultimoIntervento = data;
-      seg.ultimoOperatore = d.operatore;
-      seg.ultimaNota = d.testo;
-      seg.numeroFoto += foto.length;
-    }
-    s.interventi.push({
-      idSegnalazione: d.idSegnalazione, idClient: d.idClient, azione: d.azione, operatore: d.operatore,
-      passaA: d.passaA, testo: d.testo, data, numeroFoto: foto.length, foto,
-    });
-    return { stato: 200, corpo: { esito: 'ok', idSegnalazione: d.idSegnalazione, id: seg.id, azione: d.azione } };
-  }
-
-  function elenco(d) {
-    if (!d || d.token !== TOKEN) return { stato: 401, corpo: { esito: 'token_non_valido' } };
-    s.letture += 1;
-    if (d.idSegnalazione) {
-      return { stato: 200, corpo: {
-        esito: 'ok', modalita: 'storia', idSegnalazione: d.idSegnalazione,
-        interventi: s.interventi.filter(i => i.idSegnalazione === d.idSegnalazione)
-          .map(({ azione, operatore, passaA, testo, data, numeroFoto }) => ({ azione, operatore, passaA, testo, data, numeroFoto })),
-      } };
-    }
-    return { stato: 200, corpo: { esito: 'ok', modalita: 'elenco', segnalazioni: [...s.segnalazioni.values()].reverse() } };
-  }
-
-  s.risposte = (dati, _n, url) => (url.startsWith('/segnalazioni-elenco') ? elenco(dati) : ricevi(dati));
-  return s;
+    return regole.riceviPasso(dati, archivio, { token: TOKEN });
+  };  return s;
 }
 
 async function telefono(browser, app, flow, autore, { conDettatura = 'finta' } = {}) {
@@ -126,7 +95,7 @@ module.exports = {
   nome: 'Segnalazioni: apre, passa, chiude, riapre; «Tocca a te» in cima all’app',
 
   async esegui({ browser, app, flow, registro, aiuto }) {
-    const server = serverFinto();
+    const server = await serverVero();
     flow.stato.risposte = server.risposte;
     const telefoni = [];
     const errori = [];
@@ -209,7 +178,7 @@ module.exports = {
         jpeg.length < fs.statSync(materiale('foto-cantiere.jpg')).size, `${jpeg.length} byte`);
       registro.controlla('passaA = Enzo, operatore = Paolo', apertura.passaA === 'Enzo Santovito' && apertura.operatore === 'Paolo Sanzarello');
       const idSegnalazione = apertura.idSegnalazione;
-      registro.controlla('sul server tocca a Enzo', server.segnalazioni.get(idSegnalazione).toccaA === 'Enzo Santovito');
+      registro.controlla('sul server tocca a Enzo', server.segnalazione(idSegnalazione).ToccaA === 'Enzo Santovito');
 
       registro.titolo('Enzo apre l’app: la trova in cima, senza scorrere');
       const enzo = await telefono(browser, app, flow, 'Enzo Santovito');
@@ -255,7 +224,7 @@ module.exports = {
       await attendiServer(() => server.interventi.length === primaE + 1, 'passaggio arrivato');
       const passaggio = server.interventi[server.interventi.length - 1];
       registro.controlla('al server arriva un passaggio a Rosario, sulla stessa segnalazione',
-        passaggio.azione === 'passaggio' && passaggio.passaA === 'Rosario Incarbone' && passaggio.idSegnalazione === idSegnalazione);
+        passaggio.Azione === 'passaggio' && passaggio.PassaA === 'Rosario Incarbone' && passaggio.IdSegnalazione === idSegnalazione);
       registro.controlla('Enzo, che è fra i cinque, vede «Nuova segnalazione»',
         await (async () => { await e.goto(`${app.indirizzo}/index.html#/segnalazioni`); await e.waitForSelector('#aggiorna'); return (await e.$$('#nuova')).length === 1; })());
 
@@ -277,9 +246,9 @@ module.exports = {
       await r.click('#chiudi');
       await attendiServer(() => server.interventi.length === primaR + 1, 'chiusura arrivata');
       registro.controlla('sul server è chiusa, chiusa da Rosario, e non tocca più a nessuno',
-        server.segnalazioni.get(idSegnalazione).stato === 'Chiusa'
-        && server.segnalazioni.get(idSegnalazione).chiusaDa === 'Rosario Incarbone'
-        && server.segnalazioni.get(idSegnalazione).toccaA === '');
+        server.segnalazione(idSegnalazione).Stato === 'Chiusa'
+        && server.segnalazione(idSegnalazione).ChiusaDa === 'Rosario Incarbone'
+        && !server.segnalazione(idSegnalazione).ToccaA);
       await r.goto(`${app.indirizzo}/index.html#/segnalazioni`);
       await aiuto.attendi(r, () => /aggiornato/.test(document.querySelector('#segn-lettura').innerText), 'elenco riletto');
       await r.goto(`${app.indirizzo}/index.html#/segnalazioni/scheda?id=${idSegnalazione}`);
@@ -300,7 +269,7 @@ module.exports = {
       await p.click('#riapri');
       await attendiServer(() => server.interventi.length === primaP + 1, 'riapertura arrivata');
       registro.controlla('sul server è di nuovo aperta, e tocca a Rosario',
-        server.segnalazioni.get(idSegnalazione).stato === 'Aperta' && server.segnalazioni.get(idSegnalazione).toccaA === 'Rosario Incarbone');
+        server.segnalazione(idSegnalazione).Stato === 'Aperta' && server.segnalazione(idSegnalazione).ToccaA === 'Rosario Incarbone');
 
       registro.titolo('Chi non è fra i cinque non apre');
       const florin = await telefono(browser, app, flow, 'Florin Zaharia');
@@ -345,18 +314,18 @@ module.exports = {
       await flow.riprendi();
       await attendiServer(() => server.interventi.length === primaD + 1, 'apertura partita al ritorno della rete', 90000);
       const comune = server.interventi[server.interventi.length - 1];
-      const segComune = server.segnalazioni.get(comune.idSegnalazione);
+      const segComune = server.segnalazione(comune.IdSegnalazione);
       registro.controlla('arriva con «Lotto 4 · Piano terra», piano P0, nessuna unità, nessuna foto',
-        segComune.ambito === 'Parte comune' && segComune.parteComune === 'Lotto 4 · Piano terra'
-        && segComune.piano === 'P0' && segComune.unita === '' && comune.numeroFoto === 0,
-        JSON.stringify({ a: segComune.ambito, pc: segComune.parteComune, p: segComune.piano, u: segComune.unita }));
-      registro.controlla('chi apre senza scegliere un nome la tiene lui', segComune.toccaA === 'Domenico Caminiti');
+        segComune.Ambito === 'Parte comune' && segComune.ParteComune === 'Lotto 4 · Piano terra'
+        && segComune.Piano === 'P0' && segComune.Unita === '' && comune.NumeroFoto === 0,
+        JSON.stringify({ a: segComune.Ambito, pc: segComune.ParteComune, p: segComune.Piano, u: segComune.Unita }));
+      registro.controlla('chi apre senza scegliere un nome la tiene lui', segComune.ToccaA === 'Domenico Caminiti');
 
       registro.titolo('Un rifiuto definitivo non si ritenta all’infinito');
       server.forza = { stato: 409, corpo: { esito: 'gia_chiusa' } };
       await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
       await aiuto.attendi(d, () => /aggiornato/.test(document.querySelector('#segn-lettura').innerText), 'elenco di Domenico');
-      await d.goto(`${app.indirizzo}/index.html#/segnalazioni/scheda?id=${comune.idSegnalazione}`);
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni/scheda?id=${comune.IdSegnalazione}`);
       await d.waitForSelector('#segn-azioni');
       await d.click('#chiudi');
       await d.waitForSelector('#segn-rifiutati', { timeout: 60000 });
