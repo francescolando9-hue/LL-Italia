@@ -211,7 +211,8 @@ test('elenco: le aperte e le chiuse da meno di 30 giorni, coi campi per l\'app; 
 // --- Foto singole (0.44.0) -----------------------------------------------------
 // Una foto: azione `foto`, operatore e data del passo, idPasso, una foto sola.
 function fotoDi(passoBase, campi = {}) {
-  const idClient = id().padEnd(36, '0');
+  // Come l'app: un idClient a forma di UUID, che è anche il nome dell'allegato.
+  const idClient = crypto.randomUUID();
   return {
     token: TOKEN, azione: 'foto', idClient, idSegnalazione: passoBase.idSegnalazione, idPasso: passoBase.idClient,
     operatore: passoBase.operatore, dataIntervento: passoBase.dataIntervento,
@@ -308,6 +309,18 @@ test('foto: ripresa dopo un guasto a metà — niente secondo allegato e niente 
   r = await riceviPasso(h, a, { token: TOKEN });
   assert.deepEqual([r.stato, r.corpo.numeroFoto], [200, 3]);
   assert.equal(a.interventi.filter(i => i.Azione === 'foto').length, 3);
+});
+
+test('foto: un allegato aggiunto a mano dalla lista non entra in NumeroFoto', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-mano' });
+  await riceviPasso(apertura, a, { token: TOKEN });
+  await a.aggiungiFoto(1, 'IMG_1234.jpg', Buffer.from([1]));
+  await a.aggiungiFoto(1, 'verbale.pdf', Buffer.from([2]));
+  const r = await riceviPasso(fotoDi(apertura), a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.numeroFoto], [200, 1], 'una foto dell\'app, non tre allegati');
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1);
+  assert.equal(a.allegati.get(1).size, 3, 'gli allegati a mano restano dove sono');
 });
 
 test('foto: una foto non sporca la ripresa di un passo (IdClient della segnalazione intatto)', async () => {

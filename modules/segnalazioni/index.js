@@ -303,7 +303,7 @@ async function ridisegna() {
     ${rifiutati.length > 0 ? `
       <section class="scheda" id="segn-rifiutati">
         <h2>Non registrati</h2>
-        <ul class="segn-elenco">${rifiutati.map(rigaRifiuto).join('')}</ul>
+        <ul class="segn-elenco">${righeRifiutati(rifiutati).join('')}</ul>
       </section>` : ''}
     <section class="scheda">
       <h2>Aperte</h2>
@@ -328,9 +328,23 @@ async function ridisegna() {
       avviso.textContent = `Elenco non riletto: ${errore.message}.`;
     }
   });
-  el.querySelectorAll('[data-riprova]').forEach(b => b.addEventListener('click', () => invio.riprova(b.dataset.riprova)));
+  el.querySelectorAll('[data-riprova]').forEach(b => b.addEventListener('click', async () => {
+    for (const id of b.dataset.riprova.split(',')) await invio.riprova(id);
+  }));
   el.querySelectorAll('[data-togli]').forEach(b => b.addEventListener('click', async () => {
-    await coda.elimina(b.dataset.togli);
+    const ids = b.dataset.togli.split(',');
+    // Un passo rifiutato si toglie insieme alle sue foto non ancora partite:
+    // senza, la foto non troverebbe più il passo e partirebbe da sola (su una
+    // segnalazione che non c'è, o su una già chiusa). Restano fra i «Non
+    // registrati», da togliere a loro volta: non si perdono in silenzio.
+    const elementi = await coda.elenca();
+    for (const f of elementi.filter(x => invio.eFoto(x) && ids.includes(x.idPasso) && x.stato !== 'inviata')) {
+      f.stato = 'inviata';
+      f.esitoServer = 'passo_non_registrato';
+      f.inviatoIl = Date.now();
+      await coda.aggiorna(f);
+    }
+    for (const id of ids) await coda.elimina(id);
     await ridisegna();
   }));
 }
@@ -342,10 +356,10 @@ const DEL_PASSO = {
   apertura: 'dell\'apertura', passaggio: 'del passaggio', chiusura: 'della chiusura', riapertura: 'della riapertura',
 };
 
-function badgeStato(p) {
+function badgeStato(p, ids = [p.id]) {
   return p.stato === 'errore'
     ? `<span class="badge badge-errore">Errore</span> <span class="segn-errore">${scappaHtml(p.ultimoErrore)}</span>
-       <button class="btn btn-piccolo btn-secondario" type="button" data-riprova="${p.id}">Riprova</button>`
+       <button class="btn btn-piccolo btn-secondario" type="button" data-riprova="${ids.join(',')}">Riprova</button>`
     : p.stato === 'invio' ? '<span class="badge badge-invio">Invio in corso</span>' : '<span class="badge badge-coda">In coda</span>';
 }
 
@@ -360,35 +374,55 @@ function rigaPasso(p) {
 }
 
 // Le foto in coda (dalla 0.44.0 un elemento per foto): dodici righe uguali
-// coprirebbero il resto. Quelle dello stesso passo e nello stesso stato stanno
-// in una riga sola, «Foto della chiusura · MNG · 5 foto · In coda»; una foto in
-// errore ha la sua riga, col suo errore e il suo «Riprova».
-export function righeCoda(elementi) {
+// coprirebbero il resto. Quelle dello stesso passo, nello stesso stato e con lo
+// stesso errore stanno in una riga sola, «Foto della chiusura · MNG · 5 foto ·
+// In coda», con un solo «Riprova» che vale per tutte. Una foto con un errore
+// diverso dalle altre ha la sua riga.
+function raggruppaFoto(elementi, chiaveDi) {
   const righe = [];
   const gruppi = new Map();
   for (const p of elementi) {
-    if (!invio.eFoto(p) || p.stato === 'errore') { righe.push({ p }); continue; }
-    const chiave = `${p.idPasso}|${p.stato}`;
+    if (!invio.eFoto(p)) { righe.push({ p, ids: [p.id] }); continue; }
+    const chiave = chiaveDi(p);
     if (!gruppi.has(chiave)) {
-      const gruppo = { p, quante: 0 };
+      const gruppo = { p, ids: [] };
       gruppi.set(chiave, gruppo);
       righe.push(gruppo);
     }
-    gruppi.get(chiave).quante += 1;
+    gruppi.get(chiave).ids.push(p.id);
   }
-  return righe.map(({ p, quante }) => (!invio.eFoto(p) ? rigaPasso(p) : `
+  return righe;
+}
+
+function dicituraFoto(p) {
+  return `Foto${DEL_PASSO[p.azionePasso] ? ` ${DEL_PASSO[p.azionePasso]}` : ''} · ${scappaHtml(p.commessa || '')}`;
+}
+
+export function righeCoda(elementi) {
+  return raggruppaFoto(elementi, p => `${p.idPasso}|${p.stato}|${p.stato === 'errore' ? p.ultimoErrore : ''}`)
+    .map(({ p, ids }) => (!invio.eFoto(p) ? rigaPasso(p) : `
     <li class="segn-passo segn-foto-coda" data-id="${p.id}" data-passo="${scappaHtml(p.idPasso || '')}">
-      <span class="segn-dove">Foto${DEL_PASSO[p.azionePasso] ? ` ${DEL_PASSO[p.azionePasso]}` : ''} · ${scappaHtml(p.commessa || '')}</span>
-      <span class="segn-meta">${badgeStato(p)} · <span class="segn-quante">${quante || 1}</span> foto</span>
+      <span class="segn-dove">${dicituraFoto(p)}</span>
+      <span class="segn-meta">${badgeStato(p, ids)} · <span class="segn-quante">${ids.length}</span> foto</span>
     </li>`));
 }
 
-function rigaRifiuto(p) {
+// Fra i «Non registrati» le foto di uno stesso passo stanno in una riga sola, e
+// «Ho capito, togli» le toglie tutte.
+export function righeRifiutati(elementi) {
+  return raggruppaFoto(elementi, p => `${p.idPasso}|${p.esitoServer}`)
+    .map(({ p, ids }) => rigaRifiuto(p, ids));
+}
+
+function rigaRifiuto(p, ids = [p.id]) {
+  const dove = invio.eFoto(p)
+    ? `${dicituraFoto(p)} · <span class="segn-quante">${ids.length}</span> foto`
+    : `${NOMI_AZIONE[p.azione] || p.azione}${p.azione === 'passaggio' ? ` a ${scappaHtml(p.passaA)}` : ''}`;
   return `
     <li class="segn-passo">
-      <span class="segn-dove">${NOMI_AZIONE[p.azione] || p.azione}${p.azione === 'passaggio' ? ` a ${scappaHtml(p.passaA)}` : ''}</span>
+      <span class="segn-dove">${dove}</span>
       <span class="segn-testo">${scappaHtml(invio.RIFIUTI_DEFINITIVI[p.esitoServer])}</span>
-      <button class="btn btn-piccolo btn-secondario" type="button" data-togli="${p.id}">Ho capito, togli</button>
+      <button class="btn btn-piccolo btn-secondario" type="button" data-togli="${ids.join(',')}">Ho capito, togli</button>
     </li>`;
 }
 

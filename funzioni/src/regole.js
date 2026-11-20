@@ -41,6 +41,11 @@ export const GIORNI_CHIUSE = 30;
 // e niente di quello che arriva da fuori deve poterne cambiare il senso.
 const ID_VALIDO = /^[A-Za-z0-9-]{8,64}$/;
 const NOME_FOTO_VALIDO = /^[A-Za-z0-9-]{1,64}$/;
+// Un allegato messo dall'app: `idClient.jpg` (0.44.0) o `idClient8-n.jpg` (0.43.x),
+// cioè otto lettere o cifre, un trattino e il resto. Uno aggiunto a mano dalla
+// lista (`IMG_1234.jpg`, un PDF) non è una foto dell'app e non entra in NumeroFoto:
+// altrimenti l'archiviatore avrebbe sempre una foto in meno di quelle contate.
+export const ALLEGATO_DELL_APP = /^[A-Za-z0-9]{8}-[A-Za-z0-9-]{1,55}\.jpg$/;
 
 const risposta = (stato, corpo) => ({ stato, corpo });
 
@@ -227,7 +232,8 @@ export async function riceviPasso(d, archivio, { token, registra = () => {} }) {
 // Ordine dei passi, scelto per la ripresa:
 //   1. allegato, saltato se c'è già col suo nome;
 //   2. NumeroFoto, che si RICAVA dagli allegati: il più grande fra il valore
-//      scritto e quanti allegati ha la segnalazione. Una ripresa che trova
+//      scritto e quanti allegati messi dall'app ha la segnalazione (quelli
+//      aggiunti a mano dalla lista non contano: ALLEGATO_DELL_APP). Una ripresa che trova
 //      l'allegato già caricato non conta due volte, e una caduta fra 1 e 2 si
 //      recupera alla ripresa. Nel caso normale è il +1 della specifica;
 //   3. la riga in SegnalazioniInterventi, PER ULTIMA: è la guardia sui doppioni.
@@ -255,7 +261,7 @@ async function riceviFoto(d, archivio, registra) {
       await archivio.aggiungiFoto(id, nome, Buffer.from(f.contenutoBase64, 'base64'));
       presenti.add(nome);
     }
-    allegati = presenti.size;
+    allegati = [...presenti].filter(n => ALLEGATO_DELL_APP.test(n)).length;
   } catch (e) {
     registra('scrittura_foto', e);
     return risposta(500, { esito: 'errore_scrittura_foto' });
