@@ -17,11 +17,16 @@ const CHIAVE_STORIE = 'llitalia.segnalazioni.storie';
 const STORIE_DA_TENERE = 50;
 
 // Chi apre una segnalazione: decisione di Francesco del 20/11/2026, i cinque
-// che passano negli alloggi e parlano coi clienti. I clienti no. Il server
-// rifiuta comunque un'apertura da un altro nome (403): l'elenco sta qui per
-// non mostrare un pulsante che porta a un rifiuto.
+// che passano negli alloggi e parlano coi clienti; corretta da lui la sera
+// stessa (0.43.1): «No le segnalazioni devo poterle aprire anche io» e
+// «Aggiungi anche Florin e Roberto Borinschi a quelli che possono aprire
+// segnalazioni». Otto. I clienti no. Il server rifiuta comunque un'apertura da
+// un altro nome (403): l'elenco sta qui per non mostrare un pulsante che porta
+// a un rifiuto, e deve restare uguale a quello di funzioni/src/regole.js (il
+// collaudo 29 li confronta).
 export const POSSONO_APRIRE = [
-  'Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Paolo Sanzarello', 'Rosario Incarbone',
+  'Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Florin Zaharia',
+  'Francesco Lando', 'Paolo Sanzarello', 'Roberto Borinschi', 'Rosario Incarbone',
 ];
 
 // Chi riapre una segnalazione chiusa, e chi può agire su tutte anche quando

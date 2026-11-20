@@ -14,9 +14,13 @@
 
 import { timingSafeEqual } from 'node:crypto';
 
-// Chi apre: decisione 1 di Francesco del 20/11/2026. I clienti no.
+// Chi apre: decisione 1 di Francesco del 20/11/2026, corretta da lui la sera
+// stessa (0.43.1): «No le segnalazioni devo poterle aprire anche io» e
+// «Aggiungi anche Florin e Roberto Borinschi a quelli che possono aprire
+// segnalazioni». Otto, coi nomi di core/operatori.js. I clienti no.
 export const POSSONO_APRIRE = [
-  'Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Paolo Sanzarello', 'Rosario Incarbone',
+  'Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Florin Zaharia',
+  'Francesco Lando', 'Paolo Sanzarello', 'Roberto Borinschi', 'Rosario Incarbone',
 ];
 // Chi riapre: decisione 8.
 export const COORDINANO = ['Francesco Lando', 'Paolo Sanzarello'];

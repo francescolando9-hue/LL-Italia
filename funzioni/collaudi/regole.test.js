@@ -55,13 +55,32 @@ test('dati che mancano o non validi → 400 payload_incompleto', async () => {
   assert.equal(payloadIncompleto(passo()), '');
 });
 
-test('apertura: solo i cinque; riapertura: solo Francesco e Paolo → 403', async () => {
+test('apertura: solo gli otto; riapertura: solo Francesco e Paolo → 403', async () => {
   const a = creaMemoria();
-  assert.equal((await manda(a, { operatore: 'Florin Zaharia' })).stato, 403);
-  assert.equal((await manda(a, { operatore: 'Francesco Lando' })).stato, 403, 'Francesco riapre ma non apre');
+  for (const nome of ['Maurizio Lando', 'Giovanni Lippolis', 'Alessio Ferrara', 'Emanuele Zaccaro', 'Riccardo Zaccaro',
+    'francesco lando', 'Francesco Lando ', 'Florin', 'Roberto Borinschi ']) {
+    assert.equal((await manda(a, { operatore: nome, idSegnalazione: `seg-${nome.replace(/\W/g, '')}x` })).stato, 403, nome);
+  }
+  assert.equal(a.segnalazioni.size, 0);
+  // Correzione di Francesco del 20/11/2026 (0.43.1): «No le segnalazioni devo
+  // poterle aprire anche io», «Aggiungi anche Florin e Roberto Borinschi a
+  // quelli che possono aprire segnalazioni». Fino alla 0.43.0 qui c'era un 403.
+  for (const nome of ['Francesco Lando', 'Florin Zaharia', 'Roberto Borinschi']) {
+    const s = `seg-${nome.replace(/\W/g, '')}`;
+    const r = await manda(a, { operatore: nome, idSegnalazione: s });
+    assert.deepEqual([r.stato, r.corpo.esito], [200, 'ok'], `${nome} apre`);
+    const sua = [...a.segnalazioni.values()].find(x => x.IdSegnalazione === s);
+    assert.deepEqual([sua.ApertaDa, sua.ToccaA], [nome, nome], `${nome}: senza passaA la tiene lui`);
+  }
   for (const nome of ['Andrea Gondos', 'Domenico Caminiti', 'Enzo Santovito', 'Paolo Sanzarello', 'Rosario Incarbone']) {
     assert.equal((await manda(a, { operatore: nome, idSegnalazione: `seg-${nome.replace(/\W/g, '')}` })).stato, 200, nome);
   }
+  // Chi riapre non cambia: Francesco e Paolo.
+  await manda(a, { operatore: 'Francesco Lando', idSegnalazione: 'seg-FrancescoLando', azione: 'chiusura' });
+  for (const nome of ['Rosario Incarbone', 'Domenico Caminiti', 'Enzo Santovito', 'Andrea Gondos', 'Florin Zaharia', 'Roberto Borinschi']) {
+    assert.equal((await manda(a, { operatore: nome, idSegnalazione: 'seg-FrancescoLando', azione: 'riapertura' })).stato, 403, nome);
+  }
+  assert.equal((await manda(a, { operatore: 'Francesco Lando', idSegnalazione: 'seg-FrancescoLando', azione: 'riapertura' })).stato, 200);
 });
 
 test('il giro intero: apre con foto, passa, chiude, non si passa una chiusa, riapre', async () => {
