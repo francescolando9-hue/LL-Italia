@@ -4,7 +4,8 @@
 // decisioni di Francesco del 20/11/2026; previsione approvata il 20/11/2026
 // (versione 2). Il giro:
 //   - il primo che passa da un alloggio o da una parte comune apre la
-//     segnalazione, con un testo (anche dettato) e fino a 3 foto;
+//     segnalazione, con un testo (anche dettato) e le foto che servono (dalla
+//     0.44.0 senza limite: ogni foto parte da sola, dopo il suo passo);
 //   - poi la chiude, o la passa a un altro: «ho fatto la mia parte, deve
 //     passare X»;
 //   - chi deve intervenire la trova IN CIMA ALL'APP, appena la apre («Tocca a
@@ -17,7 +18,7 @@ import * as coda from './coda.js';
 import * as invio from './invio.js';
 import {
   impostazioniSegnalazioni, salvaImpostazioniSegnalazioni, configurato, elencoSalvato, storiaSalvata,
-  normalizzaEndpoint, POSSONO_APRIRE, COORDINANO, FOTO_MASSIME,
+  normalizzaEndpoint, POSSONO_APRIRE, COORDINANO,
 } from './impostazioni.js';
 import { vistaConfigura, vistaCondividi } from './configurazione.js';
 import { collegaDettatura } from './dettatura.js';
@@ -80,6 +81,49 @@ export function luogo(s) {
   return s.parteComune || 'parti comuni';
 }
 
+// La storia di una segnalazione con le foto al loro posto (dalla 0.44.0). Ogni
+// foto è una riga `foto` sul server; a video non compare da sola: si conta nel
+// passo a cui appartiene («Apertura · Paolo · … · 5 foto»), riconosciuto da
+// `idPasso`, sommata alle foto che un passo di una 0.43.x portava dentro. Le
+// foto il cui passo non è nella storia (un passo rifiutato, una storia letta a
+// metà) stanno in una riga «Foto» per passo, dove compare la prima.
+export function raggruppaStoria(interventi) {
+  const passi = interventi.filter(i => i.azione !== 'foto');
+  const perIdClient = new Map();
+  const righe = [];
+  for (const i of interventi) {
+    if (i.azione !== 'foto') {
+      const riga = { ...i, numeroFoto: Number(i.numeroFoto) || 0 };
+      if (i.idClient) perIdClient.set(i.idClient, riga);
+      righe.push(riga);
+    }
+  }
+  const orfane = new Map();
+  interventi.forEach((i, posizione) => {
+    if (i.azione !== 'foto') return;
+    const passo = i.idPasso ? perIdClient.get(i.idPasso) : null;
+    if (passo) { passo.numeroFoto += 1; return; }
+    const chiave = i.idPasso || `foto-${posizione}`;
+    if (!orfane.has(chiave)) {
+      const riga = { azione: 'foto', operatore: i.operatore || '', data: i.data || '', testo: '', passaA: '', numeroFoto: 0, posizione };
+      orfane.set(chiave, riga);
+    }
+    orfane.get(chiave).numeroFoto += 1;
+  });
+  if (orfane.size === 0) return righe;
+  // Le orfane al posto della loro prima foto. `righe` e `passi` vanno di pari
+  // passo: la riga n è il passo n.
+  const tutte = [
+    ...righe.map((r, n) => ({ r, posizione: interventi.indexOf(passi[n]) })),
+    ...[...orfane.values()].map(r => ({ r, posizione: r.posizione })),
+  ];
+  return tutte.sort((a, b) => a.posizione - b.posizione).map(({ r }) => {
+    const riga = { ...r };
+    delete riga.posizione;
+    return riga;
+  });
+}
+
 function oraLeggibile(ms) {
   if (!ms) return '';
   const d = new Date(ms);
@@ -91,8 +135,13 @@ function oraLeggibile(ms) {
 // aperte da qui e non ancora arrivate, con i passi in coda già applicati. Così
 // una segnalazione appena passata a Enzo sparisce subito da «Tocca a te» di chi
 // l'ha passata, invece di restarci finché il passo non arriva.
-export function segnalazioniDelTelefono(dalServer, passi) {
+export function segnalazioniDelTelefono(dalServer, elementi) {
   const perId = new Map(dalServer.map(s => [s.idSegnalazione, { ...s }]));
+  // Le foto (dalla 0.44.0 elementi a sé) non cambiano lo stato: contano solo
+  // nel numero delle foto di una segnalazione aperta da qui e non ancora arrivata.
+  const passi = elementi.filter(p => !invio.eFoto(p));
+  const fotoLocali = idSeg => elementi.filter(p => invio.eFoto(p) && p.idSegnalazione === idSeg
+    && !(p.stato === 'inviata' && invio.RIFIUTI_DEFINITIVI[p.esitoServer])).length;
   for (const p of passi) {
     if (p.stato === 'inviata' && p.esitoServer !== 'ok' && p.esitoServer !== 'gia_presente') continue;
     let s = perId.get(p.idSegnalazione);
@@ -100,7 +149,7 @@ export function segnalazioniDelTelefono(dalServer, passi) {
       s = {
         id: null, idSegnalazione: p.idSegnalazione, commessa: p.commessa, ambito: p.ambito, piano: p.piano,
         unita: p.unita, parteComune: p.parteComune, testo: p.testo, apertaDa: p.autore, apertaIl: '',
-        stato: 'Aperta', toccaA: p.passaA || p.autore, numeroFoto: (p.foto || []).length,
+        stato: 'Aperta', toccaA: p.passaA || p.autore, numeroFoto: (p.foto || []).length + fotoLocali(p.idSegnalazione),
         ultimoOperatore: p.autore, ultimaNota: p.testo, locale: true,
       };
       perId.set(p.idSegnalazione, s);
@@ -249,7 +298,7 @@ async function ridisegna() {
     ${inCoda.length > 0 ? `
       <section class="scheda" id="segn-coda">
         <h2>Da inviare</h2>
-        <ul class="segn-elenco">${inCoda.map(rigaPasso).join('')}</ul>
+        <ul class="segn-elenco">${righeCoda(inCoda).join('')}</ul>
       </section>` : ''}
     ${rifiutati.length > 0 ? `
       <section class="scheda" id="segn-rifiutati">
@@ -287,21 +336,51 @@ async function ridisegna() {
 }
 
 const NOMI_AZIONE = {
-  apertura: 'Apertura', passaggio: 'Passaggio', chiusura: 'Chiusura', riapertura: 'Riapertura',
+  apertura: 'Apertura', passaggio: 'Passaggio', chiusura: 'Chiusura', riapertura: 'Riapertura', foto: 'Foto',
+};
+const DEL_PASSO = {
+  apertura: 'dell\'apertura', passaggio: 'del passaggio', chiusura: 'della chiusura', riapertura: 'della riapertura',
 };
 
-function rigaPasso(p) {
-  const stato = p.stato === 'errore'
+function badgeStato(p) {
+  return p.stato === 'errore'
     ? `<span class="badge badge-errore">Errore</span> <span class="segn-errore">${scappaHtml(p.ultimoErrore)}</span>
        <button class="btn btn-piccolo btn-secondario" type="button" data-riprova="${p.id}">Riprova</button>`
     : p.stato === 'invio' ? '<span class="badge badge-invio">Invio in corso</span>' : '<span class="badge badge-coda">In coda</span>';
+}
+
+function rigaPasso(p) {
   const verso = p.azione === 'passaggio' ? ` a ${scappaHtml(p.passaA)}` : '';
   return `
     <li class="segn-passo" data-id="${p.id}">
       <span class="segn-dove">${NOMI_AZIONE[p.azione] || p.azione}${verso} · ${scappaHtml(p.commessa || '')} ${p.azione === 'apertura' ? scappaHtml(luogo(p)) : ''}</span>
       <span class="segn-testo">${scappaHtml(String(p.testo || '').slice(0, 90))}</span>
-      <span class="segn-meta">${stato}${(p.foto || []).length ? ` · ${p.foto.length} foto` : ''}</span>
+      <span class="segn-meta">${badgeStato(p)}${(p.foto || []).length ? ` · ${p.foto.length} foto` : ''}</span>
     </li>`;
+}
+
+// Le foto in coda (dalla 0.44.0 un elemento per foto): dodici righe uguali
+// coprirebbero il resto. Quelle dello stesso passo e nello stesso stato stanno
+// in una riga sola, «Foto della chiusura · MNG · 5 foto · In coda»; una foto in
+// errore ha la sua riga, col suo errore e il suo «Riprova».
+export function righeCoda(elementi) {
+  const righe = [];
+  const gruppi = new Map();
+  for (const p of elementi) {
+    if (!invio.eFoto(p) || p.stato === 'errore') { righe.push({ p }); continue; }
+    const chiave = `${p.idPasso}|${p.stato}`;
+    if (!gruppi.has(chiave)) {
+      const gruppo = { p, quante: 0 };
+      gruppi.set(chiave, gruppo);
+      righe.push(gruppo);
+    }
+    gruppi.get(chiave).quante += 1;
+  }
+  return righe.map(({ p, quante }) => (!invio.eFoto(p) ? rigaPasso(p) : `
+    <li class="segn-passo segn-foto-coda" data-id="${p.id}" data-passo="${scappaHtml(p.idPasso || '')}">
+      <span class="segn-dove">Foto${DEL_PASSO[p.azionePasso] ? ` ${DEL_PASSO[p.azionePasso]}` : ''} · ${scappaHtml(p.commessa || '')}</span>
+      <span class="segn-meta">${badgeStato(p)} · <span class="segn-quante">${quante || 1}</span> foto</span>
+    </li>`));
 }
 
 function rigaRifiuto(p) {
@@ -321,7 +400,7 @@ let fermaDettatura = () => {};
 function campiFoto(prefisso = '') {
   return `
     <div class="campo">
-      <label>Foto <span class="tenue">(facoltative, al massimo ${FOTO_MASSIME})</span></label>
+      <label>Foto <span class="tenue">(facoltative, quante servono)</span></label>
       <div class="segn-foto" id="${prefisso}anteprime"></div>
       <div class="segn-pulsanti">
         <label class="btn btn-secondario btn-piccolo" for="${prefisso}scatta">📷 Scatta foto</label>
@@ -333,9 +412,10 @@ function campiFoto(prefisso = '') {
     </div>`;
 }
 
-// Le foto si preparano subito, una per volta: chi ne sceglie quattro vede
-// perché la quarta non entra, invece di scoprirlo all'invio.
-function collegaFoto(el, prefisso, massime) {
+// Le foto si preparano subito, una per volta: chi ne sceglie una che il
+// telefono non sa leggere lo vede adesso, invece di scoprirlo all'invio. Dalla
+// 0.44.0 non c'è un massimo.
+function collegaFoto(el, prefisso) {
   const anteprime = el.querySelector(`#${prefisso}anteprime`);
   const avviso = el.querySelector(`#${prefisso}avviso-foto`);
   const disegna = () => {
@@ -352,13 +432,6 @@ function collegaFoto(el, prefisso, massime) {
     }));
   };
   const aggiungi = async file => {
-    if (fotoNuove.length >= massime()) {
-      avviso.textContent = massime() === 0
-        ? `Questa segnalazione ha già ${FOTO_MASSIME} foto: non se ne possono aggiungere.`
-        : `Al massimo ${FOTO_MASSIME} foto per segnalazione: questa non è stata aggiunta.`;
-      avviso.classList.remove('nascosto');
-      return;
-    }
     try {
       const blob = await preparaFoto(file);
       fotoNuove.push({ blob, url: URL.createObjectURL(blob) });
@@ -494,7 +567,7 @@ function vistaNuova(el) {
   el.querySelectorAll('input[name="ambito"]').forEach(r => r.addEventListener('change', disegnaDove));
 
   fermaDettatura = collegaDettatura(el.querySelector('#detta'), el.querySelector('#testo'), el.querySelector('#avviso-detta'));
-  collegaFoto(el, '', () => FOTO_MASSIME);
+  collegaFoto(el, '');
 
   el.querySelector('#form-nuova').addEventListener('submit', async evento => {
     evento.preventDefault();
@@ -571,10 +644,14 @@ async function vistaScheda(el, _sotto, parametri, giaRiletta = false) {
   const aperta = s.stato === 'Aperta';
   const puoAgire = aperta && (s.toccaA === nome || coordina(nome));
   const puoRiaprire = !aperta && coordina(nome);
-  const fotoRimaste = Math.max(0, FOTO_MASSIME - (Number(s.numeroFoto) || 0)
-    - passi.filter(p => p.idSegnalazione === idSegnalazione && p.stato !== 'inviata')
-      .reduce((n, p) => n + (p.foto || []).length, 0));
-  const locali = passi.filter(p => p.idSegnalazione === idSegnalazione && p.stato !== 'inviata');
+  const nonArrivati = passi.filter(p => p.idSegnalazione === idSegnalazione && p.stato !== 'inviata');
+  const locali = nonArrivati.filter(p => !invio.eFoto(p));
+  // Foto da questo telefono non ancora arrivate: elementi a sé dalla 0.44.0,
+  // dentro i passi in una coda rimasta da una 0.43.x.
+  const fotoInInvio = nonArrivati.reduce((n, p) => n + (invio.eFoto(p) ? 1 : (p.foto || []).length), 0);
+  // Per una segnalazione già arrivata il server le conta; per una nuova sono già
+  // nel numero che il telefono le attribuisce.
+  const fotoArrivate = s.locale ? 0 : (Number(s.numeroFoto) || 0);
 
   el.innerHTML = `
     <section class="scheda">
@@ -585,7 +662,7 @@ async function vistaScheda(el, _sotto, parametri, giaRiletta = false) {
         <dt>Stato</dt><dd id="segn-stato">${aperta ? 'Aperta' : 'Chiusa'}${s.inInvio ? ' (in invio)' : ''}</dd>
         ${aperta ? `<dt>Tocca a</dt><dd id="segn-tocca">${scappaHtml(s.toccaA || '—')}</dd>` : ''}
         ${!aperta && s.chiusaDa ? `<dt>Chiusa da</dt><dd>${scappaHtml(s.chiusaDa)}${s.chiusaIl ? ` il ${dataLeggibile(s.chiusaIl)}` : ''}</dd>` : ''}
-        <dt>Foto</dt><dd>${Number(s.numeroFoto) || 0}${Number(s.numeroFoto) ? ' (si guardano in SharePoint)' : ''}</dd>
+        <dt>Foto</dt><dd id="segn-numero-foto">${fotoArrivate}${fotoArrivate ? ' (si guardano in SharePoint)' : ''}${fotoInInvio ? ` · ${fotoInInvio} in invio da questo telefono` : ''}</dd>
       </dl>
     </section>
     <section class="scheda">
@@ -597,7 +674,7 @@ async function vistaScheda(el, _sotto, parametri, giaRiletta = false) {
       <section class="scheda" id="segn-azioni">
         <h2>Il tuo intervento</h2>
         ${campiTesto('a-', 'Cosa hai fatto', 'Per esempio: collegamenti a posto, sentire quelli delle macchine')}
-        ${fotoRimaste > 0 ? campiFoto('a-') : ''}
+        ${campiFoto('a-')}
         <div class="campo">
           <label for="a-passa">Ho fatto la mia parte, deve passare</label>
           <select id="a-passa">${opzioniPassaggio(nome, '— scegli chi —')}</select>
@@ -622,16 +699,16 @@ async function vistaScheda(el, _sotto, parametri, giaRiletta = false) {
   const disegnaStoria = storia => {
     const lista = el.querySelector('#segn-storia');
     if (!lista) return;
-    const interventi = storia && Array.isArray(storia.interventi) ? storia.interventi : [];
+    const interventi = raggruppaStoria(storia && Array.isArray(storia.interventi) ? storia.interventi : []);
     lista.innerHTML = interventi.length === 0
       ? `<li class="tenue">${s.locale ? 'Ancora nessuno: la segnalazione non è arrivata.' : 'Storia non disponibile senza rete.'}</li>`
       : interventi.map(i => `
         <li>
           <strong>${NOMI_AZIONE[i.azione] || scappaHtml(i.azione)}</strong>
-          ${i.azione === 'passaggio' || (i.azione !== 'chiusura' && i.passaA) ? ` a ${scappaHtml(i.passaA || '')}` : ''}
+          ${i.azione === 'passaggio' || (i.azione !== 'chiusura' && i.azione !== 'foto' && i.passaA) ? ` a ${scappaHtml(i.passaA || '')}` : ''}
           · ${scappaHtml(i.operatore || '')} · ${dataLeggibile(i.data)}
           ${i.testo ? `<br><span>${scappaHtml(i.testo)}</span>` : ''}
-          ${Number(i.numeroFoto) ? `<br><span class="tenue">${i.numeroFoto} foto</span>` : ''}
+          ${Number(i.numeroFoto) ? `<br><span class="tenue segn-foto-passo">${i.numeroFoto} foto</span>` : ''}
         </li>`).join('');
   };
   disegnaStoria(storiaSalvata(idSegnalazione));
@@ -672,7 +749,7 @@ async function vistaScheda(el, _sotto, parametri, giaRiletta = false) {
 
   if (puoAgire) {
     fermaDettatura = collegaDettatura(el.querySelector('#a-detta'), el.querySelector('#a-testo'), el.querySelector('#a-avviso-detta'));
-    if (fotoRimaste > 0) collegaFoto(el, 'a-', () => fotoRimaste);
+    collegaFoto(el, 'a-');
     el.querySelector('#passa').addEventListener('click', () => {
       const passaA = el.querySelector('#a-passa').value;
       if (!passaA) {
@@ -766,16 +843,23 @@ export default {
     if (configurato()) invio.avvia();
   },
   inCima,
+  // Dalla 0.44.0 una foto è un elemento della coda ma non è un passo: «In coda»
+  // e «Bloccate» contano tutti gli elementi che devono ancora arrivare (anche
+  // una foto ferma è una cosa che manca all'ufficio), «Oggi» conta passi e foto
+  // a parte, e la riga «Foto in coda» dice quante di quelle in coda sono foto.
   async stato() {
     const passi = await coda.elenca().catch(() => []);
     const elenco = elencoSalvato();
+    const oggi = coda.contatoriOggi();
+    const fotoInCoda = passi.filter(p => invio.eFoto(p) && p.stato !== 'inviata').length;
     return {
       bozze: 0,
       inAttesa: passi.filter(p => p.stato === 'in_coda' || p.stato === 'invio').length,
       inErrore: passi.filter(p => p.stato === 'errore').length,
-      oggi: coda.contatoriOggi(),
-      oggiTesto: `${coda.contatoriOggi().scattate} passi fatti, ${coda.contatoriOggi().inviate} arrivati`,
+      oggi,
+      oggiTesto: `${oggi.scattate} passi fatti, ${oggi.inviate} arrivati · ${oggi.foto} foto, ${oggi.fotoInviate} arrivate`,
       righe: [
+        ['Foto in coda', String(fotoInCoda)],
         ['Elenco letto', elenco.lettoIl ? oraLeggibile(elenco.lettoIl) : 'mai'],
         ['Segnalazioni che toccano a te', String(toccanoA(segnalazioniDelTelefono(elenco.segnalazioni, passi), io()).length)],
       ],
