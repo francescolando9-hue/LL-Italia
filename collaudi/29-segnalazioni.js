@@ -34,6 +34,7 @@ async function serverVero() {
   const { creaMemoria } = await import(pathToFileURL(path.join(base, 'memoria.js')).href);
   const archivio = creaMemoria();
   const s = {
+    regole,
     archivio,
     interventi: archivio.interventi,
     forza: null,
@@ -271,15 +272,64 @@ module.exports = {
       registro.controlla('sul server è di nuovo aperta, e tocca a Rosario',
         server.segnalazione(idSegnalazione).Stato === 'Aperta' && server.segnalazione(idSegnalazione).ToccaA === 'Rosario Incarbone');
 
-      registro.titolo('Chi non è fra i cinque non apre');
-      const florin = await telefono(browser, app, flow, 'Florin Zaharia');
-      telefoni.push(florin);
-      await florin.pagina.goto(`${app.indirizzo}/index.html#/segnalazioni`);
-      await florin.pagina.waitForSelector('#aggiorna');
-      registro.controlla('nessun «Nuova segnalazione» per Florin', (await florin.pagina.$$('#nuova')).length === 0);
-      await florin.pagina.goto(`${app.indirizzo}/index.html#/segnalazioni/nuova`);
-      await florin.pagina.waitForSelector('h2');
-      registro.controlla('e la pagina dice chi le apre', /le aprono Paolo, Domenico, Rosario, Enzo e Andrea/i.test(await florin.pagina.innerText('body')));
+      registro.titolo('Chi non è fra gli otto non apre');
+      const giovanni = await telefono(browser, app, flow, 'Giovanni Lippolis');
+      telefoni.push(giovanni);
+      await giovanni.pagina.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await giovanni.pagina.waitForSelector('#aggiorna');
+      registro.controlla('nessun «Nuova segnalazione» per Giovanni', (await giovanni.pagina.$$('#nuova')).length === 0);
+      await giovanni.pagina.goto(`${app.indirizzo}/index.html#/segnalazioni/nuova`);
+      await giovanni.pagina.waitForSelector('h2');
+      registro.controlla('e la pagina dice chi le apre',
+        /le aprono Paolo, Domenico, Rosario, Enzo, Andrea, Florin, Roberto e Francesco/i.test(await giovanni.pagina.innerText('body')));
+
+      // Correzione di Francesco del 20/11/2026 (0.43.1): «No le segnalazioni
+      // devo poterle aprire anche io» e «Aggiungi anche Florin e Roberto
+      // Borinschi a quelli che possono aprire segnalazioni». Fino alla 0.43.0
+      // niente pulsante per loro, e il server avrebbe risposto 403.
+      registro.titolo('Florin e Roberto: il pulsante c’è');
+      for (const nome of ['Florin Zaharia', 'Roberto Borinschi']) {
+        const t = await telefono(browser, app, flow, nome);
+        telefoni.push(t);
+        await t.pagina.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+        await t.pagina.waitForSelector('#aggiorna');
+        registro.controlla(`«Nuova segnalazione» c’è per ${nome}`, (await t.pagina.$$('#nuova')).length === 1);
+      }
+
+      registro.titolo('Francesco apre: il pulsante c’è e il server accetta');
+      const francesco = await telefono(browser, app, flow, 'Francesco Lando');
+      telefoni.push(francesco);
+      const f = francesco.pagina;
+      await f.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await f.waitForSelector('#aggiorna');
+      registro.controlla('«Nuova segnalazione» c’è per Francesco', (await f.$$('#nuova')).length === 1);
+      await f.click('#nuova');
+      await f.waitForSelector('#commessa');
+      await f.selectOption('#commessa', 'MNG');
+      await f.check('input[name="ambito"][value="Alloggio"]');
+      await f.waitForSelector('#unita');
+      await f.selectOption('#unita', '7B');
+      await f.fill('#testo', 'Maniglia della porta finestra da registrare');
+      const primaF = server.interventi.length;
+      await f.click('#invia-segnalazione');
+      await attendiServer(() => server.interventi.length === primaF + 1, 'apertura di Francesco arrivata');
+      const aperturaF = server.interventi[server.interventi.length - 1];
+      registro.controlla('sul server c’è l’apertura di Francesco, e la tiene lui',
+        aperturaF.Azione === 'apertura' && aperturaF.Operatore === 'Francesco Lando'
+        && server.segnalazione(aperturaF.IdSegnalazione).ToccaA === 'Francesco Lando',
+        JSON.stringify({ a: aperturaF.Azione, o: aperturaF.Operatore }));
+      registro.controlla('nessun rifiuto in coda', (await f.$$('#segn-rifiutati')).length === 0);
+      // Chi apre e chi riapre stanno scritti in due posti: nell'app, per non
+      // mostrare un pulsante che porta a un rifiuto, e nelle funzioni, dove
+      // sono la regola. Una correzione fatta in un posto solo deve dare rosso.
+      const nellApp = await f.evaluate(async () => {
+        const m = await import('./modules/segnalazioni/impostazioni.js');
+        return { aprono: m.POSSONO_APRIRE, coordinano: m.COORDINANO };
+      });
+      registro.controlla('app e funzioni hanno lo stesso elenco di chi apre e di chi riapre',
+        JSON.stringify(nellApp.aprono) === JSON.stringify(server.regole.POSSONO_APRIRE)
+        && JSON.stringify(nellApp.coordinano) === JSON.stringify(server.regole.COORDINANO),
+        JSON.stringify(nellApp.aprono));
 
       registro.titolo('Al massimo 3 foto; senza «Detta» resta la tastiera');
       const domenico = await telefono(browser, app, flow, 'Domenico Caminiti', { conDettatura: 'assente' });

@@ -410,7 +410,7 @@ function vistaNuova(el) {
     el.innerHTML = `
       <section class="scheda">
         <h2>Nuova segnalazione</h2>
-        <p>Le segnalazioni le aprono Paolo, Domenico, Rosario, Enzo e Andrea. Se ne vedi una che tocca a te, la trovi nell'elenco.</p>
+        <p>Le segnalazioni le aprono Paolo, Domenico, Rosario, Enzo, Andrea, Florin, Roberto e Francesco. Se ne vedi una che tocca a te, la trovi nell'elenco.</p>
       </section>
       <a class="btn btn-secondario" href="${ROTTA}">Torna alle segnalazioni</a>`;
     return;

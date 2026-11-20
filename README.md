@@ -219,7 +219,7 @@ Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (
 
 I problemi negli alloggi e nelle parti comuni, dal primo che li vede a chi li risolve. Nasce dalla riunione del 26/10/2026 fra Francesco e Paolo e dalle otto decisioni di Francesco del 20/11/2026.
 
-- **Chi apre:** Paolo, Domenico, Rosario, Enzo e Andrea Gondos. I clienti no. Per gli altri nomi la tessera non offre «Nuova segnalazione», e il flow rifiuta comunque (403).
+- **Chi apre:** Paolo, Domenico, Rosario, Enzo, Andrea Gondos, Florin, Roberto Borinschi e Francesco (gli ultimi tre dalla 0.43.1, correzione di Francesco del 20/11/2026). I clienti no. Per gli altri nomi la tessera non offre «Nuova segnalazione», e il flow rifiuta comunque (403).
 - **Cosa si scrive:** cantiere, alloggio o parte comune (dall'anagrafica che l'app ha già; per una commessa senza anagrafica si scrive a parole), un testo libero e fino a **3 foto** per segnalazione. Il testo si può **dettare** («Detta», riconoscimento vocale del browser): compare mentre si parla e si corregge prima di mandare; **l'audio non si conserva**. Dove il riconoscimento non c'è resta il microfono della tastiera. Le foto qui sono ricodificate in JPEG a 1600 px: servono a capire il problema, l'archivio resta compito del modulo Foto.
 - **Niente fase né attività:** le propone l'IA nel giro serale delle 20:00 sul PC dell'ufficio, Francesco le rivede, e il giro dopo le rende definitive insieme a «a carico di: noi / cliente / altri».
 - **Poi:** chi l'ha in mano la **chiude** («Risolto, chiudi») o la **passa** («Ho fatto la mia parte, deve passare…»). Paolo e Francesco possono agire su tutte e **riaprire** quelle chiuse.
