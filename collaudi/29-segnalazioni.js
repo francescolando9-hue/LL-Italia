@@ -4,8 +4,9 @@
 //
 // Il flow finto qui risponde con le REGOLE VERE delle funzioni
 // (funzioni/src/regole.js) su un archivio in memoria: guardia sui doppioni,
-// chi apre, chi riapre, «già chiusa», «troppe foto», «segnalazione
-// sconosciuta». Senza un server che ricorda, un collaudo di questo modulo
+// chi apre, chi riapre, «già chiusa», «segnalazione sconosciuta», e dalla
+// 0.44.0 le foto una per richiesta, senza limite, dopo il loro passo. Senza un
+// server che ricorda, un collaudo di questo modulo
 // proverebbe solo che le richieste partono, e il modulo è il primo che LEGGE:
 // quello che legge deve essere quello che si è scritto. E con le regole vere,
 // app e server si provano insieme.
@@ -22,6 +23,14 @@ const CAMPI_ATTESI = [
   'commessa', 'ambito', 'piano', 'unita', 'parteComune', 'dataIntervento',
   'idDispositivo', 'versioneApp', 'foto',
 ];
+// Dalla 0.44.0: una foto per richiesta, con operatore e data del passo.
+const CAMPI_FOTO = [
+  'token', 'azione', 'idClient', 'idSegnalazione', 'idPasso', 'operatore', 'dataIntervento',
+  'idDispositivo', 'versioneApp', 'foto',
+];
+const richiesteFoto = (flow, idPasso) => flow.stato.ricevuti
+  .map((r, indice) => ({ r, indice }))
+  .filter(x => x.r && x.r.azione === 'foto' && (!idPasso || x.r.idPasso === idPasso));
 
 // Il server: le REGOLE VERE delle funzioni (funzioni/src/regole.js) su un
 // archivio in memoria (funzioni/src/memoria.js). Fino al 20/11/2026 pomeriggio
@@ -158,7 +167,7 @@ module.exports = {
       await p.selectOption('#passa-a', 'Enzo Santovito');
       const prima = server.interventi.length;
       await p.click('#invia-segnalazione');
-      await attendiServer(() => server.interventi.length === prima + 1, 'apertura arrivata');
+      await attendiServer(() => server.interventi.length === prima + 2, 'apertura e la sua foto arrivate');
       const apertura = flow.stato.ricevuti.find(r => r && r.azione === 'apertura');
       registro.dice('campi', Object.keys(apertura));
       registro.controlla('ci sono tutti i campi del contratto', CAMPI_ATTESI.every(c => c in apertura),
@@ -171,12 +180,32 @@ module.exports = {
       registro.controlla('nessuna fase né attività nel payload: le propone il giro delle 20', !('fase' in apertura) && !('attivita' in apertura));
       registro.controlla('dataIntervento è ISO con fuso (il flow ne prende 19 caratteri)',
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(apertura.dataIntervento), apertura.dataIntervento);
-      const foto = apertura.foto[0];
+      // Dalla 0.44.0 il passo parte senza foto, e la foto è una richiesta sua.
+      registro.controlla('l’apertura parte senza foto', Array.isArray(apertura.foto) && apertura.foto.length === 0,
+        String((apertura.foto || []).length));
+      const [{ r: richiestaFoto, indice: indiceFoto }] = richiesteFoto(flow, apertura.idClient);
+      const indiceApertura = flow.stato.ricevuti.indexOf(apertura);
+      registro.dice('campi della foto', Object.keys(richiestaFoto));
+      registro.controlla('la foto ha esattamente i campi del contratto delle foto',
+        CAMPI_FOTO.every(c => c in richiestaFoto) && Object.keys(richiestaFoto).every(c => CAMPI_FOTO.includes(c)),
+        Object.keys(richiestaFoto).join(','));
+      registro.controlla('azione foto, idPasso = idClient dell’apertura, idClient suo',
+        richiestaFoto.azione === 'foto' && richiestaFoto.idPasso === apertura.idClient
+        && richiestaFoto.idClient !== apertura.idClient && richiestaFoto.idSegnalazione === apertura.idSegnalazione);
+      registro.controlla('operatore e data sono quelli del passo',
+        richiestaFoto.operatore === apertura.operatore && richiestaFoto.dataIntervento === apertura.dataIntervento,
+        `${richiestaFoto.operatore} ${richiestaFoto.dataIntervento}`);
+      registro.controlla('e parte dopo il passo', indiceFoto > indiceApertura, `${indiceApertura} → ${indiceFoto}`);
+      const foto = richiestaFoto.foto[0];
       const jpeg = Buffer.from(foto.contenutoBase64, 'base64');
-      registro.controlla('una foto, JPEG, col nome fisso «idClient-1»',
-        apertura.foto.length === 1 && jpeg[0] === 0xFF && jpeg[1] === 0xD8 && foto.nome === `${apertura.idClient.slice(0, 8)}-1`, foto.nome);
+      registro.controlla('una foto, JPEG, col nome = il suo idClient intero',
+        richiestaFoto.foto.length === 1 && jpeg[0] === 0xFF && jpeg[1] === 0xD8 && foto.nome === richiestaFoto.idClient, foto.nome);
       registro.controlla('ridotta (lato lungo 1600 px): più leggera dell’originale',
         jpeg.length < fs.statSync(materiale('foto-cantiere.jpg')).size, `${jpeg.length} byte`);
+      const segP = server.segnalazione(apertura.idSegnalazione);
+      registro.controlla('sul server: NumeroFoto 1, un allegato col nome della foto, riga foto col suo passo',
+        segP.NumeroFoto === 1 && [...server.archivio.allegati.get(segP.ID).keys()].join() === `${richiestaFoto.idClient}.jpg`
+        && server.interventi.at(-1).Azione === 'foto' && server.interventi.at(-1).Testo === apertura.idClient);
       registro.controlla('passaA = Enzo, operatore = Paolo', apertura.passaA === 'Enzo Santovito' && apertura.operatore === 'Paolo Sanzarello');
       const idSegnalazione = apertura.idSegnalazione;
       registro.controlla('sul server tocca a Enzo', server.segnalazione(idSegnalazione).ToccaA === 'Enzo Santovito');
@@ -201,9 +230,19 @@ module.exports = {
       await e.waitForSelector('#segn-azioni');
       await aiuto.attendi(e, () => /Apertura/.test(document.querySelector('#segn-storia').innerText), 'storia letta dal server');
       registro.controlla('la storia mostra l’apertura di Paolo', /Apertura[\s\S]*Paolo Sanzarello/.test(await e.innerText('#segn-storia')));
+      const storiaE = await e.innerText('#segn-storia');
+      registro.controlla('la foto sta nell’apertura («1 foto»), non in una riga a sé',
+        (await e.$$('#segn-storia > li')).length === 1 && /1 foto/.test(storiaE) && !/^\s*Foto\b/m.test(storiaE),
+        storiaE.replace(/\s+/g, ' '));
       await e.fill('#a-testo', 'Collegamenti elettrici a posto, deve vedere l’idraulico');
       await e.selectOption('#a-passa', 'Rosario Incarbone');
+      // Due foto col passaggio, e il passaggio che al primo tentativo trova il
+      // server in errore: le foto devono aspettarlo, non arrivare prima di lui.
+      await e.setInputFiles('#a-galleria', [materiale('foto-cantiere.jpg'), materiale('foto-cantiere.jpg')]);
+      await aiuto.attendi(e, () => document.querySelectorAll('#a-anteprime img').length === 2, 'anteprime delle due foto', 60000);
+      server.forza = { stato: 500, corpo: { esito: 'errore_scrittura_segnalazione' } };
       const primaE = server.interventi.length;
+      const richiestePrimaE = flow.stato.ricevuti.length;
       await e.click('#passa');
       // Dopo «Passa» l'app torna da sola all'elenco: si aspetta che ci sia
       // arrivata e l'abbia disegnato, altrimenti il ritorno arriva DOPO la
@@ -222,10 +261,25 @@ module.exports = {
       await e.waitForTimeout(300);
       registro.controlla('dalla home di Enzo sparisce subito, anche prima che il server risponda',
         (await e.$$('#tocca-a-te')).length === 0);
-      await attendiServer(() => server.interventi.length === primaE + 1, 'passaggio arrivato');
-      const passaggio = server.interventi[server.interventi.length - 1];
+      await attendiServer(() => server.interventi.length === primaE + 3, 'passaggio e due foto arrivati', 90000);
+      const passaggio = server.interventi.slice(primaE).find(i => i.Azione === 'passaggio');
       registro.controlla('al server arriva un passaggio a Rosario, sulla stessa segnalazione',
-        passaggio.Azione === 'passaggio' && passaggio.PassaA === 'Rosario Incarbone' && passaggio.IdSegnalazione === idSegnalazione);
+        Boolean(passaggio) && passaggio.PassaA === 'Rosario Incarbone' && passaggio.IdSegnalazione === idSegnalazione);
+      const dopoE = flow.stato.ricevuti.slice(richiestePrimaE).map((x, n) => ({ x, n }));
+      const tentativiPassaggio = dopoE.filter(({ x }) => x && x.azione === 'passaggio');
+      const fotoE = dopoE.filter(({ x }) => x && x.azione === 'foto');
+      registro.dice('ordine delle richieste', dopoE.map(({ x }) => x && x.azione).join(' → '));
+      registro.controlla('il passaggio è partito due volte (la prima il server era in errore)', tentativiPassaggio.length === 2,
+        String(tentativiPassaggio.length));
+      registro.controlla('nessuna foto è partita prima che il passaggio arrivasse',
+        fotoE.length === 2 && fotoE.every(({ n }) => n > tentativiPassaggio.at(-1).n),
+        fotoE.map(({ n }) => n).join(','));
+      registro.controlla('le due foto hanno il passaggio come passo, e operatore e data sue',
+        fotoE.every(({ x }) => x.idPasso === tentativiPassaggio[0].x.idClient && x.operatore === 'Enzo Santovito'
+          && x.dataIntervento === tentativiPassaggio[0].x.dataIntervento));
+      registro.controlla('sul server la segnalazione ha 3 foto, e ToccaA, UltimoOperatore restano del passaggio',
+        server.segnalazione(idSegnalazione).NumeroFoto === 3 && server.segnalazione(idSegnalazione).ToccaA === 'Rosario Incarbone'
+        && server.segnalazione(idSegnalazione).UltimoOperatore === 'Enzo Santovito');
       registro.controlla('Enzo, che è fra i cinque, vede «Nuova segnalazione»',
         await (async () => { await e.goto(`${app.indirizzo}/index.html#/segnalazioni`); await e.waitForSelector('#aggiorna'); return (await e.$$('#nuova')).length === 1; })());
 
@@ -305,6 +359,26 @@ module.exports = {
       registro.controlla('«Nuova segnalazione» c’è per Francesco', (await f.$$('#nuova')).length === 1);
       await f.click('#nuova');
       await f.waitForSelector('#commessa');
+      // Dalla 0.44.0 (master 202611202113) SNZ2.1 e MRS hanno l'anagrafica:
+      // alloggio e piano dal menù, non più scritti a parole.
+      await f.selectOption('#commessa', 'MRS');
+      await f.check('input[name="ambito"][value="Alloggio"]');
+      await f.waitForSelector('#unita');
+      const unitaMRS = await f.$$eval('#unita option', o => o.filter(x => x.value).map(x => `${x.value}|${x.dataset.piano}`));
+      registro.controlla('MRS · alloggio: menù con 65 alloggi, piano dalla mappa (2.10B → P10), niente testo libero',
+        unitaMRS.length === 65 && unitaMRS.includes('2.10B|P10') && unitaMRS.includes('3.0C|P0')
+        && (await f.$$('#dove-testo')).length === 0, `${unitaMRS.length} voci`);
+      await f.selectOption('#commessa', 'SNZ2.1');
+      await f.check('input[name="ambito"][value="Parte comune"]');
+      await f.waitForSelector('#piano');
+      const pianiSNZ21 = await f.$$eval('#piano option', o => o.map(x => x.value));
+      registro.controlla('SNZ2.1 · parti comuni: piano dal menù (P-1…P11 e Tetto), senza palazzina',
+        pianiSNZ21.join(',') === ',P-1,P0,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,Tetto'
+        && (await f.$$('#scala')).length === 0 && (await f.$$('#dove-testo')).length === 0, pianiSNZ21.join(' '));
+      await f.check('input[name="ambito"][value="Alloggio"]');
+      await f.waitForSelector('#unita');
+      registro.controlla('SNZ2.1 · alloggio: 52 alloggi',
+        (await f.$$eval('#unita option', o => o.filter(x => x.value).length)) === 52);
       await f.selectOption('#commessa', 'MNG');
       await f.check('input[name="ambito"][value="Alloggio"]');
       await f.waitForSelector('#unita');
@@ -331,7 +405,7 @@ module.exports = {
         && JSON.stringify(nellApp.coordinano) === JSON.stringify(server.regole.COORDINANO),
         JSON.stringify(nellApp.aprono));
 
-      registro.titolo('Al massimo 3 foto; senza «Detta» resta la tastiera');
+      registro.titolo('Foto senza limite (12); senza «Detta» resta la tastiera');
       const domenico = await telefono(browser, app, flow, 'Domenico Caminiti', { conDettatura: 'assente' });
       telefoni.push(domenico);
       const d = domenico.pagina;
@@ -340,36 +414,62 @@ module.exports = {
       registro.controlla('senza riconoscimento vocale il pulsante sparisce e lo si dice',
         await d.$eval('#detta', x => x.classList.contains('nascosto'))
         && /microfono della tastiera/.test(await d.innerText('#avviso-detta')));
-      const quattro = Array(4).fill(materiale('foto-cantiere.jpg'));
-      await d.setInputFiles('#galleria', quattro);
-      await aiuto.attendi(d, () => !document.querySelector('#avviso-foto').classList.contains('nascosto'), 'avviso della quarta foto', 90000);
-      registro.controlla('entrano 3 foto, la quarta no, e lo dice',
-        (await d.$$eval('#anteprime img', x => x.length)) === 3 && /Al massimo 3 foto/.test(await d.innerText('#avviso-foto')));
+      registro.controlla('l’etichetta delle foto non parla più di un massimo',
+        !/al massimo/i.test(await d.innerText('#form-nuova')));
+      const dodici = Array(12).fill(materiale('foto-cantiere.jpg'));
+      await d.setInputFiles('#galleria', dodici);
+      await aiuto.attendi(d, () => document.querySelectorAll('#anteprime img').length === 12, 'dodici anteprime', 180000);
+      registro.controlla('entrano tutte e 12, senza avvisi',
+        (await d.$$eval('#anteprime img', x => x.length)) === 12 && await d.$eval('#avviso-foto', x => x.classList.contains('nascosto')));
 
-      registro.titolo('Parte comune su TN1, e senza rete resta in coda');
+      registro.titolo('Parte comune su TN1 con 12 foto, e senza rete resta in coda');
       await d.selectOption('#commessa', 'TN1');
       await d.check('input[name="ambito"][value="Parte comune"]');
       await d.waitForSelector('#piano');
       await d.selectOption('#scala', '4');
       await d.selectOption('#piano', 'P0');
       await d.fill('#testo', 'Portone della scala che non si chiude');
-      await d.click('.segn-togli');
-      await d.click('.segn-togli');
-      await d.click('.segn-togli');
       await flow.sospendi();
       const primaD = server.interventi.length;
       await d.click('#invia-segnalazione');
       await d.waitForSelector('#segn-coda');
-      registro.controlla('senza rete la segnalazione resta «Da inviare»', /Apertura/.test(await d.innerText('#segn-coda')));
+      const codaD = await d.innerText('#segn-coda');
+      registro.dice('coda', codaD.replace(/\s+/g, ' '));
+      registro.controlla('senza rete la segnalazione resta «Da inviare»', /Apertura/.test(codaD));
+      registro.controlla('e le 12 foto stanno in una riga sola, «Foto dell’apertura · TN1 · 12 foto»',
+        (await d.$$('#segn-coda .segn-foto-coda')).length === 1 && /Foto dell'apertura · TN1/.test(codaD)
+        && (await d.$eval('#segn-coda .segn-foto-coda .segn-quante', x => x.textContent)) === '12');
+      const elementiD = await d.evaluate(async () => (await import('./modules/segnalazioni/coda.js')).elenca());
+      registro.controlla('in coda 13 elementi: il passo senza foto e 12 foto da una ciascuna',
+        elementiD.length === 13 && elementiD.filter(x => x.azione === 'foto').length === 12
+        && elementiD.find(x => x.azione === 'apertura').foto.length === 0
+        && elementiD.filter(x => x.azione === 'foto').every(x => x.foto.length === 1),
+        `${elementiD.length} elementi`);
+      await d.goto(`${app.indirizzo}/index.html#/informazioni`);
+      await aiuto.attendi(d, () => /Foto in coda/i.test(document.body.innerText), 'numeri del modulo');
+      const infoD = await d.innerText('body');
+      registro.controlla('Informazioni: «Foto in coda 12», e oggi «1 passi fatti … 12 foto»',
+        /Foto in coda\s*12/i.test(infoD) && /1 passi fatti, 0 arrivati · 12 foto, 0 arrivate/i.test(infoD),
+        (infoD.match(/FOTO IN CODA[^\n]*\n?[^\n]*/i) || [''])[0] + ' | ' + (infoD.match(/[^\n]*passi fatti[^\n]*/i) || [''])[0]);
       await flow.riprendi();
-      await attendiServer(() => server.interventi.length === primaD + 1, 'apertura partita al ritorno della rete', 90000);
-      const comune = server.interventi[server.interventi.length - 1];
+      await attendiServer(() => server.interventi.length === primaD + 13, 'apertura e 12 foto partite al ritorno della rete', 180000);
+      const comune = server.interventi.slice(primaD).find(i => i.Azione === 'apertura');
       const segComune = server.segnalazione(comune.IdSegnalazione);
-      registro.controlla('arriva con «Lotto 4 · Piano terra», piano P0, nessuna unità, nessuna foto',
+      registro.controlla('arriva con «Lotto 4 · Piano terra», piano P0, nessuna unità, nessuna foto nel passo',
         segComune.Ambito === 'Parte comune' && segComune.ParteComune === 'Lotto 4 · Piano terra'
         && segComune.Piano === 'P0' && segComune.Unita === '' && comune.NumeroFoto === 0,
         JSON.stringify({ a: segComune.Ambito, pc: segComune.ParteComune, p: segComune.Piano, u: segComune.Unita }));
+      registro.controlla('sul server 12 foto: NumeroFoto 12, 12 allegati diversi, 12 righe foto col passo dell’apertura',
+        segComune.NumeroFoto === 12 && server.archivio.allegati.get(segComune.ID).size === 12
+        && server.interventi.slice(primaD).filter(i => i.Azione === 'foto' && i.Testo === comune.IdClient).length === 12,
+        `${segComune.NumeroFoto} · ${server.archivio.allegati.get(segComune.ID).size}`);
       registro.controlla('chi apre senza scegliere un nome la tiene lui', segComune.ToccaA === 'Domenico Caminiti');
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await d.waitForSelector('#aggiorna');
+      await d.waitForTimeout(500);
+      const rimasti = await d.evaluate(async () => (await import('./modules/segnalazioni/coda.js')).elenca());
+      registro.controlla('sul telefono le foto arrivate non restano: resta solo il passo',
+        rimasti.filter(x => x.azione === 'foto').length === 0 && (await d.$$('#segn-coda')).length === 0, `${rimasti.length} elementi`);
 
       registro.titolo('Un rifiuto definitivo non si ritenta all’infinito');
       server.forza = { stato: 409, corpo: { esito: 'gia_chiusa' } };
@@ -377,13 +477,144 @@ module.exports = {
       await aiuto.attendi(d, () => /aggiornato/.test(document.querySelector('#segn-lettura').innerText), 'elenco di Domenico');
       await d.goto(`${app.indirizzo}/index.html#/segnalazioni/scheda?id=${comune.IdSegnalazione}`);
       await d.waitForSelector('#segn-azioni');
+      // Con una foto. Decisione di Francesco del 20/11/2026 («Sì, i consigli»): con
+      // «già chiusa» la segnalazione esiste, e la foto di chi ha lavorato si manda
+      // lo stesso; fino a questa correzione restava fra i «Non registrati».
+      await d.setInputFiles('#a-galleria', [materiale('foto-cantiere.jpg')]);
+      await aiuto.attendi(d, () => document.querySelectorAll('#a-anteprime img').length === 1, 'anteprima della foto della chiusura', 60000);
+      const richiestePrimaRifiuto = flow.stato.ricevuti.length;
+      const fotoPrimaRifiuto = server.segnalazione(comune.IdSegnalazione).NumeroFoto;
       await d.click('#chiudi');
       await d.waitForSelector('#segn-rifiutati', { timeout: 60000 });
+      // Con un guasto la foto non arriva: l'attesa scade e lo dicono i controlli qui sotto,
+      // invece di fermare il collaudo.
+      await attendiServer(() => server.interventi.at(-1).Azione === 'foto' && server.segnalazione(comune.IdSegnalazione).NumeroFoto === fotoPrimaRifiuto + 1,
+        'la foto della chiusura rifiutata arrivata', 20000).catch(() => {});
+      await d.goto(`${app.indirizzo}/index.html#/home`);
+      await d.waitForSelector('.griglia-moduli');
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await d.waitForSelector('#segn-rifiutati');
+      const rifiutati = await d.innerText('#segn-rifiutati');
+      const dopoRifiuto = flow.stato.ricevuti.slice(richiestePrimaRifiuto).filter(x => x && x.azione);
+      const chiusuraRifiutata = dopoRifiuto.find(x => x.azione === 'chiusura');
       registro.controlla('il passo va fra i «Non registrati», con la frase giusta, e non in errore',
-        /era già stata chiusa/.test(await d.innerText('#segn-rifiutati')) && (await d.$$('#segn-coda .badge-errore')).length === 0);
+        /era già stata chiusa/.test(rifiutati) && (await d.$$('#segn-coda .badge-errore')).length === 0);
+      registro.controlla('«già chiusa»: la segnalazione esiste, e la foto della chiusura parte lo stesso, dopo il passo, col suo idPasso',
+        dopoRifiuto.map(x => x.azione).join(',') === 'chiusura,foto' && dopoRifiuto[1].idPasso === chiusuraRifiutata.idClient
+        && server.interventi.at(-1).Testo === chiusuraRifiutata.idClient, dopoRifiuto.map(x => x.azione).join(' → '));
+      registro.controlla('fra i «Non registrati» resta solo il passo, non la foto',
+        (await d.$$('#segn-rifiutati li')).length === 1 && !/Foto non mandata/.test(rifiutati), rifiutati.replace(/\s+/g, ' '));
       await d.click('[data-togli]');
       await d.waitForTimeout(300);
       registro.controlla('«Ho capito, togli» lo toglie', (await d.$$('#segn-rifiutati')).length === 0);
+
+      registro.titolo('Foto in errore e rifiutate: una riga per passo, non una per foto (rilievo del revisore)');
+      const righe = await d.evaluate(async () => {
+        const m = await import('./modules/segnalazioni/index.js');
+        const base = { idSegnalazione: 'seg-x', commessa: 'MNG', azionePasso: 'passaggio', idPasso: 'passo-0000001', autore: 'Enzo Santovito' };
+        const passo = { ...base, id: 'passo-0000001', azione: 'passaggio', passaA: 'Rosario Incarbone', stato: 'errore', ultimoErrore: 'Errore del server: 500', foto: [] };
+        const { MESSAGGIO_ATTESA_PASSO } = await import('./modules/segnalazioni/invio.js');
+        // 12 foto che aspettano il passo, parte già segnate in errore dal motore e parte ancora in coda,
+        // e 3 con un errore vero.
+        const foto = Array.from({ length: 12 }, (_, i) => ({ ...base, id: `foto-${String(i).padStart(7, '0')}`, azione: 'foto', stato: i < 7 ? 'errore' : 'in_coda', ultimoErrore: i < 7 ? MESSAGGIO_ATTESA_PASSO : '', foto: [] }));
+        const guaste = Array.from({ length: 3 }, (_, i) => ({ ...base, id: `guasta-${String(i).padStart(6, '0')}`, azione: 'foto', stato: 'errore', ultimoErrore: 'Errore del server: 500', foto: [] }));
+        const html = m.righeCoda([passo, ...foto, ...guaste]).join('');
+        const rif = m.righeRifiutati(foto.slice(0, 3).map(f => ({ ...f, stato: 'inviata', esitoServer: 'passo_non_registrato' }))).join('');
+        const div = document.createElement('div');
+        div.innerHTML = `<ul>${html}</ul>`;
+        const div2 = document.createElement('div');
+        div2.innerHTML = `<ul>${rif}</ul>`;
+        const righeFoto = [...div.querySelectorAll('.segn-foto-coda')];
+        return {
+          righe: div.querySelectorAll('li').length,
+          quante: righeFoto.map(r => r.querySelector('.segn-quante').textContent).join(','),
+          riprovaAttesa: righeFoto[0].querySelectorAll('[data-riprova]').length,
+          testoAttesa: righeFoto[0].innerText,
+          riprovaGuaste: righeFoto[1].querySelector('[data-riprova]').dataset.riprova.split(',').length,
+          rifiutate: div2.querySelectorAll('li').length,
+          togli: div2.querySelector('[data-togli]').dataset.togli.split(',').length,
+        };
+      });
+      registro.controlla('passo in errore, 12 foto in attesa (7 segnate in errore, 5 in coda) e 3 con un errore vero: 3 righe',
+        righe.righe === 3 && righe.quante === '12,3', JSON.stringify(righe));
+      registro.controlla('le 12 in attesa dicono «In coda» e non hanno «Riprova»; le 3 guaste hanno un «Riprova» per 3',
+        righe.riprovaAttesa === 0 && /In coda/.test(righe.testoAttesa) && !/Errore/.test(righe.testoAttesa) && righe.riprovaGuaste === 3);
+      registro.controlla('3 foto rifiutate dello stesso passo: una riga, e «togli» le toglie tutte e 3',
+        righe.rifiutate === 1 && righe.togli === 3);
+
+      registro.titolo('«Ho capito, togli» su un’apertura rifiutata si porta dietro le sue foto ancora in coda');
+      // Un'apertura rifiutata («nome non ammesso»): la segnalazione non esiste, e le
+      // sue foto non devono partire nemmeno dopo che il passo è stato tolto.
+      await d.context().setOffline(true);
+      const idRifiutato = await d.evaluate(async () => {
+        const m = await import('./modules/segnalazioni/coda.js');
+        const ora = Date.now();
+        const comune = { idSegnalazione: crypto.randomUUID(), autore: 'Domenico Caminiti', commessa: 'TN1', dataIntervento: '2026-11-21T10:00:00+01:00', tentativi: 0, ultimoErrore: '', idRiga: null, creatoIl: ora, accodatoIl: ora };
+        const passo = { ...comune, id: crypto.randomUUID(), azione: 'apertura', passaA: '', testo: 'mai registrata', ambito: 'Alloggio', piano: 'P3', unita: '431', parteComune: '', foto: [], stato: 'inviata', esitoServer: 'operatore_non_ammesso', inviatoIl: ora };
+        await m.aggiorna(passo);
+        const jpeg = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], { type: 'image/jpeg' });
+        for (let i = 0; i < 2; i += 1) {
+          await m.aggiorna({ ...comune, id: crypto.randomUUID(), azione: 'foto', idPasso: passo.id, azionePasso: 'apertura', foto: [jpeg], stato: 'in_coda', esitoServer: '', inviatoIl: null, creatoIl: ora + i + 1 });
+        }
+        // Una seconda apertura rifiutata, con una foto, che nessuno toglie: al
+        // ritorno della rete è il motore a non farla partire.
+        const altra = { ...comune, idSegnalazione: crypto.randomUUID(), id: crypto.randomUUID(), azione: 'apertura', passaA: '', testo: 'nemmeno questa', ambito: 'Alloggio', piano: 'P3', unita: '431', parteComune: '', foto: [], stato: 'inviata', esitoServer: 'operatore_non_ammesso', inviatoIl: ora };
+        await m.aggiorna(altra);
+        await m.aggiorna({ ...comune, idSegnalazione: altra.idSegnalazione, id: crypto.randomUUID(), azione: 'foto', idPasso: altra.id, azionePasso: 'apertura', foto: [jpeg], stato: 'in_coda', esitoServer: '', inviatoIl: null, creatoIl: ora + 5 });
+        window.aperturaNonTolta = altra.id;
+        return passo.id;
+      });
+      const richiestePrimaTogli = flow.stato.ricevuti.length;
+      // Un goto allo stesso indirizzo non ridisegna (trappola 6): si passa dalla home.
+      await d.goto(`${app.indirizzo}/index.html#/home`);
+      await d.waitForSelector('.griglia-moduli');
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await d.waitForSelector('#segn-rifiutati');
+      await d.click(`[data-togli="${idRifiutato}"]`);
+      await d.waitForTimeout(300);
+      const dopoTogli = await d.evaluate(async idP => (await import('./modules/segnalazioni/coda.js')).elenca()
+        .then(e => e.filter(x => x.id === idP || x.idPasso === idP).map(x => `${x.azione}:${x.stato}:${x.esitoServer}`)), idRifiutato);
+      registro.controlla('il passo è tolto, le sue 2 foto passano fra i «Non registrati» e non in coda',
+        dopoTogli.join(',') === 'foto:inviata:passo_non_registrato,foto:inviata:passo_non_registrato', dopoTogli.join(' '));
+      await d.context().setOffline(false);
+      await d.evaluate(() => window.dispatchEvent(new Event('online')));
+      await d.waitForTimeout(1500);
+      registro.controlla('e tornata la rete non parte nessuna foto', flow.stato.ricevuti.slice(richiestePrimaTogli).filter(x => x && x.azione === 'foto').length === 0);
+      const nonTolta = await d.evaluate(async () => (await import('./modules/segnalazioni/coda.js')).elenca()
+        .then(e => e.filter(x => x.idPasso === window.aperturaNonTolta).map(x => `${x.stato}:${x.esitoServer}`)));
+      registro.controlla('l’altra apertura rifiutata, non tolta: la sua foto la ferma il motore, fra i «Non registrati»',
+        nonTolta.join(',') === 'inviata:passo_non_registrato', nonTolta.join(' '));
+      // In «Non registrati»: l'apertura non tolta, la sua foto, e le 2 foto della prima.
+      await aiuto.attendi(d, () => document.querySelectorAll('#segn-rifiutati li').length === 3, 'tre righe fra i non registrati', 20000);
+      for (let i = 0; i < 3; i += 1) {
+        await d.click('#segn-rifiutati [data-togli]');
+        await d.waitForTimeout(300);
+      }
+
+      registro.titolo('Un passo rimasto in coda da una 0.43.x parte con le sue foto dentro, come allora');
+      const idVecchio = await d.evaluate(async idSeg => {
+        const m = await import('./modules/segnalazioni/coda.js');
+        const jpeg = new Blob([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], { type: 'image/jpeg' });
+        const ora = Date.now();
+        const record = {
+          id: crypto.randomUUID(), idSegnalazione: idSeg, azione: 'passaggio', autore: 'Domenico Caminiti',
+          passaA: 'Paolo Sanzarello', testo: 'dalla 0.43.1', commessa: 'TN1', ambito: '', piano: '', unita: '', parteComune: '',
+          foto: [jpeg, jpeg], dataIntervento: '2026-11-20T21:00:00+01:00', stato: 'in_coda', creatoIl: ora, accodatoIl: ora,
+          tentativi: 0, ultimoErrore: '', inviatoIl: null, idRiga: null, esitoServer: '',
+        };
+        await m.aggiorna(record);
+        return record.id;
+      }, comune.IdSegnalazione);
+      const primaV = server.interventi.length;
+      await d.reload();
+      await d.goto(`${app.indirizzo}/index.html#/segnalazioni`);
+      await attendiServer(() => server.interventi.length === primaV + 1, 'passo della 0.43.x arrivato', 60000);
+      const vecchio = flow.stato.ricevuti.filter(x => x && x.idClient === idVecchio).at(-1);
+      // 12 dell'apertura, 1 della chiusura rifiutata con «già chiusa», e queste 2.
+      registro.controlla('2 foto dentro il passo, coi nomi «idClient8-1» e «-2», e il server le accetta (NumeroFoto 15)',
+        vecchio.foto.length === 2 && vecchio.foto[0].nome === `${idVecchio.slice(0, 8)}-1` && vecchio.foto[1].nome === `${idVecchio.slice(0, 8)}-2`
+        && server.segnalazione(comune.IdSegnalazione).NumeroFoto === 15,
+        `${vecchio.foto.map(x => x.nome).join(',')} · NumeroFoto ${server.segnalazione(comune.IdSegnalazione).NumeroFoto}`);
 
       registro.titolo('Pagina Informazioni');
       await p.goto(`${app.indirizzo}/index.html#/informazioni`);

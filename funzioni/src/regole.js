@@ -24,9 +24,15 @@ export const POSSONO_APRIRE = [
 ];
 // Chi riapre: decisione 8.
 export const COORDINANO = ['Francesco Lando', 'Paolo Sanzarello'];
-// Fino a 3 foto per segnalazione: decisione 4.
-export const FOTO_MASSIME = 3;
+// Dalla 0.44.0 le foto non hanno limite (Francesco, 20/11/2026: «le foto non
+// devono essere massimo 3, numero libero») e viaggiano una per richiesta, con
+// l'azione `foto`. I passi dei telefoni ancora alla 0.43.x portano le foto
+// dentro di sé, fino a 3: il massimo che quell'app manda. Oltre è un invio che
+// nessuna app scrive, e si rifiuta. Il limite per segnalazione non c'è più.
+export const FOTO_PER_PASSO = 3;
 export const AZIONI = ['apertura', 'passaggio', 'chiusura', 'riapertura'];
+// L'azione delle foto singole: non è un passo e non cambia la segnalazione.
+export const AZIONE_FOTO = 'foto';
 // Le chiuse restano nell'elenco per 30 giorni: servono a chi deve riaprirle.
 export const GIORNI_CHIUSE = 30;
 
@@ -35,6 +41,11 @@ export const GIORNI_CHIUSE = 30;
 // e niente di quello che arriva da fuori deve poterne cambiare il senso.
 const ID_VALIDO = /^[A-Za-z0-9-]{8,64}$/;
 const NOME_FOTO_VALIDO = /^[A-Za-z0-9-]{1,64}$/;
+// Un allegato messo dall'app: `idClient.jpg` (0.44.0) o `idClient8-n.jpg` (0.43.x),
+// cioè otto lettere o cifre, un trattino e il resto. Uno aggiunto a mano dalla
+// lista (`IMG_1234.jpg`, un PDF) non è una foto dell'app e non entra in NumeroFoto:
+// altrimenti l'archiviatore avrebbe sempre una foto in meno di quelle contate.
+export const ALLEGATO_DELL_APP = /^[A-Za-z0-9]{8}-[A-Za-z0-9-]{1,55}\.jpg$/;
 
 const risposta = (stato, corpo) => ({ stato, corpo });
 
@@ -64,12 +75,16 @@ export function payloadIncompleto(d) {
   if (!ID_VALIDO.test(String(d.idSegnalazione || ''))) return 'idSegnalazione';
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(String(d.dataIntervento || ''))) return 'dataIntervento';
   if (!testo(d.operatore)) return 'operatore';
-  if (!AZIONI.includes(d.azione)) return 'azione';
+  if (!AZIONI.includes(d.azione) && d.azione !== AZIONE_FOTO) return 'azione';
   if (d.azione === 'apertura' && !testo(d.commessa)) return 'commessa';
   if (d.azione === 'passaggio' && !testo(d.passaA)) return 'passaA';
+  if (d.azione === AZIONE_FOTO && !ID_VALIDO.test(String(d.idPasso || ''))) return 'idPasso';
   const foto = d.foto === undefined ? [] : d.foto;
   if (!Array.isArray(foto)) return 'foto';
-  if (foto.length > FOTO_MASSIME) return 'foto';
+  // Una foto per richiesta, esattamente: due in una richiesta sono un'app
+  // che non segue il contratto, e nessuna è una richiesta vuota.
+  if (d.azione === AZIONE_FOTO && foto.length !== 1) return 'foto';
+  if (foto.length > FOTO_PER_PASSO) return 'foto';
   for (const f of foto) {
     if (!f || !NOME_FOTO_VALIDO.test(String(f.nome || '')) || !testo(f.contenutoBase64, Infinity)) return 'foto';
   }
@@ -83,6 +98,7 @@ export async function riceviPasso(d, archivio, { token, registra = () => {} }) {
   if (!d || !tokenValido(token, d.token)) return risposta(401, { esito: 'token_non_valido' });
   const manca = payloadIncompleto(d);
   if (manca) return risposta(400, { esito: 'payload_incompleto', campo: manca });
+  if (d.azione === AZIONE_FOTO) return riceviFoto(d, archivio, registra);
   if (d.azione === 'apertura' && !POSSONO_APRIRE.includes(d.operatore)) return risposta(403, { esito: 'operatore_non_ammesso' });
   if (d.azione === 'riapertura' && !COORDINANO.includes(d.operatore)) return risposta(403, { esito: 'operatore_non_ammesso' });
 
@@ -108,7 +124,7 @@ export async function riceviPasso(d, archivio, { token, registra = () => {} }) {
     if (seg && d.azione !== 'apertura') {
       if ((d.azione === 'passaggio' || d.azione === 'chiusura') && seg.Stato === 'Chiusa') return risposta(409, { esito: 'gia_chiusa' });
       if (d.azione === 'riapertura' && seg.Stato === 'Aperta') return risposta(409, { esito: 'gia_aperta' });
-      if ((Number(seg.NumeroFoto) || 0) + foto.length > FOTO_MASSIME) return risposta(409, { esito: 'troppe_foto' });
+      // Dalla 0.44.0 non c'è più «troppe foto»: il limite per segnalazione è tolto.
     }
   }
   const fotoTotali = !seg ? foto.length
@@ -201,6 +217,88 @@ export async function riceviPasso(d, archivio, { token, registra = () => {} }) {
   return risposta(200, { esito: 'ok', idSegnalazione: d.idSegnalazione, id, azione: d.azione });
 }
 
+// --- Foto singole (dalla 0.44.0) --------------------------------------------
+//
+// Una richiesta, una foto. L'app la manda DOPO il passo a cui appartiene, con
+// operatore e data di quel passo e il suo `idClient` in `idPasso`. La foto non è
+// un passo: non cambia Stato, ToccaA, UltimaNota, UltimoOperatore né IdClient
+// della segnalazione — IdClient è quello che riconosce un passo ripreso dopo un
+// guasto a metà, e una foto che lo sovrascrivesse trasformerebbe la ripresa di
+// una chiusura in un «già chiusa».
+//
+// Vale su una segnalazione chiusa (la foto di una chiusura arriva dopo la
+// chiusura) e la manda chiunque abbia il codice, come passaggio e chiusura.
+//
+// Ordine dei passi, scelto per la ripresa:
+//   1. allegato, saltato se c'è già col suo nome;
+//   2. NumeroFoto, che si RICAVA dagli allegati: il più grande fra il valore
+//      scritto e quanti allegati messi dall'app ha la segnalazione (quelli
+//      aggiunti a mano dalla lista non contano: ALLEGATO_DELL_APP). Una ripresa che trova
+//      l'allegato già caricato non conta due volte, e una caduta fra 1 e 2 si
+//      recupera alla ripresa. Nel caso normale è il +1 della specifica;
+//   3. la riga in SegnalazioniInterventi, PER ULTIMA: è la guardia sui doppioni.
+// L'idPasso sta in Testo: niente colonna nuova negli interventi, quindi le
+// funzioni non dipendono da uno script di colonne. Nella storia esce come
+// `idPasso`, e il testo di una riga `foto` resta vuoto.
+async function riceviFoto(d, archivio, registra) {
+  const f = d.foto[0];
+  const nome = `${f.nome}.jpg`;
+  let seg;
+  try {
+    if (await archivio.cercaIntervento(d.idClient)) return risposta(200, { esito: 'gia_presente', idClient: d.idClient });
+    seg = await archivio.cercaSegnalazione(d.idSegnalazione);
+  } catch (e) {
+    registra('lettura', e);
+    return risposta(500, { esito: 'errore_lettura' });
+  }
+  if (!seg) return risposta(409, { esito: 'segnalazione_sconosciuta' });
+  const id = seg.ID;
+
+  let allegati;
+  try {
+    const presenti = new Set(await archivio.fotoPresenti(id));
+    if (!presenti.has(nome)) {
+      await archivio.aggiungiFoto(id, nome, Buffer.from(f.contenutoBase64, 'base64'));
+      presenti.add(nome);
+    }
+    allegati = [...presenti].filter(n => ALLEGATO_DELL_APP.test(n)).length;
+  } catch (e) {
+    registra('scrittura_foto', e);
+    return risposta(500, { esito: 'errore_scrittura_foto' });
+  }
+
+  const numero = Math.max(Number(seg.NumeroFoto) || 0, allegati);
+  if (numero !== (Number(seg.NumeroFoto) || 0)) {
+    try {
+      await archivio.aggiornaSegnalazione(id, { NumeroFoto: numero });
+    } catch (e) {
+      registra('scrittura_segnalazione', e);
+      return risposta(500, { esito: 'errore_scrittura_segnalazione' });
+    }
+  }
+
+  try {
+    await archivio.creaIntervento({
+      Title: AZIONE_FOTO,
+      IdSegnalazione: d.idSegnalazione,
+      RigaSegnalazione: id,
+      IdClient: d.idClient,
+      Azione: AZIONE_FOTO,
+      Operatore: testo(d.operatore, 255),
+      PassaA: '',
+      Testo: String(d.idPasso),
+      DataIntervento: cifre14(d.dataIntervento),
+      NumeroFoto: 1,
+      IdDispositivo: testo(d.idDispositivo, 255),
+      VersioneApp: testo(d.versioneApp, 255),
+    });
+  } catch (e) {
+    registra('scrittura_intervento', e);
+    return risposta(500, { esito: 'errore_scrittura_intervento' });
+  }
+  return risposta(200, { esito: 'ok', idSegnalazione: d.idSegnalazione, id, azione: AZIONE_FOTO, numeroFoto: numero });
+}
+
 // --- Elenco: le segnalazioni, o la storia di una ----------------------------
 
 export function perApp(s) {
@@ -236,10 +334,19 @@ export async function leggi(d, archivio, { token, ora = new Date(), registra = (
         esito: 'ok',
         modalita: 'storia',
         idSegnalazione: d.idSegnalazione,
-        interventi: interventi.map(i => ({
-          azione: i.Azione || '', operatore: i.Operatore || '', passaA: i.PassaA || '', testo: i.Testo || '',
-          data: i.DataIntervento || '', numeroFoto: Number(i.NumeroFoto) || 0,
-        })),
+        // Dalla 0.44.0 anche `idClient` e `idPasso`: la scheda raccoglie le
+        // righe `foto` nel passo a cui appartengono. Il testo di una riga
+        // `foto` è l'idPasso: esce vuoto, perché i telefoni ancora alla 0.43.x
+        // mostrano il testo così com'è.
+        interventi: interventi.map(i => {
+          const eFoto = i.Azione === AZIONE_FOTO;
+          return {
+            azione: i.Azione || '', operatore: i.Operatore || '', passaA: i.PassaA || '',
+            testo: eFoto ? '' : (i.Testo || ''),
+            data: i.DataIntervento || '', numeroFoto: Number(i.NumeroFoto) || 0,
+            idClient: i.IdClient || '', idPasso: eFoto ? (i.Testo || '') : '',
+          };
+        }),
       });
     }
     const dal = new Date(ora.getTime() - GIORNI_CHIUSE * 86400000);

@@ -27,7 +27,7 @@
 // fra due osservazioni indipendenti — cosa sta girando e cosa è installato — e
 // quando **non** coincidono l'app lo sa e lo dice, invece di tacere.
 
-export const VERSIONE_CODICE = '0.43.1';
+export const VERSIONE_CODICE = '0.44.0';
 
 const PREFISSO = 'llitalia-';
 

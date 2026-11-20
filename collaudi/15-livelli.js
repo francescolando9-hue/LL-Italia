@@ -145,8 +145,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202610261235';
-    const IMPRONTA_MASTER = 'ecb2c273fa623b24291ba792530d12359e1c4ae0c0f996c2e980a31729a12ec4';
+    const VERSIONE_MASTER = '202611202113';
+    const IMPRONTA_MASTER = '3316cd9d6fc2ae6980724d41708d8c2ed691ae4961a9e67cabfbb48f57af6c3e';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -256,7 +256,10 @@ module.exports = {
           comuni: a.pianiDi(c).map(p => p.codice).filter(p => !elenco.some(s => s.piani.includes(p))),
         };
       };
-      out.scale = { MAR: scale('MAR'), MNG: scale('MNG'), 'SNZ2.2': scale('SNZ2.2'), TN1: scale('TN1') };
+      out.scale = {
+        MAR: scale('MAR'), MNG: scale('MNG'), 'SNZ2.2': scale('SNZ2.2'), TN1: scale('TN1'),
+        'SNZ2.1': scale('SNZ2.1'), MRS: scale('MRS'),
+      };
       const pTN1 = a.pianiDi('TN1');
       out.TN1 = {
         piani: pTN1.map(p => p.codice).join(','),
@@ -288,8 +291,10 @@ module.exports = {
       m.voci === 26 && m.piano === 10 && m.unita === 4 && m.prospetto === 1 && m.nessuno === 11,
       `voci ${m.voci} · piano ${m.piano} · unità ${m.unita} · prospetto ${m.prospetto} · nessuno ${m.nessuno}`,
       'le tre fasi escluse dalle app (0.41.0) non hanno livelli: escono tutte dal gruppo «senza livelli»');
-    registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15',
-      numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15);
+    registro.controlla('piani: MAR 4, MNG 12, SNZ2.2 15, e dal master 202611202113 SNZ2.1 14 e MRS 13',
+      numeri.edifici.MAR.piani === 4 && numeri.edifici.MNG.piani === 12 && numeri.edifici['SNZ2.2'].piani === 15
+        && numeri.edifici['SNZ2.1'].piani === 14 && numeri.edifici.MRS.piani === 13,
+      `SNZ2.1 ${(numeri.edifici['SNZ2.1'] || {}).piani} · MRS ${(numeri.edifici.MRS || {}).piani}`);
     registro.controlla('in tutte le commesse edificio il Tetto è l’ultimo piano, e l’ordine sale dal più basso',
       Object.values(numeri.edifici).every(e => e.ultimo === 'Tetto' && e.crescente),
       'i piani stanno nel loro ordine proprio, non in ordine alfabetico: «P10» prima di «P2» non vuol dire niente');
@@ -298,17 +303,22 @@ module.exports = {
       'il Tetto è un piano a sé, non una parte comune e non un alloggio');
     registro.controlla('unità invariate: MAR 15, MNG 16, SNZ2.2 51',
       numeri.edifici.MAR.unita === 15 && numeri.edifici.MNG.unita === 16 && numeri.edifici['SNZ2.2'].unita === 51);
+    // Anagrafica decisa da Francesco il 20/11/2026 (Excel del 20/11 alle 20:56):
+    // 117 unità, 52 + 65.
+    registro.controlla('unità nuove: SNZ2.1 52, MRS 65',
+      (numeri.edifici['SNZ2.1'] || {}).unita === 52 && (numeri.edifici.MRS || {}).unita === 65,
+      `SNZ2.1 ${(numeri.edifici['SNZ2.1'] || {}).unita} · MRS ${(numeri.edifici.MRS || {}).unita}`);
     registro.controlla('lotti: SNU 3, BRU 3',
       numeri.lotti.SNU.join(',') === 'Lotto1,Lotto2,Lotto3' && numeri.lotti.BRU.join(',') === 'Lotto1,Lotto2,Lotto3');
-    registro.controlla('le commesse del conteggio sono quelle del menù che hanno un edificio: MAR, MNG, SNZ2.2, TN1',
-      numeri.edificiElenco.join(',') === 'MAR,MNG,SNZ2.2,TN1', numeri.edificiElenco.join(' '),
+    registro.controlla('le commesse del conteggio sono quelle del menù che hanno un edificio: MAR, MNG, MRS, SNZ2.1, SNZ2.2, TN1',
+      numeri.edificiElenco.slice().sort().join(',') === 'MAR,MNG,MRS,SNZ2.1,SNZ2.2,TN1', numeri.edificiElenco.join(' '),
       'l’elenco si ricava da core/cantieri.js e dall’anagrafica, non si scrive a mano');
     // Erano due, `SNZ2.2 · Interrato · P-1` e `TN1 · Interrato · P-1`, e una
     // senza voci, `MAR · Interrato`: tutte e tre dipendevano da `Interrato`,
     // che dal 26/10/2026 non è più una fase. Il caso 16 della specifica, la voce
     // unica del piano, si prova con una commessa sintetica più sotto.
-    registro.controlla('60 combinazioni di commessa, fase e livello obbligatorio: 15 per commessa, e nessuna a voce unica',
-      numeri.combinazioni === 60 && numeri.uniche.length === 0,
+    registro.controlla('90 combinazioni di commessa, fase e livello obbligatorio: 15 per commessa su 6, e nessuna a voce unica',
+      numeri.combinazioni === 90 && numeri.uniche.length === 0,
       `${numeri.combinazioni} combinazioni, a voce unica: ${numeri.uniche.join(' ; ') || 'nessuna'}`);
     registro.controlla('e nessuna senza voci: ogni livello obbligatorio ha qualcosa da scegliere',
       numeri.senzaVoci.length === 0, numeri.senzaVoci.join(' ; ') || 'nessuna');
@@ -326,6 +336,18 @@ module.exports = {
       sm.comuni.join(',') === 'Tetto', sm.comuni.join(' ') || 'nessuno');
     registro.controlla('MNG e SNZ2.2 hanno una scala sola: niente campo «scale»',
       numeri.scale.MNG.quante === 0 && numeri.scale['SNZ2.2'].quante === 0);
+    // Dal master 202611202113: la scala sta nel codice dell'unità (`2.10B` è
+    // scala 2, piano 10, alloggio B) e nel dato, come a MAR; niente corpi distinti.
+    const s21 = numeri.scale['SNZ2.1'];
+    registro.controlla('SNZ2.1: due scale da 26 alloggi, ogni alloggio in una sola, P-1 e Tetto comuni',
+      s21.quante === 2 && s21.codici.join(',') === '1,2' && s21.alloggi.join(',') === '26,26' && s21.partizione
+        && s21.ugualeAUnPiano.length === 0 && s21.comuni.join(',') === 'P-1,Tetto',
+      `${s21.codici.join(' ')} · alloggi ${s21.alloggi.join('/')} · comuni ${s21.comuni.join(' ')}`);
+    const smr = numeri.scale.MRS;
+    registro.controlla('MRS: tre scale da 20, 22 e 23 alloggi, ogni alloggio in una sola, P-1 e Tetto comuni',
+      smr.quante === 3 && smr.codici.join(',') === '1,2,3' && smr.alloggi.join(',') === '20,22,23' && smr.partizione
+        && smr.ugualeAUnPiano.length === 0 && smr.comuni.join(',') === 'P-1,Tetto',
+      `${smr.codici.join(' ')} · alloggi ${smr.alloggi.join('/')} · comuni ${smr.comuni.join(' ')}`);
     const st = numeri.scale.TN1;
     registro.controlla('TN1: le palazzine 4–7 come scale, 16 alloggi ciascuna',
       st.quante === 4 && st.codici.join(',') === '4,5,6,7' && st.alloggi.every(n => n === 16) && st.partizione,
@@ -684,19 +706,34 @@ module.exports = {
     registro.controlla('per un’urbanizzazione il lotto viaggia nel campo fase', lotto.fase === 'Lotto3');
     registro.controlla('e i tre livelli restano null', lotto.piano === null && lotto.unita === null);
 
-    // SNZ2.1 e MRS sono concluse e in anagrafica non ci sono: le loro fasi
-    // restano tutte, e i livelli non viaggiano. A valle la foto finisce nella
-    // cartella del mese con un'anomalia — voluto: non si blocca chi sta
-    // scattando per un dato che manca in ufficio.
+    // Fino alla 0.43.1 SNZ2.1 e MRS erano senza anagrafica: le fasi restavano
+    // tutte e i livelli non viaggiavano. Dalla 0.44.0 (master 202611202113)
+    // hanno piani e unità come le altre commesse: le fasi per unità chiedono
+    // l'alloggio, e il piano arriva dalla mappa.
     await scegliCommessa('#commessa', 'MRS');
     const fasiMRS = await voci('#fase');
-    registro.controlla('una commessa senza anagrafica mostra le 26 fasi delle app, e non Interrato',
+    registro.controlla('MRS mostra le 26 fasi delle app, e non Interrato',
       fasiMRS.length === 26 && !fasiMRS.includes('Interrato')
         && !['AcquistoTerreno', 'Marketing', 'SpeseTecniche'].some(f => fasiMRS.includes(f)), String(fasiMRS.length));
-    const senzaAnagrafica = await mandaFoto('MRS', 'Strutture');
-    registro.controlla('e non chiede il piano, perché non ne ha da offrire',
-      senzaAnagrafica.piano === null,
-      'non bloccare l’operatore per un dato che manca in ufficio è una scelta, non una dimenticanza');
+    await scegliFase('ImpiantoIdrosanitario');
+    await pagina.waitForSelector('#unita');
+    const unitaMRS = await voci('#unita');
+    registro.controlla('MRS · idrosanitario chiede l’alloggio: 65 unità più le parti comuni',
+      unitaMRS.length === 66 && unitaMRS.includes('3.10B') && unitaMRS.includes('2.0A') && unitaMRS.at(-1) === 'PartiComuni',
+      `${unitaMRS.length} voci, prima ${unitaMRS[0]}, ultima ${unitaMRS.at(-1)}`);
+    const conAnagrafica = await mandaFoto('MRS', 'ImpiantoIdrosanitario', { unita: '2.10B' });
+    registro.controlla('l’alloggio 2.10B di MRS parte col piano P10 ricavato dalla mappa (non P1)',
+      conAnagrafica.unita === '2.10B' && conAnagrafica.piano === 'P10' && conAnagrafica.scala === null,
+      `unita ${conAnagrafica.unita} · piano ${conAnagrafica.piano} · scala ${conAnagrafica.scala}`);
+    const pianoMRS = await mandaFoto('MRS', 'Strutture', { piano: 'P-1' });
+    registro.controlla('e Strutture chiede il piano: P-1 parte com’è', pianoMRS.piano === 'P-1', String(pianoMRS.piano));
+    await scegliCommessa('#commessa', 'SNZ2.1');
+    await scegliFase('ImpiantoElettricoAlloggi');
+    await pagina.waitForSelector('#unita');
+    const unitaSNZ21 = await voci('#unita');
+    registro.controlla('SNZ2.1 · elettrico alloggi chiede l’alloggio: 52 unità, senza parti comuni (fase gemella)',
+      unitaSNZ21.length === 52 && unitaSNZ21.includes('1.01') && unitaSNZ21.includes('2.11B') && !unitaSNZ21.includes('PartiComuni'),
+      `${unitaSNZ21.length} voci`);
 
     registro.titolo('Nel modulo Bolle il lotto sì, i livelli NO');
     // Il selettore della fase è condiviso di proposito, e per un'urbanizzazione

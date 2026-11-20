@@ -3,13 +3,15 @@
 //
 // Il contratto lo fissano le regole del server (`funzioni/src/regole.js`), che il
 // collaudo 29 fa girare contro l'app; nato col testo dei flow del 20/11/2026, ed
-// è questo: POST JSON, un passo per richiesta, foto JPEG in base64 dentro la
-// stessa richiesta (al massimo 3 per segnalazione). Le risposte:
-//   200 ok / gia_presente           → il passo è registrato
+// è questo: POST JSON, un passo per richiesta. Dalla 0.44.0 il passo parte
+// senza foto e ogni foto è una richiesta sua, azione `foto`, con una foto JPEG
+// in base64, `idPasso` e operatore e data del passo; niente limite di foto. I
+// passi rimasti in coda da una 0.43.x partono ancora con le loro foto dentro,
+// come allora. Le risposte:
+//   200 ok / gia_presente           → il passo (o la foto) è registrato
 //   409 segnalazione_sconosciuta    → l'apertura non è ancora arrivata: si riprova
-//   409 gia_chiusa, gia_aperta,     → il passo NON si registrerà mai così com'è:
-//       troppe_foto; 403 operatore_   non si ritenta, si dice all'operatore
-//       non_ammesso
+//   409 gia_chiusa, gia_aperta;     → il passo NON si registrerà mai così com'è:
+//       403 operatore_non_ammesso     non si ritenta, si dice all'operatore
 //   altro                           → errore, resta in coda e si ritenta
 import * as coda from './coda.js';
 import {
@@ -26,9 +28,28 @@ import { creaMotore, eGiaPresente, fetchConScadenza, messaggioScaduto } from '..
 export const RIFIUTI_DEFINITIVI = {
   gia_chiusa: 'Non registrato: la segnalazione era già stata chiusa.',
   gia_aperta: 'Non registrato: la segnalazione era già aperta.',
-  troppe_foto: 'Non registrato: la segnalazione ha già 3 foto.',
+  // Dalla 0.44.0 il server non lo manda più; resta per un rifiuto di una 0.43.x
+  // ancora fra i «Non registrati» di un telefono aggiornato.
+  troppe_foto: 'Non registrato: la segnalazione aveva già 3 foto.',
   operatore_non_ammesso: 'Non registrato: il tuo nome non può aprire o riaprire segnalazioni.',
+  // Lo decide il telefono, non il server: la foto di un'apertura rifiutata non
+  // parte, perché cercherebbe per sempre una segnalazione che non c'è.
+  passo_non_registrato: 'Foto non mandata: l’apertura a cui apparteneva non è stata registrata, e la segnalazione non esiste.',
 };
+
+export const eFoto = record => record.azione === coda.AZIONE_FOTO;
+
+// Le foto di un passo rifiutato (decisione di Francesco del 20/11/2026, «Sì, i
+// consigli»). Si scartano SOLO quando la segnalazione non esiste, cioè quando
+// il passo rifiutato è un'apertura (oggi «nome non ammesso»). Per ogni altro
+// passo rifiutato la segnalazione esiste — il server rifiuta passaggio,
+// chiusura e riapertura solo dopo averla trovata, e «sconosciuta» non è un
+// rifiuto definitivo — e le foto si mandano lo stesso: documentano il lavoro
+// fatto, e il server le accetta anche su una chiusa. Vale per tutti i rifiuti
+// di quei passi, non solo per «già chiusa»: «già aperta» su una riapertura e
+// «nome non ammesso» su una riapertura rifiutano il cambio di stato, non la
+// segnalazione. Il rifiuto del passo resta fra i «Non registrati».
+export const fotoScartateConIlPasso = passo => passo.azione === 'apertura';
 
 const motore = creaMotore({
   coda,
@@ -39,11 +60,18 @@ const motore = creaMotore({
     record.esitoServer = risposta.rifiutato || (risposta.giaPresente ? 'gia_presente' : 'ok');
     // Un rifiuto definitivo non è un invio arrivato: non si conta.
     if (risposta.rifiutato) record.nonContare = true;
+    // Una foto non è un passo: si conta a parte, e il motore non la conta fra i passi.
+    if (eFoto(record)) {
+      if (!risposta.rifiutato) coda.incrementaFotoInviate(1);
+      record.nonContare = true;
+    }
     // Il passo è sul server: l'elenco va riletto, altrimenti la home continua a
     // mostrare la segnalazione come se toccasse ancora a chi l'ha appena passata.
     // Finita la lettura si avvisa la vista, che si ridisegna con l'elenco nuovo:
     // il ridisegno che segue l'invio arriva prima che la lettura finisca.
-    leggiElenco().then(() => motore.notifica()).catch(() => {});
+    // Una foto non cambia chi deve intervenire: dodici foto non sono dodici
+    // letture dell'elenco. Il numero delle foto lo riporta la lettura dopo.
+    if (!eFoto(record)) leggiElenco().then(() => motore.notifica()).catch(() => {});
   },
 });
 
@@ -53,7 +81,12 @@ export const { alCambiamento, avvia, riprova } = motore;
 // lettere dell'idClient e il numero della foto. Diverse fra loro nello stesso
 // invio, e fisse fra un tentativo e l'altro: il server riconosce quelle già
 // caricate da un invio ripreso e non le carica due volte.
+//
+// Dalla 0.44.0 una foto singola si chiama col suo `idClient` intero: unico, fisso
+// fra i tentativi, e l'archiviatore la ricollega alla sua riga negli interventi
+// leggendo il nome. Le foto dentro un passo di una 0.43.x restano `idClient8-n`.
 export function nomeFoto(record, indice) {
+  if (eFoto(record)) return String(record.id);
   return `${String(record.id).slice(0, 8)}-${indice + 1}`;
 }
 
@@ -61,6 +94,20 @@ export async function corpoInvio(record, impostazioni, dispositivo, versione) {
   const foto = [];
   for (let i = 0; i < (record.foto || []).length; i += 1) {
     foto.push({ nome: nomeFoto(record, i), contenutoBase64: await blobInBase64(record.foto[i]) });
+  }
+  if (eFoto(record)) {
+    return {
+      token: impostazioni.token,
+      azione: record.azione,
+      idClient: record.id,
+      idSegnalazione: record.idSegnalazione,
+      idPasso: record.idPasso,
+      operatore: record.autore,
+      dataIntervento: record.dataIntervento,
+      idDispositivo: dispositivo,
+      versioneApp: versione,
+      foto,
+    };
   }
   return {
     token: impostazioni.token,
@@ -91,11 +138,31 @@ async function leggiEsito(risposta) {
   }
 }
 
+// Una foto parte DOPO il suo passo. Il motore manda gli elementi in ordine, ma
+// un passo in errore resta indietro e il giro va avanti: senza questo controllo
+// la foto arriverebbe prima del passo, e se il passo venisse poi rifiutato
+// («già chiusa») la foto resterebbe attaccata a una segnalazione a cui non
+// appartiene. Un passo che non c'è più nella coda è arrivato ed è stato potato.
+export const MESSAGGIO_ATTESA_PASSO = 'Aspetta il suo passo, che non è ancora arrivato: parte subito dopo.';
+
+export function attesaDelPasso(record, elementi) {
+  if (!eFoto(record)) return '';
+  const passo = elementi.find(r => r.id === record.idPasso);
+  if (!passo) return '';
+  if (passo.stato === 'inviata') {
+    return RIFIUTI_DEFINITIVI[passo.esitoServer] && fotoScartateConIlPasso(passo) ? 'rifiutato' : '';
+  }
+  return 'in_attesa';
+}
+
 async function inviaSingola(record) {
   const impostazioni = impostazioniSegnalazioni();
   if (!impostazioni.endpoint) {
     throw new Error('Indirizzo non configurato: apri le impostazioni del modulo Segnalazioni');
   }
+  const attesa = attesaDelPasso(record, await coda.elenca());
+  if (attesa === 'rifiutato') return { rifiutato: 'passo_non_registrato' };
+  if (attesa === 'in_attesa') throw new Error(MESSAGGIO_ATTESA_PASSO);
   const corpo = await corpoInvio(record, impostazioni, await idDispositivo(), await versioneApp());
   let risposta;
   try {

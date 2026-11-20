@@ -33,8 +33,8 @@ export const POSSONO_APRIRE = [
 // non l'ha in mano: Francesco e Paolo (decisione 8 del 20/11/2026).
 export const COORDINANO = ['Francesco Lando', 'Paolo Sanzarello'];
 
-// Fino a 3 foto per segnalazione, in tutto (decisione 4 del 20/11/2026).
-export const FOTO_MASSIME = 3;
+// Le foto non hanno più un massimo (dalla 0.44.0; Francesco, 20/11/2026: «le
+// foto non devono essere massimo 3, numero libero»).
 
 const PREDEFINITE = {
   endpoint: '',

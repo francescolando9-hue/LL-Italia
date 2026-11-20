@@ -62,9 +62,34 @@ function transazione(modo, operazione) {
 
 // Un passo nuovo entra direttamente in coda: non c'è una bozza da confermare,
 // perché il passo nasce già dal tocco su «Invia», «Passa» o «Chiudi».
+//
+// Dalla 0.44.0 le foto non viaggiano dentro il passo: il passo parte senza
+// foto, e ogni foto è un elemento suo, con l'azione `foto` (decisione di
+// Francesco del 20/11/2026: «numero libero», una foto per richiesta). Ogni foto
+// porta autore e `dataIntervento` del passo a cui appartiene e il suo
+// `idClient` in `idPasso`. Passo e foto entrano in coda **in una transazione
+// sola**: o ci sono tutti o non c'è niente — con la memoria piena non resta un
+// passo senza le sue foto, né foto senza il loro passo. `creatoIl` sale di un
+// millisecondo per elemento, così il motore li manda nell'ordine giusto: prima
+// il passo, poi le foto nell'ordine in cui sono state scelte.
+export const AZIONE_FOTO = 'foto';
+
+function nuovoRecord(campi, ora) {
+  return segnaIngressoInCoda({
+    stato: 'in_coda',
+    creatoIl: ora,
+    tentativi: 0,
+    ultimoErrore: '',
+    inviatoIl: null,
+    idRiga: null,
+    esitoServer: '',
+    ...campi,
+  }, ora);
+}
+
 export function accoda(dati) {
   const ora = Date.now();
-  const record = segnaIngressoInCoda({
+  const passo = nuovoRecord({
     id: crypto.randomUUID(),
     idSegnalazione: dati.idSegnalazione || crypto.randomUUID(),
     azione: dati.azione,
@@ -76,19 +101,28 @@ export function accoda(dati) {
     piano: dati.piano || '',
     unita: dati.unita || '',
     parteComune: dati.parteComune || '',
-    foto: Array.isArray(dati.foto) ? dati.foto : [],
+    foto: [],
     dataIntervento: timestampDispositivo(),
-    stato: 'in_coda',
-    creatoIl: ora,
-    tentativi: 0,
-    ultimoErrore: '',
-    inviatoIl: null,
-    idRiga: null,
-    esitoServer: '',
   }, ora);
-  return transazione('readwrite', store => store.add(record)).then(() => {
+  const foto = (Array.isArray(dati.foto) ? dati.foto : []).map((blob, i) => nuovoRecord({
+    id: crypto.randomUUID(),
+    idSegnalazione: passo.idSegnalazione,
+    azione: AZIONE_FOTO,
+    idPasso: passo.id,
+    azionePasso: passo.azione,
+    autore: passo.autore,
+    commessa: passo.commessa,
+    dataIntervento: passo.dataIntervento,
+    foto: [blob],
+  }, ora + i + 1));
+  return transazione('readwrite', store => {
+    store.add(passo);
+    for (const f of foto) store.add(f);
+  }).then(() => {
     incrementa('fatti', 1);
-    return record;
+    if (foto.length > 0) incrementa('foto', foto.length);
+    passo.fotoAccodate = foto.length;
+    return passo;
   });
 }
 
@@ -117,9 +151,15 @@ export async function potaInviate(conserva = 20) {
       await aggiorna(record);
     }
   }
-  const daTogliere = inviati
-    .filter(r => !r.esitoServer || r.esitoServer === 'ok' || r.esitoServer === 'gia_presente')
-    .slice(0, Math.max(0, inviati.length - conserva));
+  const arrivato = r => !r.esitoServer || r.esitoServer === 'ok' || r.esitoServer === 'gia_presente';
+  // Le foto arrivate non servono più al telefono (la storia le legge dal
+  // server) e non devono spingere fuori i passi: si tolgono subito. Dei passi
+  // si tengono gli ultimi N, come prima della 0.44.0.
+  const passi = inviati.filter(r => r.azione !== AZIONE_FOTO);
+  const daTogliere = [
+    ...inviati.filter(r => r.azione === AZIONE_FOTO && arrivato(r)),
+    ...passi.filter(arrivato).slice(0, Math.max(0, passi.length - conserva)),
+  ];
   for (const record of daTogliere) await elimina(record.id);
 }
 
@@ -132,9 +172,9 @@ function oggi() {
 function leggiContatori() {
   try {
     const dati = JSON.parse(localStorage.getItem(CHIAVE_CONTATORI)) || {};
-    return dati.giorno === oggi() ? dati : { giorno: oggi(), fatti: 0, inviati: 0 };
+    return dati.giorno === oggi() ? dati : { giorno: oggi(), fatti: 0, inviati: 0, foto: 0, fotoInviate: 0 };
   } catch {
-    return { giorno: oggi(), fatti: 0, inviati: 0 };
+    return { giorno: oggi(), fatti: 0, inviati: 0, foto: 0, fotoInviate: 0 };
   }
 }
 
@@ -148,11 +188,22 @@ function incrementa(campo, quanti) {
   }
 }
 
+// Il motore della shell chiama questa funzione per ogni elemento arrivato, e
+// non sa se è un passo o una foto. Le foto le conta a parte `segnaInviato`
+// (invio.js), che le marca `nonContare` per il motore: una foto non è un passo
+// (specifica 0.44.0, §1), e i passi restano contati come prima.
 export function incrementaInviate(quanti = 1) {
   incrementa('inviati', quanti);
 }
 
+export function incrementaFotoInviate(quante = 1) {
+  incrementa('fotoInviate', quante);
+}
+
 export function contatoriOggi() {
   const dati = leggiContatori();
-  return { scattate: dati.fatti || 0, inviate: dati.inviati || 0 };
+  return {
+    scattate: dati.fatti || 0, inviate: dati.inviati || 0,
+    foto: dati.foto || 0, fotoInviate: dati.fotoInviate || 0,
+  };
 }

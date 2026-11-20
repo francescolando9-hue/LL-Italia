@@ -99,9 +99,13 @@ test('il giro intero: apre con foto, passa, chiude, non si passa una chiusa, ria
   assert.equal(r.stato, 200);
   assert.equal(a.segnalazioni.get(1).ToccaA, 'Rosario Incarbone');
 
+  // Dalla 0.44.0 non c'è più «troppe foto»: un passo di un telefono 0.43.x con 3
+  // foto su una segnalazione che ne ha già una passa (fino alla 0.43.1 era 409).
   r = await manda(a, { idSegnalazione: s, azione: 'passaggio', operatore: 'Rosario Incarbone', passaA: 'Enzo Santovito',
     foto: [{ nome: 'x1', contenutoBase64: JPEG }, { nome: 'x2', contenutoBase64: JPEG }, { nome: 'x3', contenutoBase64: JPEG }] });
-  assert.deepEqual([r.stato, r.corpo.esito], [409, 'troppe_foto'], '1 + 3 > 3');
+  assert.deepEqual([r.stato, r.corpo.esito], [200, 'ok'], '1 + 3 foto: niente più limite per segnalazione');
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 4);
+  assert.equal(a.segnalazioni.get(1).ToccaA, 'Enzo Santovito');
 
   r = await manda(a, { idSegnalazione: s, azione: 'chiusura', operatore: 'Rosario Incarbone', testo: 'Sifone sostituito' });
   assert.equal(r.stato, 200);
@@ -117,7 +121,7 @@ test('il giro intero: apre con foto, passa, chiude, non si passa una chiusa, ria
   assert.deepEqual([a.segnalazioni.get(1).Stato, a.segnalazioni.get(1).ToccaA, a.segnalazioni.get(1).ChiusaDa], ['Aperta', 'Rosario Incarbone', null]);
   r = await manda(a, { idSegnalazione: s, azione: 'riapertura', operatore: 'Paolo Sanzarello' });
   assert.deepEqual([r.stato, r.corpo.esito], [409, 'gia_aperta']);
-  assert.deepEqual(a.interventi.map(i => i.Azione), ['apertura', 'passaggio', 'chiusura', 'riapertura']);
+  assert.deepEqual(a.interventi.map(i => i.Azione), ['apertura', 'passaggio', 'passaggio', 'chiusura', 'riapertura']);
 });
 
 test('lo stesso invio due volte → gia_presente, niente di nuovo', async () => {
@@ -202,6 +206,180 @@ test('elenco: le aperte e le chiuse da meno di 30 giorni, coi campi per l\'app; 
   assert.equal(r.corpo.interventi[0].data, '20261120151117');
   assert.equal((await leggi({ token: 'no' }, a, { token: TOKEN })).stato, 401);
   assert.equal((await leggi({ token: TOKEN, idSegnalazione: "x' or 1 eq 1" }, a, { token: TOKEN })).stato, 400);
+});
+
+// --- Foto singole (0.44.0) -----------------------------------------------------
+// Una foto: azione `foto`, operatore e data del passo, idPasso, una foto sola.
+function fotoDi(passoBase, campi = {}) {
+  // Come l'app: un idClient a forma di UUID, che è anche il nome dell'allegato.
+  const idClient = crypto.randomUUID();
+  return {
+    token: TOKEN, azione: 'foto', idClient, idSegnalazione: passoBase.idSegnalazione, idPasso: passoBase.idClient,
+    operatore: passoBase.operatore, dataIntervento: passoBase.dataIntervento,
+    idDispositivo: 'dispositivo-1', versioneApp: '0.44.0',
+    foto: [{ nome: idClient, contenutoBase64: JPEG }], ...campi,
+  };
+}
+
+test('foto: una richiesta, una foto — allegato, NumeroFoto + 1, riga foto; la segnalazione non cambia altro', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-0001', passaA: 'Enzo Santovito', testo: 'perde', dataIntervento: '2026-11-21T09:10:11+01:00' });
+  assert.equal((await riceviPasso(apertura, a, { token: TOKEN })).corpo.esito, 'ok');
+  const prima = { ...a.segnalazioni.get(1) };
+  const f = fotoDi(apertura, { dataIntervento: apertura.dataIntervento });
+  const r = await riceviPasso(f, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito, r.corpo.azione, r.corpo.numeroFoto], [200, 'ok', 'foto', 1]);
+  const dopo = a.segnalazioni.get(1);
+  assert.equal(dopo.NumeroFoto, 1);
+  for (const campo of ['Stato', 'ToccaA', 'UltimaNota', 'UltimoOperatore', 'IdClient', 'UltimoIntervento']) {
+    assert.equal(dopo[campo], prima[campo], `${campo} non cambia`);
+  }
+  assert.deepEqual([...a.allegati.get(1).keys()], [`${f.idClient}.jpg`], 'col nome che manda l\'app');
+  const riga = a.interventi.at(-1);
+  assert.deepEqual(
+    [riga.Azione, riga.Operatore, riga.DataIntervento, riga.IdClient, riga.NumeroFoto, riga.Testo, riga.RigaSegnalazione],
+    ['foto', 'Paolo Sanzarello', '20261121091011', f.idClient, 1, apertura.idClient, 1],
+  );
+});
+
+test('foto: chiunque abbia il codice, anche su una chiusa; doppione → gia_presente', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-0002' });
+  await riceviPasso(apertura, a, { token: TOKEN });
+  const chiusura = passo({ idSegnalazione: 'seg-foto-0002', azione: 'chiusura', operatore: 'Giovanni Lippolis' });
+  assert.equal((await riceviPasso(chiusura, a, { token: TOKEN })).stato, 200);
+  const f = fotoDi(chiusura);
+  let r = await riceviPasso(f, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [200, 'ok'], 'foto di una chiusura, dopo la chiusura, da uno che non apre');
+  assert.equal(a.segnalazioni.get(1).Stato, 'Chiusa');
+  r = await riceviPasso(f, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [200, 'gia_presente']);
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1, 'il doppione non conta');
+  assert.equal(a.allegati.get(1).size, 1);
+  assert.equal(a.interventi.filter(i => i.Azione === 'foto').length, 1);
+});
+
+test('foto: segnalazione che non c\'è → 409 sconosciuta; zero, due foto o senza idPasso → 400', async () => {
+  const a = creaMemoria();
+  const base = passo({ idSegnalazione: 'seg-foto-mai' });
+  let r = await riceviPasso(fotoDi(base), a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [409, 'segnalazione_sconosciuta']);
+  assert.equal(a.interventi.length, 0);
+  for (const [campi, campo] of [
+    [{ foto: [] }, 'foto'],
+    [{ foto: [{ nome: 'f1', contenutoBase64: JPEG }, { nome: 'f2', contenutoBase64: JPEG }] }, 'foto'],
+    [{ foto: undefined }, 'foto'],
+    [{ idPasso: '' }, 'idPasso'],
+    [{ idPasso: "x' or 1 eq 1" }, 'idPasso'],
+  ]) {
+    r = await riceviPasso(fotoDi(base, campi), a, { token: TOKEN });
+    assert.deepEqual([r.stato, r.corpo.campo], [400, campo], JSON.stringify(Object.keys(campi)));
+  }
+  assert.equal((await riceviPasso(fotoDi(base, { token: 'altro' }), a, { token: TOKEN })).stato, 401);
+});
+
+test('foto: ripresa dopo un guasto a metà — niente secondo allegato e niente doppio conteggio', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-0003' });
+  await riceviPasso(apertura, a, { token: TOKEN });
+  // Allegato caricato, intervento non scritto.
+  const f = fotoDi(apertura);
+  a.stato.guasto = 'creaIntervento';
+  let r = await riceviPasso(f, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [500, 'errore_scrittura_intervento']);
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1);
+  r = await riceviPasso(f, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [200, 'ok']);
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1, 'contata una volta');
+  assert.equal(a.allegati.get(1).size, 1, 'un allegato solo');
+  // Allegato caricato, NumeroFoto non aggiornato.
+  const g = fotoDi(apertura);
+  a.stato.guasto = 'aggiornaSegnalazione';
+  r = await riceviPasso(g, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [500, 'errore_scrittura_segnalazione']);
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1);
+  r = await riceviPasso(g, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito, r.corpo.numeroFoto], [200, 'ok', 2], 'la ripresa recupera il conteggio');
+  assert.equal(a.allegati.get(1).size, 2);
+  // Allegato non caricato: la ripresa lo carica.
+  const h = fotoDi(apertura);
+  a.stato.guasto = 'aggiungiFoto';
+  r = await riceviPasso(h, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [500, 'errore_scrittura_foto']);
+  r = await riceviPasso(h, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.numeroFoto], [200, 3]);
+  assert.equal(a.interventi.filter(i => i.Azione === 'foto').length, 3);
+});
+
+test('foto: un allegato aggiunto a mano dalla lista non entra in NumeroFoto', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-mano' });
+  await riceviPasso(apertura, a, { token: TOKEN });
+  await a.aggiungiFoto(1, 'IMG_1234.jpg', Buffer.from([1]));
+  await a.aggiungiFoto(1, 'verbale.pdf', Buffer.from([2]));
+  const r = await riceviPasso(fotoDi(apertura), a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.numeroFoto], [200, 1], 'una foto dell\'app, non tre allegati');
+  assert.equal(a.segnalazioni.get(1).NumeroFoto, 1);
+  assert.equal(a.allegati.get(1).size, 3, 'gli allegati a mano restano dove sono');
+});
+
+test('foto: una foto non sporca la ripresa di un passo (IdClient della segnalazione intatto)', async () => {
+  const a = creaMemoria();
+  const apertura = passo({ idSegnalazione: 'seg-foto-0004' });
+  await riceviPasso(apertura, a, { token: TOKEN });
+  const chiusura = passo({ idSegnalazione: 'seg-foto-0004', azione: 'chiusura' });
+  a.stato.guasto = 'creaIntervento';
+  assert.equal((await riceviPasso(chiusura, a, { token: TOKEN })).stato, 500);
+  // Nel frattempo arriva la foto di quella chiusura.
+  assert.equal((await riceviPasso(fotoDi(chiusura), a, { token: TOKEN })).stato, 200);
+  const r = await riceviPasso(chiusura, a, { token: TOKEN });
+  assert.deepEqual([r.stato, r.corpo.esito], [200, 'ok'], 'non «già chiusa»');
+});
+
+test('foto: un giro con 12 foto su una segnalazione, in tre passi', async () => {
+  const a = creaMemoria();
+  const s = 'seg-foto-dodici';
+  const passi = [
+    passo({ idSegnalazione: s, passaA: 'Enzo Santovito' }),
+    passo({ idSegnalazione: s, azione: 'passaggio', operatore: 'Enzo Santovito', passaA: 'Rosario Incarbone' }),
+    passo({ idSegnalazione: s, azione: 'chiusura', operatore: 'Rosario Incarbone' }),
+  ];
+  const quante = [5, 4, 3];
+  for (let i = 0; i < passi.length; i += 1) {
+    assert.equal((await riceviPasso(passi[i], a, { token: TOKEN })).corpo.esito, 'ok');
+    for (let n = 0; n < quante[i]; n += 1) {
+      const r = await riceviPasso(fotoDi(passi[i]), a, { token: TOKEN });
+      assert.equal(r.corpo.esito, 'ok');
+    }
+  }
+  const seg = a.segnalazioni.get(1);
+  assert.equal(seg.NumeroFoto, 12);
+  assert.equal(a.allegati.get(1).size, 12);
+  assert.equal(seg.Stato, 'Chiusa');
+  const righe = a.interventi.filter(i => i.Azione === 'foto');
+  assert.equal(righe.length, 12);
+  assert.deepEqual(quante, passi.map(p => righe.filter(i => i.Testo === p.idClient).length), 'ogni foto col suo passo');
+  // La storia: le foto escono con idPasso e senza testo; i passi con idClient.
+  const storia = (await leggi({ token: TOKEN, idSegnalazione: s }, a, { token: TOKEN })).corpo.interventi;
+  assert.equal(storia.length, 15);
+  const fotoStoria = storia.filter(i => i.azione === 'foto');
+  assert.ok(fotoStoria.every(i => i.testo === '' && i.idPasso && i.numeroFoto === 1));
+  assert.deepEqual(storia.filter(i => i.azione !== 'foto').map(i => i.idClient), passi.map(p => p.idClient));
+  assert.ok(storia.filter(i => i.azione !== 'foto').every(i => i.idPasso === ''));
+});
+
+test('passi dei telefoni 0.43.x: fino a 3 foto accettate, 4 rifiutate; le foto non entrano nel limite', async () => {
+  const a = creaMemoria();
+  const s = 'seg-vecchia-01';
+  const tre = [1, 2, 3].map(n => ({ nome: `abcdefgh-${n}`, contenutoBase64: JPEG }));
+  let r = await manda(a, { idSegnalazione: s, versioneApp: '0.43.1', foto: tre });
+  assert.deepEqual([r.stato, a.segnalazioni.get(1).NumeroFoto], [200, 3]);
+  r = await manda(a, { idSegnalazione: s, azione: 'passaggio', passaA: 'Enzo Santovito', versioneApp: '0.43.1',
+    foto: [1, 2, 3, 4].map(n => ({ nome: `ijklmnop-${n}`, contenutoBase64: JPEG })) });
+  assert.deepEqual([r.stato, r.corpo.campo], [400, 'foto']);
+  r = await manda(a, { idSegnalazione: s, azione: 'passaggio', passaA: 'Enzo Santovito', versioneApp: '0.43.1',
+    foto: [1, 2, 3].map(n => ({ nome: `ijklmnop-${n}`, contenutoBase64: JPEG })) });
+  assert.deepEqual([r.stato, a.segnalazioni.get(1).NumeroFoto], [200, 6], '3 + 3: oltre il vecchio limite di 3');
 });
 
 test('cifre14', () => {
