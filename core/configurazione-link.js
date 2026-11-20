@@ -40,11 +40,17 @@ export function configurazioneTrasferibile(descrittore) {
     salva,                 // (dati) => salva le impostazioni del modulo
     normalizzaEndpoint,    // (url) => url con api-version corretta
     extraDaSalvare = {},   // campi da forzare all'applicazione del link
+    // Il nome del campo di un SECONDO indirizzo, per un modulo che parla con
+    // due flow (Segnalazioni, dalla 0.43.0: uno riceve, uno restituisce
+    // l'elenco). Viaggia nel parametro `l`. Foto e Bolle non lo dichiarano, e
+    // per loro link e schermate restano esattamente come prima.
+    secondoEndpoint = '',
   } = descrittore;
 
   function linkConfigurazione(correnti) {
     const base = `${location.origin}${location.pathname}`;
-    return `${base}${rotta}/configura?e=${inBase64Url(correnti.endpoint)}&t=${inBase64Url(correnti.token)}`;
+    const secondo = secondoEndpoint ? `&l=${inBase64Url(correnti[secondoEndpoint] || '')}` : '';
+    return `${base}${rotta}/configura?e=${inBase64Url(correnti.endpoint)}&t=${inBase64Url(correnti.token)}${secondo}`;
   }
 
   // --- Ricezione: applica la configurazione arrivata dal link ---------------
@@ -52,14 +58,18 @@ export function configurazioneTrasferibile(descrittore) {
   function vistaConfigura(el, _sotto, parametri) {
     let endpoint = '';
     let token = '';
+    let secondo = '';
     try {
       endpoint = normalizzaEndpoint(daBase64Url(parametri.get('e') || ''));
       token = daBase64Url(parametri.get('t') || '');
+      if (secondoEndpoint) secondo = normalizzaEndpoint(daBase64Url(parametri.get('l') || ''));
     } catch {
       endpoint = '';
     }
 
-    if (!endpoint || !token) {
+    // Un link a cui manca il secondo indirizzo configurerebbe un telefono a
+    // metà: manda, ma non vede niente. Meglio dirlo subito.
+    if (!endpoint || !token || (secondoEndpoint && !secondo)) {
       el.innerHTML = `
         <section class="scheda">
           <h2>Configurazione non valida</h2>
@@ -98,7 +108,7 @@ export function configurazioneTrasferibile(descrittore) {
     `;
 
     el.querySelector('#applica').addEventListener('click', () => {
-      salva({ endpoint, token, ...extraDaSalvare });
+      salva({ endpoint, token, ...(secondoEndpoint ? { [secondoEndpoint]: secondo } : {}), ...extraDaSalvare });
       // Il link non deve restare nell'indirizzo né nella cronologia del browser.
       pulisciParametri();
       el.innerHTML = `
@@ -115,7 +125,7 @@ export function configurazioneTrasferibile(descrittore) {
 
   async function vistaCondividi(el) {
     const correnti = impostazioni();
-    if (!correnti.endpoint) {
+    if (!correnti.endpoint || (secondoEndpoint && !correnti[secondoEndpoint])) {
       el.innerHTML = `
         <section class="scheda">
           <h2>Niente da condividere</h2>

@@ -215,6 +215,20 @@ Misure **sul flow vero** (10/09/2026, telefono reale): avanzamento 1,49 MB → ~
 
 Specifica completa e requisiti del flow: `docs/AppFotoCantiereSpecifica….md` (la revisione corrente è in testa al file). Quello che è stato **misurato sul tenant** sta in `docs/FotoCantiereBriefingRicevente.md`, e dove i due divergono **fa fede il briefing**. Il lavoro a valle — come le foto d'archivio arrivano dalla raccolta alle cartelle di commessa sul server — ha un runbook che **non sta in questo repo**: vive su `L:` accanto al file di conoscenza di progetto, perché nomina percorsi del server interno e qui verrebbe pubblicato su GitHub Pages. Si esegue in Cowork, il venerdì. **Punto aperto:** l'apertura della sessione di caricamento a blocchi.
 
+## Modulo «Segnalazioni» (dalla 0.43.0)
+
+I problemi negli alloggi e nelle parti comuni, dal primo che li vede a chi li risolve. Nasce dalla riunione del 26/10/2026 fra Francesco e Paolo e dalle otto decisioni di Francesco del 20/11/2026.
+
+- **Chi apre:** Paolo, Domenico, Rosario, Enzo e Andrea Gondos. I clienti no. Per gli altri nomi la tessera non offre «Nuova segnalazione», e il flow rifiuta comunque (403).
+- **Cosa si scrive:** cantiere, alloggio o parte comune (dall'anagrafica che l'app ha già; per una commessa senza anagrafica si scrive a parole), un testo libero e fino a **3 foto** per segnalazione. Il testo si può **dettare** («Detta», riconoscimento vocale del browser): compare mentre si parla e si corregge prima di mandare; **l'audio non si conserva**. Dove il riconoscimento non c'è resta il microfono della tastiera. Le foto qui sono ricodificate in JPEG a 1600 px: servono a capire il problema, l'archivio resta compito del modulo Foto.
+- **Niente fase né attività:** le propone l'IA nel giro serale delle 20:00 sul PC dell'ufficio, Francesco le rivede, e il giro dopo le rende definitive insieme a «a carico di: noi / cliente / altri».
+- **Poi:** chi l'ha in mano la **chiude** («Risolto, chiudi») o la **passa** («Ho fatto la mia parte, deve passare…»). Paolo e Francesco possono agire su tutte e **riaprire** quelle chiuse.
+- **«Tocca a te» in cima all'app:** chi deve intervenire la vede appena apre l'app, sopra le tessere. Niente mail, niente Teams. È il primo modulo che **legge** dal server: alla home si chiede l'elenco al flow `SegnalazioniElenco` (al massimo una volta al minuto), e senza rete resta l'ultimo letto, con la sua ora. Un passo appena fatto si applica subito alla copia del telefono: una segnalazione passata sparisce dalla home di chi l'ha passata senza aspettare il server.
+- **Due flow, un token:** `SegnalazioniRicevitore` riceve i passi (apertura, passaggio, chiusura, riapertura), `SegnalazioniElenco` restituisce l'elenco e la storia di una segnalazione. Il QR del modulo porta **tutti e due gli indirizzi** (`core/configurazione-link.js`, campo `secondoEndpoint`): un link senza il secondo si rifiuta.
+- **Coda:** come Foto e Bolle, ogni passo esce dalla coda solo a conferma del server e riparte da solo. Un rifiuto che non cambia ritentando — «già chiusa», «già aperta», «troppe foto», «nome non ammesso» — non resta in errore per sempre: va fra i **«Non registrati»** con la sua frase.
+
+Il contratto esatto e i passi dei due flow stanno nel testo preparato per Francesco il 20/11/2026, fuori da questo repo (nomina il sito e le liste).
+
 ## Collaudi
 
 Le prove automatiche stanno in `collaudi/`: guidano l'app da un browser vero, come farebbe un telefono, e **dicono i numeri** invece di limitarsi a passare.
@@ -227,7 +241,7 @@ node collaudi/esegui.js                          # tutti, esce 1 se qualcosa non
 
 Playwright è una dipendenza di **sviluppo**: l'app resta senza dipendenze e senza build step. Le foto di prova si generano, non si committano.
 
-Ventotto collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, otto commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria**, **cantiere senza memoria**, **riservatezza**, **palazzina e parti comuni**, **contatori in fondo e avviso in cima**, **scorrimento fra le bolle inviate**, **Rimanda di una bolla che non perde la fase**, **cantiere o fase da correggere nelle bolle inviate** e **foto HEIC dalla galleria** (0.42.0).
+Ventinove collaudi: senza rete, versione in uso, pagina Informazioni, memoria piena, continuità delle bolle, bolle su più pagine, contratto di invio delle foto, errori del flow, elenco chiuso degli operatori, ora dello scatto, obiettivo e comandi della fotocamera in-app, fase di lavoro e barra dei comandi, gerarchia visiva, otto commesse, livelli dell'archivio, Rimanda, invii interrotti, JPEG riconosciuto dai byte, lettura negata dal telefono, **fase senza memoria**, **cantiere senza memoria**, **riservatezza**, **palazzina e parti comuni**, **contatori in fondo e avviso in cima**, **scorrimento fra le bolle inviate**, **Rimanda di una bolla che non perde la fase**, **cantiere o fase da correggere nelle bolle inviate** **foto HEIC dalla galleria** (0.42.0) e **segnalazioni** (0.43.0).
 
 Due leve, dal 26/10/2026, per riprodurre a comando i rossi che compaiono solo quando tutto è più lento: `node collaudi/esegui.js --cpu=4` rallenta quattro volte la CPU del browser di prova, `--ritardo-letture=300` consegna all'app con 300 ms di ritardo le letture della coda. L'app non si tocca; le leve usate si leggono in testa all'uscita.
 
@@ -283,6 +297,8 @@ core/configurazione-link.js  link e QR che configurano un altro telefono, condiv
 core/versione.js      versione in uso, letta dalla cache attiva del service worker
 modules/bolle/        modulo Bolle: vista, coda IndexedDB, compressione, invio, impostazioni
 modules/foto/         modulo Foto cantiere: due categorie, coda propria, invio
+modules/segnalazioni/ modulo Segnalazioni (0.43.0): apre, passa, chiude, riapre;
+                      «Tocca a te» in cima alla home (inCima), dettatura, due flow
 collaudi/             prove automatiche su browser vero (node collaudi/esegui.js)
 collaudi/riservatezza.js  controllo di riservatezza (vedi sopra), senza browser
 .githooks/pre-commit  lo stesso controllo prima del commit (git config core.hooksPath .githooks)
