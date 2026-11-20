@@ -75,7 +75,7 @@ export function payloadIncompleto(d) {
 
 // --- Ricevitore: apertura, passaggio, chiusura, riapertura ------------------
 
-export async function riceviPasso(d, archivio, { token }) {
+export async function riceviPasso(d, archivio, { token, registra = () => {} }) {
   if (!d || !tokenValido(token, d.token)) return risposta(401, { esito: 'token_non_valido' });
   const manca = payloadIncompleto(d);
   if (manca) return risposta(400, { esito: 'payload_incompleto', campo: manca });
@@ -89,7 +89,8 @@ export async function riceviPasso(d, archivio, { token }) {
     gia = await archivio.cercaIntervento(d.idClient);
     if (gia) return risposta(200, { esito: 'gia_presente', idClient: d.idClient });
     seg = await archivio.cercaSegnalazione(d.idSegnalazione);
-  } catch {
+  } catch (e) {
+    registra('lettura', e);
     return risposta(500, { esito: 'errore_lettura' });
   }
 
@@ -153,7 +154,8 @@ export async function riceviPasso(d, archivio, { token }) {
       }
       // apertura ripresa: la segnalazione c'è già, si va avanti senza crearne un'altra.
     }
-  } catch {
+  } catch (e) {
+    registra('scrittura_segnalazione', e);
     return risposta(500, { esito: 'errore_scrittura_segnalazione' });
   }
 
@@ -166,7 +168,8 @@ export async function riceviPasso(d, archivio, { token }) {
       if (presenti.has(nome)) continue;
       await archivio.aggiungiFoto(id, nome, Buffer.from(f.contenutoBase64, 'base64'));
     }
-  } catch {
+  } catch (e) {
+    registra('scrittura_foto', e);
     return risposta(500, { esito: 'errore_scrittura_foto' });
   }
 
@@ -187,7 +190,8 @@ export async function riceviPasso(d, archivio, { token }) {
       IdDispositivo: testo(d.idDispositivo, 255),
       VersioneApp: testo(d.versioneApp, 255),
     });
-  } catch {
+  } catch (e) {
+    registra('scrittura_intervento', e);
     return risposta(500, { esito: 'errore_scrittura_intervento' });
   }
   return risposta(200, { esito: 'ok', idSegnalazione: d.idSegnalazione, id, azione: d.azione });
@@ -218,7 +222,7 @@ export function perApp(s) {
   };
 }
 
-export async function leggi(d, archivio, { token, ora = new Date() }) {
+export async function leggi(d, archivio, { token, ora = new Date(), registra = () => {} }) {
   if (!d || !tokenValido(token, d.token)) return risposta(401, { esito: 'token_non_valido' });
   try {
     if (d.idSegnalazione) {
@@ -237,7 +241,8 @@ export async function leggi(d, archivio, { token, ora = new Date() }) {
     const dal = new Date(ora.getTime() - GIORNI_CHIUSE * 86400000);
     const segnalazioni = await archivio.elenco(dal);
     return risposta(200, { esito: 'ok', modalita: 'elenco', segnalazioni: segnalazioni.map(perApp) });
-  } catch {
+  } catch (e) {
+    registra('lettura_elenco', e);
     return risposta(500, { esito: 'errore_lettura_elenco' });
   }
 }

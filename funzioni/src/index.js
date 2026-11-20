@@ -34,8 +34,11 @@ app.http('segnalazioni', {
   route: 'segnalazioni',
   handler: async (richiesta, contesto) => {
     const dati = await corpoJson(richiesta);
-    const esito = await riceviPasso(dati, archivioVero(), { token: process.env.TOKEN_SEGNALAZIONI });
-    if (esito.stato >= 500) contesto.error(`segnalazioni: ${esito.corpo.esito}`);
+    const esito = await riceviPasso(dati, archivioVero(), {
+      token: process.env.TOKEN_SEGNALAZIONI,
+      // La causa vera (per esempio «SharePoint GET 403») va nel log, non nella risposta.
+      registra: (passo, e) => contesto.error(`segnalazioni ${passo}: ${e && e.message}`),
+    });
     return { status: esito.stato, jsonBody: esito.corpo };
   },
 });
@@ -46,8 +49,10 @@ app.http('segnalazioni-elenco', {
   route: 'segnalazioni-elenco',
   handler: async (richiesta, contesto) => {
     const dati = await corpoJson(richiesta);
-    const esito = await leggi(dati, archivioVero(), { token: process.env.TOKEN_SEGNALAZIONI });
-    if (esito.stato >= 500) contesto.error(`segnalazioni-elenco: ${esito.corpo.esito}`);
+    const esito = await leggi(dati, archivioVero(), {
+      token: process.env.TOKEN_SEGNALAZIONI,
+      registra: (passo, e) => contesto.error(`segnalazioni-elenco ${passo}: ${e && e.message}`),
+    });
     return { status: esito.stato, jsonBody: esito.corpo };
   },
 });
