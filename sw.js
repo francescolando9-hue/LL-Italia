@@ -2,8 +2,18 @@
 // Da cambiare a ogni rilascio INSIEME a VERSIONE_CODICE in core/versione.js:
 // quella dice cosa sta girando, questa cosa è installato, e l'app avvisa
 // quando non coincidono.
-const VERSIONE = '0.44.0';
+const VERSIONE = '0.45.0';
 const CACHE = `llitalia-${VERSIONE}`;
+// Il decodificatore HEIC (circa 2 MB, `core/vendor/libheif/`) sta in una cache a
+// parte, col numero della SUA versione e non quello dell'app: non si riscarica a
+// ogni rilascio, e non c'entra con il precache «tutto o niente» di qui sopra.
+// Il nome NON comincia con `llitalia-`, così chi cerca la cache dell'app non
+// trova questa. **Si riempie solo alla prima richiesta** (la prima foto HEIC che
+// il browser non disegna da sé): l'installazione non la scarica, perché sono 2 MB
+// che la maggior parte degli operatori non userebbe mai, e un download lento non
+// deve tenere fermo l'aggiornamento dell'app.
+const CACHE_HEIC = 'libreria-heic-1.23.5';
+const PERCORSO_HEIC = '/core/vendor/libheif/';
 const RISORSE = [
   './',
   './index.html',
@@ -24,6 +34,7 @@ const RISORSE = [
   './core/orario.js',
   './core/exif.js',
   './core/byte.js',
+  './core/heic.js',
   './core/fasi.js',
   './core/anagrafica.js',
   './core/coda-invio.js',
@@ -93,7 +104,9 @@ function riempi(cache) {
 self.addEventListener('activate', evento => {
   evento.waitUntil(
     caches.keys()
-      .then(chiavi => Promise.all(chiavi.filter(c => c !== CACHE).map(c => caches.delete(c))))
+      .then(chiavi => Promise.all(chiavi
+        .filter(c => (c.startsWith('llitalia-') && c !== CACHE) || (c.startsWith('libreria-heic-') && c !== CACHE_HEIC))
+        .map(c => caches.delete(c))))
       .then(() => self.clients.claim())
   );
 });
@@ -102,6 +115,20 @@ self.addEventListener('fetch', evento => {
   const { request } = evento;
   if (request.method !== 'GET') return;
   if (new URL(request.url).origin !== self.location.origin) return;
+  if (new URL(request.url).pathname.includes(PERCORSO_HEIC)) {
+    evento.respondWith(caches.open(CACHE_HEIC).then(async cache => {
+      const inCache = await cache.match(request, { ignoreSearch: true });
+      if (inCache) return inCache;
+      try {
+        const risposta = await fetch(request);
+        if (risposta.ok) await cache.put(request.url.split('?')[0], risposta.clone());
+        return risposta;
+      } catch {
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
+      }
+    }));
+    return;
+  }
   // Si guarda SOLO nella cache di questa versione, non in tutte: durante un
   // aggiornamento le cache coesistono per qualche istante, e `caches.match`
   // senza nome le percorre tutte — poteva quindi servire alla pagina un file

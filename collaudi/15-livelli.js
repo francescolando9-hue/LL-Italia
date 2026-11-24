@@ -145,8 +145,8 @@ module.exports = {
     // `VERSIONE_MASTER` e `IMPRONTA_MASTER`, l'impronta calcolata dal file
     // del master e non dall'app — altrimenti il controllo confronterebbe
     // l'app con se stessa.
-    const VERSIONE_MASTER = '202611202113';
-    const IMPRONTA_MASTER = '3316cd9d6fc2ae6980724d41708d8c2ed691ae4961a9e67cabfbb48f57af6c3e';
+    const VERSIONE_MASTER = '202611241225';
+    const IMPRONTA_MASTER = '1f6be01ce1701d4589a45ea0d01dc7e8c4d835247b1d684109c0292ab3d25645';
     registro.titolo('L’anagrafica è la copia esatta del master');
     const copia = await pagina.evaluate(async () => {
       const ana = await import('./core/anagrafica.js');
@@ -301,8 +301,11 @@ module.exports = {
     registro.controlla('nessuna unità sul Tetto',
       Object.values(numeri.edifici).every(e => e.unitaSulTetto === 0),
       'il Tetto è un piano a sé, non una parte comune e non un alloggio');
-    registro.controlla('unità invariate: MAR 15, MNG 16, SNZ2.2 51',
-      numeri.edifici.MAR.unita === 15 && numeri.edifici.MNG.unita === 16 && numeri.edifici['SNZ2.2'].unita === 51);
+    // SNZ2.2: dalla 0.45.0 (master 202611241225) 49 alloggi (erano 51): il piano 0 ha
+    // 0A, 0C e 0D (non più 0A, 0B e 0C) e il 12 ha 12A e 12B (non più anche 12C e 12D).
+    registro.controlla('unità: MAR 15, MNG 16, SNZ2.2 49 (master 202611241225)',
+      numeri.edifici.MAR.unita === 15 && numeri.edifici.MNG.unita === 16 && numeri.edifici['SNZ2.2'].unita === 49,
+      `SNZ2.2 ${numeri.edifici['SNZ2.2'].unita}`);
     // Anagrafica decisa da Francesco il 20/11/2026 (Excel del 20/11 alle 20:56):
     // 117 unità, 52 + 65.
     registro.controlla('unità nuove: SNZ2.1 52, MRS 65',
@@ -509,7 +512,8 @@ module.exports = {
     const pianiMurature = await voci('#piano');
     registro.dice('SINT1 con due piani, Murature: piani offerti', pianiMurature.join(' '));
     registro.controlla('Murature offre anche P0, quindi la prova può fallire',
-      pianiMurature.includes('P0') && pianiMurature.length === 2);
+      pianiMurature.includes('P0') && pianiMurature.length === 3 && pianiMurature.at(-1) === 'Tutti',
+      'due piani e, dalla 0.45.0, «Tutti i piani» in fondo');
     registro.controlla('il menù torna a vedersi', await visibile('#piano') && !(await visibile('#unico-piano')));
     registro.controlla('e parte dal segnaposto, NON da P0',
       (await pagina.$eval('#piano', e => e.value)) === '',
@@ -543,8 +547,8 @@ module.exports = {
     await scegliFase('FognaturaNera');
     const pianiFognatura = await voci('#piano');
     registro.dice('MNG, FognaturaNera: piani offerti', pianiFognatura.join(' '));
-    registro.controlla('Fognatura nera chiede il piano, e sono i 12 di MNG',
-      pianiFognatura.length === 12 && await visibile('#piano') && !(await visibile('#unico-piano')),
+    registro.controlla('Fognatura nera chiede il piano, e sono i 12 di MNG più «Tutti i piani»',
+      pianiFognatura.length === 13 && pianiFognatura.at(-1) === 'Tutti' && await visibile('#piano') && !(await visibile('#unico-piano')),
       `${pianiFognatura.length} voci`);
     registro.controlla('e non chiede unità né prospetto',
       !(await visibile('#campo-unita')) && !(await visibile('#campo-prospetto')));
@@ -571,8 +575,8 @@ module.exports = {
     await scegliFase('FinituraPartiComuniInterne');
     const pianiPC = await voci('#piano');
     registro.dice('SNZ2.2, FinituraPartiComuniInterne: piani offerti', pianiPC.join(' '));
-    registro.controlla('Finitura parti comuni interne offre i 15 piani di SNZ2.2, P-1 compreso',
-      pianiPC.length === 15 && pianiPC.includes('P-1'), `${pianiPC.length} voci`);
+    registro.controlla('Finitura parti comuni interne offre i 15 piani di SNZ2.2, P-1 compreso, più «Tutti i piani»',
+      pianiPC.length === 16 && pianiPC.includes('P-1') && pianiPC.at(-1) === 'Tutti', `${pianiPC.length} voci`);
     registro.controlla('nessuna voce unica: il menù si vede e P-1 non è scelto dall’app',
       await visibile('#piano') && !(await visibile('#unico-piano'))
         && (await pagina.$eval('#piano', e => e.value)) === '',
@@ -612,8 +616,8 @@ module.exports = {
       !(await visibile('#campo-unita')) && !(await visibile('#campo-prospetto')));
     registro.dice('MAR: piani offerti', (await voci('#piano')).join(' '));
     registro.controlla('sono i quattro di MAR, col Tetto in fondo',
-      (await voci('#piano')).join(',') === 'P0,P1,P2,Tetto',
-      'il Tetto è un piano a sé dal 04/10/2026, subito sopra l’ultimo piano');
+      (await voci('#piano')).join(',') === 'P0,P1,P2,Tetto,Tutti',
+      'il Tetto è un piano a sé dal 04/10/2026; «Tutti i piani» sta dopo, dalla 0.45.0');
     await pagina.setInputFiles('#input-galleria', [materiale('scatto-exif.jpg')]);
     await aiuto.attendi(pagina, () => document.querySelectorAll('.foto-anteprima').length === 1, 'anteprima', 90000);
     registro.controlla('con la foto pronta ma senza piano, Invia è spento',
@@ -677,8 +681,8 @@ module.exports = {
     registro.controlla('e il piano resta null', facciata.piano === null);
     await scegliCommessa('#commessa', 'MAR');
     await scegliFase('FinituraFacciata');
-    registro.controlla('i prospetti sono i quattro standard',
-      (await voci('#prospetto')).join(',') === 'Nord,Sud,Est,Ovest');
+    registro.controlla('i prospetti sono i quattro standard, più «Tutti i prospetti»',
+      (await voci('#prospetto')).join(',') === 'Nord,Sud,Est,Ovest,Tutti');
 
     registro.titolo('Fase senza livelli, e commessa senza anagrafica');
     // `SistemazioneEsterna`, entrata il 18/09/2026: fase senza livelli, quindi
@@ -718,9 +722,10 @@ module.exports = {
     await scegliFase('ImpiantoIdrosanitario');
     await pagina.waitForSelector('#unita');
     const unitaMRS = await voci('#unita');
-    registro.controlla('MRS · idrosanitario chiede l’alloggio: 65 unità più le parti comuni',
-      unitaMRS.length === 66 && unitaMRS.includes('3.10B') && unitaMRS.includes('2.0A') && unitaMRS.at(-1) === 'PartiComuni',
-      `${unitaMRS.length} voci, prima ${unitaMRS[0]}, ultima ${unitaMRS.at(-1)}`);
+    registro.controlla('MRS · idrosanitario chiede l’alloggio: 65 unità, le parti comuni e «Tutti gli alloggi»',
+      unitaMRS.length === 67 && unitaMRS.includes('3.10B') && unitaMRS.includes('2.0A')
+        && unitaMRS.at(-2) === 'PartiComuni' && unitaMRS.at(-1) === 'Tutti',
+      `${unitaMRS.length} voci, prima ${unitaMRS[0]}, ultime ${unitaMRS.slice(-2).join(' ')}`);
     const conAnagrafica = await mandaFoto('MRS', 'ImpiantoIdrosanitario', { unita: '2.10B' });
     registro.controlla('l’alloggio 2.10B di MRS parte col piano P10 ricavato dalla mappa (non P1)',
       conAnagrafica.unita === '2.10B' && conAnagrafica.piano === 'P10' && conAnagrafica.scala === null,
@@ -731,8 +736,9 @@ module.exports = {
     await scegliFase('ImpiantoElettricoAlloggi');
     await pagina.waitForSelector('#unita');
     const unitaSNZ21 = await voci('#unita');
-    registro.controlla('SNZ2.1 · elettrico alloggi chiede l’alloggio: 52 unità, senza parti comuni (fase gemella)',
-      unitaSNZ21.length === 52 && unitaSNZ21.includes('1.01') && unitaSNZ21.includes('2.11B') && !unitaSNZ21.includes('PartiComuni'),
+    registro.controlla('SNZ2.1 · elettrico alloggi chiede l’alloggio: 52 unità e «Tutti gli alloggi», senza parti comuni (fase gemella)',
+      unitaSNZ21.length === 53 && unitaSNZ21.includes('1.01') && unitaSNZ21.includes('2.11B') && !unitaSNZ21.includes('PartiComuni')
+        && unitaSNZ21.at(-1) === 'Tutti',
       `${unitaSNZ21.length} voci`);
 
     registro.titolo('Nel modulo Bolle il lotto sì, i livelli NO');
@@ -795,10 +801,11 @@ module.exports = {
       await scegliCommessa('#commessa', commessa);
       await scegliFase('Strutture');
       const piani = await voci('#piano');
-      const ultimaVoce = await pagina.$$eval('#piano option', o => o[o.length - 1].textContent.trim());
+      const penultimaVoce = await pagina.$$eval('#piano option', o => o[o.length - 2].textContent.trim());
       registro.dice(`${commessa}, Strutture: piani offerti`, piani.join(' '));
-      registro.controlla(`${commessa}: il Tetto è l’ultima voce del menù dei piani`,
-        piani[piani.length - 1] === 'Tetto' && ultimaVoce === 'Tetto', ultimaVoce);
+      // Dalla 0.45.0 dopo il Tetto c'è «Tutti i piani»: il Tetto è l'ultimo PIANO.
+      registro.controlla(`${commessa}: il Tetto è l’ultimo dei piani, e dopo c’è solo «Tutti i piani»`,
+        piani.at(-2) === 'Tetto' && piani.at(-1) === 'Tutti' && penultimaVoce === 'Tetto', penultimaVoce);
     }
     await scegliCommessa('#commessa', 'SNZ2.2');
     await scegliFase('FinituraAlloggi');
@@ -806,8 +813,8 @@ module.exports = {
     const valoriUnita = await voci('#unita');
     registro.dice('SNZ2.2, FinituraAlloggi: gruppi del menù delle unità', gruppi.join(' · '));
     registro.controlla('fra le unità il Tetto non c’è, né come gruppo né come voce',
-      !gruppi.includes('Tetto') && !valoriUnita.includes('Tetto') && valoriUnita.length === 51,
-      `${valoriUnita.length} unità — il Tetto non ha unità, e una fase che chiede l’unità non lo offre`);
+      !gruppi.includes('Tetto') && !valoriUnita.includes('Tetto') && valoriUnita.length === 50,
+      `${valoriUnita.length} voci (49 alloggi e «Tutti») — il Tetto non ha unità, e una fase che chiede l’unità non lo offre`);
 
     // **Un Lotto4 rimasto in memoria** (punto 4 della 0.37.8). L'app ricorda
     // l'ultima fase scelta, una per modulo (`ultimaFase` in `llitalia.foto` e

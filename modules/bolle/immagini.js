@@ -1,6 +1,9 @@
 // Compressione client-side delle foto: JPEG, lato lungo max ~2500 px, qualità ~0,85.
 // La leggibilità della bolla per l'OCR del runbook prevale sul peso (da specifica).
 
+import { eHeic } from '../../core/exif.js';
+import { decodificaHeic } from '../../core/heic.js';
+
 const LATO_MAX = 2500;
 const QUALITA = 0.85;
 // Miniatura conservata nello storico: deve bastare a riconoscere la bolla
@@ -49,11 +52,28 @@ async function ridimensiona(file, latoMax, qualita) {
 // Decodifica via canvas: copre anche i formati che il browser sa leggere ma non
 // inviare (es. HEIC su Safari). Se il dispositivo non decodifica il formato,
 // l'errore arriva all'utente e la foto non viene accodata.
+//
+// **HEIC** (dalla 0.45.0): dove il browser non lo disegna (Chrome per Android)
+// lo si decodifica con libheif (`core/heic.js`, caricato solo qui) e si prosegue
+// col canvas ottenuto; a valle viaggia sempre e solo il JPEG. L'immagine
+// decodificata si tiene per file: leggibilità, bolla e miniatura sono tre
+// passaggi sullo stesso file, e una decodifica HEIC non è gratis.
+const heicDecodificati = new WeakMap();
+
 async function decodifica(file) {
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     // Fallback per browser senza createImageBitmap o senza supporto al formato.
+  }
+  if (await eHeic(file)) {
+    if (!heicDecodificati.has(file)) heicDecodificati.set(file, decodificaHeic(file));
+    try {
+      return await heicDecodificati.get(file);
+    } catch (errore) {
+      heicDecodificati.delete(file);
+      throw errore;
+    }
   }
   const url = URL.createObjectURL(file);
   try {

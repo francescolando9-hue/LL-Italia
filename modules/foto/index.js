@@ -18,7 +18,7 @@ import { fileInMemoria, eLetturaNegata, descriviLettura } from '../../core/byte.
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import {
   sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, eUrbanizzazione, VERSIONE_ANAGRAFICA, azzeraFase,
-  etichettaScala, codicePartiComuni,
+  etichettaScala, codicePartiComuni, corpiDistinti, codiceTutti, tutti,
 } from '../../core/anagrafica.js';
 import { TIPO_ARCHIVIO, etichettaCategoria } from './categorie.js';
 import { preparaImmagine, creaAnteprima, creaAnteprimaHeic, formatoFoto } from './immagini.js';
@@ -245,8 +245,14 @@ function portaInVista(elemento) {
 // server, e leggerli è il solo modo che ha l'operatore di accorgersi di un
 // piano sbagliato prima che l'archivio se lo porti dietro.
 function scritturaLivelli(record) {
-  const pezzi = [record.scala ? etichettaScala(record.scala) : '', record.piano, record.unita, record.prospetto]
-    .filter(Boolean);
+  // A TN1 un livello «Tutti» con la palazzina vuota è «Tutti i lotti».
+  const tuttiILotti = !record.scala && corpiDistinti(record.commessa)
+    && [record.piano, record.unita, record.prospetto].includes(codiceTutti());
+  // «Tutti» si legge con l'etichetta del suo livello, non col codice: «Tutti i piani»,
+  // «Tutti gli alloggi», «Tutti i prospetti».
+  const voce = (valore, etichetta) => (valore && valore === codiceTutti() && tutti() ? tutti()[etichetta] : valore);
+  const pezzi = [record.scala ? etichettaScala(record.scala) : (tuttiILotti ? tutti().etichettaScala : ''),
+    voce(record.piano, 'etichettaPiano'), voce(record.unita, 'etichettaUnita'), voce(record.prospetto, 'etichettaProspetto')].filter(Boolean);
   return pezzi.length > 0 ? ` \u00b7 ${pezzi.join(' \u00b7 ')}` : '';
 }
 
@@ -905,13 +911,17 @@ function lettureRimando(riquadro, record) {
   // piano partirebbe già con il piano dell'unità di prima, cioè con una
   // preselezione che nessuno ha fatto. Dove l'unità è «Parti comuni» il piano è
   // una scelta vera, e il record lo porta.
-  const daUnita = Boolean(record.unita) && record.unita !== codicePartiComuni();
+  // «Tutti gli alloggi» non ricava niente: il lotto, anche «Tutti i lotti», è
+  // una scelta vera e il record lo porta (a «Tutti i lotti» la colonna è vuota).
+  const daUnita = Boolean(record.unita) && record.unita !== codicePartiComuni() && record.unita !== codiceTutti();
+  const tuttiILotti = !record.scala && corpiDistinti(record.commessa)
+    && [record.piano, record.unita, record.prospetto].includes(codiceTutti());
   const livelli = sincronizzaLivelli(riquadro, commessa, scappaHtml, 'r-', {
     fase: record.fase || '',
     piano: daUnita ? '' : record.piano || '',
     unita: record.unita || '',
     prospetto: record.prospetto || '',
-    scala: daUnita ? '' : record.scala || '',
+    scala: daUnita ? '' : record.scala || (tuttiILotti ? codiceTutti() : ''),
   }, true, { faseObbligatoria: true });
   const nota = riquadro.querySelector('#r-nota').value.trim();
   const uguale = (a, b) => (a || '') === (b || '');
