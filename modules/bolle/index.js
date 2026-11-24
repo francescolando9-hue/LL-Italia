@@ -6,7 +6,7 @@ import { fotocameraDisponibile, apriFotocamera } from '../../core/fotocamera.js'
 import { naviga } from '../../core/router.js';
 import { messaggioSalvataggio, memoriaPiena, righeAvvisoRitardo, fraseFaseDaRivedere } from '../../core/errori.js';
 import { elementiInRitardo, CONTROLLO_RITARDO_MS } from '../../core/coda-invio.js';
-import { comprimiInJpeg, creaMiniatura, impronta, valutaLeggibilita } from './immagini.js';
+import { comprimiInJpeg, creaMiniatura, impronta, rilasciaDecodifica, valutaLeggibilita } from './immagini.js';
 import { impostazioniBolle, caricaConfigurazioneLocale } from './impostazioni.js';
 import { CANTIERI, etichettaCantiere } from '../../core/cantieri.js';
 import { sincronizzaLivelli, campiLivelli, etichettaFaseOLotto, azzeraFase, faseDaRivedere } from '../../core/anagrafica.js';
@@ -317,6 +317,10 @@ async function aggiungiFile(file) {
         break;
       }
       errori.push(`${singolo.name || 'foto'}: ${messaggioSalvataggio(errore, 'la bolla')}`);
+    } finally {
+      // Una foto alla volta: la tela di un HEIC decodificato, a piena risoluzione,
+      // non resta in memoria mentre si elaborano le successive.
+      rilasciaDecodifica(singolo);
     }
   }
   const messaggi = [];

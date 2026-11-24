@@ -89,7 +89,7 @@
 import { FASI, FASI_ESCLUSE_DALLE_APP, etichettaFase } from './fasi.js';
 
 export const ANAGRAFICA = {
-  versione: '202611202113',
+  versione: '202611241225',
   prospettiStandard: ['Nord', 'Sud', 'Est', 'Ovest'],
   // 'O' = obbligatorio, il selettore compare e senza la scelta non si invia.
   // 'D' = derivato: non si chiede, si ricava dalla mappa e si manda comunque.
@@ -140,6 +140,17 @@ export const ANAGRAFICA = {
       ImpiantoElettricoAlloggi: 'ImpiantoElettricoPartiComuni',
       ImpiantoTermicoAlloggi: 'ImpiantoTermicoCondominiale',
     },
+  },
+  // La voce «Tutti» (dal master 202611241225, app 0.45.0): per una foto che
+  // riguarda più piani, più alloggi o più prospetti insieme (un impianto
+  // condominiale con le foto distribuite su più piani). Il codice è lo stesso
+  // `Tutti` che i sottocentri usano per il piano. Le etichette sono a video.
+  tutti: {
+    codice: 'Tutti',
+    etichettaPiano: 'Tutti i piani',
+    etichettaUnita: 'Tutti gli alloggi',
+    etichettaProspetto: 'Tutti i prospetti',
+    etichettaScala: 'Tutti i lotti',
   },
   commesse: {
     MAR: {
@@ -238,7 +249,7 @@ export const ANAGRAFICA = {
       ],
       unita: {
         'P-1': [],
-        P0:    ['0A', '0B', '0C'],
+        P0:    ['0A', '0C', '0D'],
         P1:    ['1A', '1B', '1C', '1D'],
         P2:    ['2A', '2B', '2C', '2D'],
         P3:    ['3A', '3B', '3C', '3D'],
@@ -250,7 +261,7 @@ export const ANAGRAFICA = {
         P9:    ['9A', '9B', '9C', '9D'],
         P10:   ['10A', '10B', '10C', '10D'],
         P11:   ['11A', '11B', '11C', '11D'],
-        P12:   ['12A', '12B', '12C', '12D'],
+        P12:   ['12A', '12B'],
         Tetto: [],
       },
       etichetteUnita: {},
@@ -259,6 +270,7 @@ export const ANAGRAFICA = {
     TN1: {
       tipo: 'edificio',
       corpiDistinti: true,
+      prefissoScala: 'Lotto',
       piani: [
         { codice: 'P-1',   etichetta: 'Primo piano interrato', ordine: -1 },
         { codice: 'P0',    etichetta: 'Piano terra',           ordine: 0 },
@@ -518,10 +530,61 @@ export function scalePerPiano(codice, piano) {
 // Le voci del selettore «Lotto»: per la facciata tutte le palazzine, per le
 // fasi per piano quelle che hanno il piano scelto — nessuna finché il piano non
 // è scelto, perché si sceglie prima il piano e poi la palazzina.
-export function vociScala(codice, codiceFase, piano = '') {
+//
+// **«Tutti i lotti»** (dalla 0.45.0) è una voce in più, in fondo, quando il
+// livello scelto è «Tutti» — «Tutti i piani», «Tutti gli alloggi», «Tutti i
+// prospetti» — e vale per tutta la commessa: il percorso è `<Fase>\Tutti\` e la
+// colonna `Scala` resta vuota. Con un piano, un alloggio o un prospetto veri il
+// lotto è sempre uno vero.
+export function vociScala(codice, codiceFase, piano = '', unita = '', prospetto = '') {
   if (!corpiDistinti(codice)) return [];
-  if (livelliDiFase(codiceFase).prospetto === 'O' && prospettiDi(codice).length > 0) return scaleDi(codice);
+  const conTutti = con => (con ? [...scaleDi(codice), voceTuttiLotti()] : scaleDi(codice));
+  const regola = livelliDiFase(codiceFase);
+  if (regola.prospetto === 'O' && prospettiDi(codice).length > 0) {
+    return conTutti(Boolean(prospetto) && prospetto === codiceTutti());
+  }
+  if (regola.unita === 'O' && unita && unita === codiceTutti()) return conTutti(true);
+  if (piano && piano === codiceTutti()) return conTutti(true);
   return piano ? scalePerPiano(codice, piano) : [];
+}
+
+// La voce «Tutti» di ogni livello (dal master 202611241225). Il codice è uno
+// solo, `Tutti`, quello che i sottocentri usano per il piano; cambia l'etichetta.
+export function tutti() {
+  return ANAGRAFICA.tutti || null;
+}
+
+export function codiceTutti() {
+  const voce = tutti();
+  return voce ? voce.codice : '';
+}
+
+function voceTutti(etichetta) {
+  return { codice: codiceTutti(), etichetta, speciale: true };
+}
+
+function voceTuttiLotti() {
+  return voceTutti(tutti().etichettaScala);
+}
+
+// I piani del menù: i piani veri e, nelle fasi per piano, «Tutti i piani» in
+// fondo. Nelle fasi per unità il piano si chiede solo con «Parti comuni», e
+// lì «Tutti» non c'è: per un'unità qualunque si sceglie «Tutti gli alloggi».
+// «Tutti» c'è solo dove le voci sono più di una: con un piano solo «Tutti i
+// piani» e quel piano sono la stessa cartella, e la regola della voce unica
+// (dalla 0.37.7) vuole che un livello con una scelta sola non si chieda.
+export function vociPiano(codice, codiceFase = '') {
+  const voci = pianiDi(codice);
+  if (voci.length > 1 && tutti() && livelliDiFase(codiceFase).unita !== 'O') {
+    voci.push(voceTutti(tutti().etichettaPiano));
+  }
+  return voci;
+}
+
+export function vociProspetto(codice) {
+  const voci = prospettiDi(codice);
+  if (voci.length > 1 && tutti()) voci.push(voceTutti(tutti().etichettaProspetto));
+  return voci;
 }
 
 export function partiComuni() {
@@ -550,9 +613,14 @@ export function faseGemella(codiceFase) {
 // sola unità e le parti comuni ha due voci, e si chiede.
 export function vociUnita(codice, codiceFase = '') {
   const voci = unitaDi(codice);
+  const alloggi = voci.length;
   const parti = partiComuni();
   if (voci.length > 0 && parti && faseConPartiComuni(codiceFase)) {
     voci.push({ codice: parti.codice, piano: '', etichettaPiano: '', etichetta: parti.etichetta, speciale: true });
+  }
+  // «Tutti gli alloggi» solo con più di un alloggio (vedi `vociPiano`).
+  if (alloggi > 1 && tutti()) {
+    voci.push({ codice: codiceTutti(), piano: '', etichettaPiano: '', etichetta: tutti().etichettaUnita, speciale: true });
   }
   return voci;
 }
@@ -581,6 +649,9 @@ export function livelliRichiesti(codice, codiceFase, scelte = {}) {
   }
   const unita = regola.unita === 'O' && unitaDi(codice).length > 0;
   const partiComuniScelte = unita && faseConPartiComuni(codiceFase) && scelte.unita === codicePartiComuni();
+  // «Tutti gli alloggi»: nessun piano da ricavare né da chiedere, e il lotto si
+  // sceglie (a TN1, anche «Tutti i lotti»).
+  const unitaTutti = unita && Boolean(codiceTutti()) && scelte.unita === codiceTutti();
   const piano = partiComuniScelte
     || (!unita && regola.piano === 'O' && pianiDi(codice).length > 0);
   const prospetto = regola.prospetto === 'O' && prospettiDi(codice).length > 0;
@@ -589,9 +660,10 @@ export function livelliRichiesti(codice, codiceFase, scelte = {}) {
     piano,
     unita,
     prospetto,
-    pianoDerivato: unita && regola.piano === 'D' && !partiComuniScelte,
-    scala: distinti && (prospetto || (piano && scalePerPiano(codice, scelte.piano).length > 0)),
-    scalaDerivata: distinti && unita && !partiComuniScelte,
+    pianoDerivato: unita && regola.piano === 'D' && !partiComuniScelte && !unitaTutti,
+    scala: distinti && (prospetto || unitaTutti
+      || (piano && (scelte.piano === codiceTutti() || scalePerPiano(codice, scelte.piano).length > 0))),
+    scalaDerivata: distinti && unita && !partiComuniScelte && !unitaTutti,
   };
 }
 
@@ -629,12 +701,12 @@ function risolvi(codice, codiceFase, fatte = {}) {
   const voceUnita = voceUnica(vociU);
   const unita = ammessa(vociU, fatte.unita) || (voceUnita ? voceUnita.codice : '');
   const dopoUnita = livelliRichiesti(codice, codiceFase, { unita });
-  const vocePiano = dopoUnita.piano ? voceUnica(pianiDi(codice)) : null;
+  const vocePiano = dopoUnita.piano ? voceUnica(vociPiano(codice, codiceFase)) : null;
   const piano = fatte.piano || (vocePiano ? vocePiano.codice : '');
-  const voceProspetto = dopoUnita.prospetto ? voceUnica(prospettiDi(codice)) : null;
+  const voceProspetto = dopoUnita.prospetto ? voceUnica(vociProspetto(codice)) : null;
   const prospetto = fatte.prospetto || (voceProspetto ? voceProspetto.codice : '');
   const richiesti = livelliRichiesti(codice, codiceFase, { unita, piano });
-  const vociS = richiesti.scala ? vociScala(codice, codiceFase, piano) : [];
+  const vociS = richiesti.scala ? vociScala(codice, codiceFase, piano, unita, prospetto) : [];
   const voceScala = voceUnica(vociS);
   const scala = ammessa(vociS, fatte.scala) || (voceScala ? voceScala.codice : '');
   return {
@@ -661,7 +733,8 @@ export function livelliDaMandare(codice, codiceFase, scelteFatte = {}) {
       : r.pianoDerivato ? (pianoDiUnita(codice, e.unita) || null) : null,
     unita: r.unita ? (e.unita || null) : null,
     prospetto: r.prospetto ? (e.prospetto || null) : null,
-    scala: r.scala ? (e.scala || null)
+    // «Tutti i lotti» non viaggia: la colonna resta vuota e il livello dice `Tutti`.
+    scala: r.scala ? (e.scala === codiceTutti() ? null : (e.scala || null))
       : r.scalaDerivata ? (scalaDiUnita(codice, e.unita) || null) : null,
   };
 }
@@ -778,7 +851,8 @@ export function opzioniLivello(voci, segnaposto, scelto, scappaHtml) {
   const nota = voci.some(v => v.codice === scelto);
   return `<option value=""${nota ? '' : ' selected'}>${scappaHtml(segnaposto)}</option>`
     + voci.map(v => {
-      const testo = v.etichetta && v.etichetta !== v.codice ? `${v.codice} — ${v.etichetta}` : v.codice;
+      const testo = v.speciale ? v.etichetta
+        : v.etichetta && v.etichetta !== v.codice ? `${v.codice} — ${v.etichetta}` : v.codice;
       return `<option value="${scappaHtml(v.codice)}"${v.codice === scelto ? ' selected' : ''}>${scappaHtml(testo)}</option>`;
     }).join('');
 }
@@ -793,7 +867,9 @@ export function opzioniLivello(voci, segnaposto, scelto, scappaHtml) {
 export function opzioniUnita(codiceCommessa, scelta, scappaHtml, codiceFase = '') {
   const tutte = unitaDi(codiceCommessa);
   const parti = tutte.length > 0 && faseConPartiComuni(codiceFase) ? partiComuni() : null;
-  const nota = tutte.some(u => u.codice === scelta) || Boolean(parti && scelta === parti.codice);
+  const conTutti = tutte.length > 0 && Boolean(tutti());
+  const nota = tutte.some(u => u.codice === scelta) || Boolean(parti && scelta === parti.codice)
+    || (conTutti && scelta === codiceTutti());
   let html = `<option value=""${nota ? '' : ' selected'}>— scegli l’unità —</option>`;
   const gruppo = (etichetta, unita) => (unita.length === 0 ? '' : `<optgroup label="${scappaHtml(etichetta)}">`
     + unita.map(u => {
@@ -815,6 +891,9 @@ export function opzioniUnita(codiceCommessa, scelta, scappaHtml, codiceFase = ''
   }
   if (parti) {
     html += `<option value="${scappaHtml(parti.codice)}"${parti.codice === scelta ? ' selected' : ''}>${scappaHtml(parti.etichetta)}</option>`;
+  }
+  if (conTutti) {
+    html += `<option value="${scappaHtml(codiceTutti())}"${codiceTutti() === scelta ? ' selected' : ''}>${scappaHtml(tutti().etichettaUnita)}</option>`;
   }
   return html;
 }
@@ -1019,13 +1098,13 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
     // fuori contesto. Per questo la fase è nella chiave di tutti i menù, e il
     // valore di prima non si porta dietro.
     rifaiSeServe(menuPiano, `piano:${codiceCommessa}:${fase}`, iniziali.piano,
-      precedente => opzioniLivello(pianiDi(codiceCommessa), '— scegli il piano —', precedente, scappaHtml),
+      precedente => opzioniLivello(vociPiano(codiceCommessa, fase), '— scegli il piano —', precedente, scappaHtml),
       false);
   } else if (menuPiano) {
     menuPiano.value = '';
   }
   mostraVoceUnica(radice, prefisso, 'piano', menuPiano,
-    richiestiPiano.piano ? voceUnica(pianiDi(codiceCommessa)) : null, fase, scappaHtml);
+    richiestiPiano.piano ? voceUnica(vociPiano(codiceCommessa, fase)) : null, fase, scappaHtml);
   const pianoScelto = menuPiano ? menuPiano.value : '';
   // Nel markup il piano sta sopra l'unità: scegliendo «Parti comuni» il suo menù
   // compare sopra quello appena toccato, e va portato sotto gli occhi.
@@ -1035,8 +1114,26 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   }
 
   // 3. La palazzina, il «Lotto» di TN1: dopo il piano, o prima del prospetto.
+  // Il prospetto si costruisce PRIMA del lotto (dalla 0.45.0): con «Tutti i
+  // prospetti» il lotto ha una voce in più, «Tutti i lotti», quindi le sue voci
+  // dipendono dal prospetto scelto. A video il prospetto sta sopra il lotto.
+  const richiestoProspetto = richiestiUnita.prospetto;
+  const campoProspetto = radice.querySelector(`#campo-${prefisso}prospetto`);
+  const menuProspetto = radice.querySelector(`#${prefisso}prospetto`);
+  if (campoProspetto) campoProspetto.classList.toggle('nascosto', !richiestoProspetto);
+  if (richiestoProspetto) {
+    rifaiSeServe(menuProspetto, `prospetto:${codiceCommessa}:${fase}`, iniziali.prospetto,
+      precedente => opzioniLivello(vociProspetto(codiceCommessa), '— scegli il prospetto —', precedente, scappaHtml),
+      false);
+  } else if (menuProspetto) {
+    menuProspetto.value = '';
+  }
+  mostraVoceUnica(radice, prefisso, 'prospetto', menuProspetto,
+    richiestoProspetto ? voceUnica(vociProspetto(codiceCommessa)) : null, fase, scappaHtml);
+  const prospettoScelto = menuProspetto ? menuProspetto.value : '';
+
   const richiestiScala = livelliRichiesti(codiceCommessa, fase, { unita: unitaScelta, piano: pianoScelto });
-  const vociS = richiestiScala.scala ? vociScala(codiceCommessa, fase, pianoScelto) : [];
+  const vociS = richiestiScala.scala ? vociScala(codiceCommessa, fase, pianoScelto, unitaScelta, prospettoScelto) : [];
   const campoScala = radice.querySelector(`#campo-${prefisso}scala`);
   const menuScala = radice.querySelector(`#${prefisso}scala`);
   if (campoScala) campoScala.classList.toggle('nascosto', !richiestiScala.scala);
@@ -1047,7 +1144,11 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
     // manderebbe, in silenzio, nella palazzina del piano di prima. Per questo
     // il piano è nella chiave. Tornando da un piano comune (P-1) il menù non si
     // rifà, ma il valore è già stato svuotato qui sotto: parte dal segnaposto.
-    rifaiSeServe(menuScala, `scala:${codiceCommessa}:${fase}:${pianoScelto}`, iniziali.scala,
+    // Dalla 0.45.0 la chiave porta anche l'alloggio e il prospetto quando sono
+    // «Tutti»: cambiano le voci («Tutti i lotti»), e un lotto scelto per un
+    // livello diverso non si porta dietro.
+    const chiaveTutti = `${unitaScelta === codiceTutti() ? 'U' : ''}${prospettoScelto === codiceTutti() ? 'S' : ''}`;
+    rifaiSeServe(menuScala, `scala:${codiceCommessa}:${fase}:${pianoScelto}:${chiaveTutti}`, iniziali.scala,
       precedente => opzioniScala(vociS, precedente, scappaHtml),
       false);
   } else if (menuScala) {
@@ -1055,25 +1156,10 @@ export function sincronizzaLivelli(radice, codiceCommessa, scappaHtml, prefisso 
   }
   mostraVoceUnica(radice, prefisso, 'scala', menuScala, voceUnica(vociS), fase, scappaHtml);
 
-  // 4. Il prospetto.
-  const richiestoProspetto = richiestiUnita.prospetto;
-  const campoProspetto = radice.querySelector(`#campo-${prefisso}prospetto`);
-  const menuProspetto = radice.querySelector(`#${prefisso}prospetto`);
-  if (campoProspetto) campoProspetto.classList.toggle('nascosto', !richiestoProspetto);
-  if (richiestoProspetto) {
-    rifaiSeServe(menuProspetto, `prospetto:${codiceCommessa}:${fase}`, iniziali.prospetto,
-      precedente => opzioniLivello(prospettiDi(codiceCommessa), '— scegli il prospetto —', precedente, scappaHtml),
-      false);
-  } else if (menuProspetto) {
-    menuProspetto.value = '';
-  }
-  mostraVoceUnica(radice, prefisso, 'prospetto', menuProspetto,
-    richiestoProspetto ? voceUnica(prospettiDi(codiceCommessa)) : null, fase, scappaHtml);
-
   const scelte = {
     piano: pianoScelto,
     unita: unitaScelta,
-    prospetto: menuProspetto ? menuProspetto.value : '',
+    prospetto: prospettoScelto,
     scala: menuScala ? menuScala.value : '',
   };
 
@@ -1170,14 +1256,14 @@ export function campiLivelli(prefisso = '', conLivelli = true) {
         <p id="aiuto-${prefisso}unita" class="aiuto tenue"></p>
         <p id="gemella-${prefisso}unita" class="aiuto tenue"></p>
       </div>
-      <div class="campo nascosto" id="campo-${prefisso}scala">
-        <label for="${prefisso}scala">Lotto</label>
-        <select id="${prefisso}scala" required></select>
-        <p id="unico-${prefisso}scala" class="valore-unico nascosto"></p>
-      </div>
       <div class="campo nascosto" id="campo-${prefisso}prospetto">
         <label for="${prefisso}prospetto">Prospetto</label>
         <select id="${prefisso}prospetto" required></select>
         <p id="unico-${prefisso}prospetto" class="valore-unico nascosto"></p>
+      </div>
+      <div class="campo nascosto" id="campo-${prefisso}scala">
+        <label for="${prefisso}scala">Lotto</label>
+        <select id="${prefisso}scala" required></select>
+        <p id="unico-${prefisso}scala" class="valore-unico nascosto"></p>
       </div>`;
 }

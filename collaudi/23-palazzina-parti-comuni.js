@@ -1,4 +1,4 @@
-// Palazzina («Lotto») e parti comuni nel modulo Foto, dalla 0.39.0: 34 casi.
+// Palazzina («Lotto») e parti comuni nel modulo Foto, dalla 0.39.0: 47 casi.
 //
 // I casi 1–28 sono la tabella della specifica, con la numerazione del master
 // — la stessa del collaudo dello script, che dallo stesso payload ricava il
@@ -37,7 +37,7 @@ const { nuovoTelefono, configura, materiale } = require('./aiuto');
 const J = JSON.stringify;
 
 module.exports = {
-  nome: 'Palazzina («Lotto») e parti comuni: 34 casi nel modulo Foto',
+  nome: 'Palazzina («Lotto») e parti comuni: 47 casi nel modulo Foto',
 
   async esegui({ browser, app, flow, registro, aiuto }) {
     const { contesto, pagina, errori } = await nuovoTelefono(browser);
@@ -219,8 +219,9 @@ module.exports = {
       await apri();
       await scegli('commessa', 'TN1');
       const dopoFase = await scegli('fase', 'FinituraPartiComuniInterne');
-      registro.controlla('il menù del piano si vede, coi sei piani di TN1, e nessuna voce unica',
-        visibile(dopoFase, 'piano') && campoDi(dopoFase, 'piano')[3] === 6 && dopoFase.unico[0] === false,
+      // Sei piani e, dalla 0.45.0, «Tutti i piani» in fondo: 7 voci.
+      registro.controlla('il menù del piano si vede, coi sei piani di TN1 più «Tutti i piani», e nessuna voce unica',
+        visibile(dopoFase, 'piano') && campoDi(dopoFase, 'piano')[3] === 7 && dopoFase.unico[0] === false,
         J(campoDi(dopoFase, 'piano')));
       registro.controlla('il piano parte dal segnaposto: il P-1 non lo sceglie più l’app',
         campoDi(dopoFase, 'piano')[2] === '', J(campoDi(dopoFase, 'piano')));
@@ -354,9 +355,12 @@ module.exports = {
       }
       await scegli('fase', 'ImpiantoIdrosanitario');
       const dopo = await pagina.$$eval('#unita option', o => o.map(e => [e.value, e.parentElement.tagName]).filter(v => v[0]));
-      const ultima = dopo[dopo.length - 1];
-      registro.controlla('nell’idrosanitario «Parti comuni» c’è: ultima voce, fuori dai gruppi',
-        ultima[0] === 'PartiComuni' && ultima[1] === 'SELECT', J(ultima));
+      // Dalla 0.45.0 l'ultima voce è «Tutti gli alloggi»: «Parti comuni» è la penultima.
+      const penultima = dopo[dopo.length - 2];
+      registro.controlla('nell’idrosanitario «Parti comuni» c’è: penultima voce, fuori dai gruppi',
+        penultima[0] === 'PartiComuni' && penultima[1] === 'SELECT', J(penultima));
+      registro.controlla('e l’ultima è «Tutti gli alloggi», anch’essa fuori dai gruppi',
+        dopo[dopo.length - 1][0] === 'Tutti' && dopo[dopo.length - 1][1] === 'SELECT', J(dopo[dopo.length - 1]));
       registro.controlla('e la riga sulle fasi gemelle sparisce',
         (await pagina.$eval('#gemella-unita', e => e.textContent.trim())) === '');
     });
@@ -700,14 +704,128 @@ module.exports = {
       commessa: 'TN1', fase: 'FognaturaBianca', passi: [['piano', 'P1'], ['scala', '4']], atteso: ['P1', null, null, '4'],
       verifica: async s => registro.controlla('Fognatura bianca chiede il piano e poi il lotto, come le altre fasi per piano',
         visibile(s, 'piano') && visibile(s, 'scala') && !visibile(s, 'unita') && !visibile(s, 'prospetto')),
-      payload: async p => registro.controlla('la fase è FognaturaBianca: a valle FognaturaBianca\\S4\\P1\\',
+      payload: async p => registro.controlla('la fase è FognaturaBianca: a valle FognaturaBianca\\Lotto4\\P1\\',
         p.fase === 'FognaturaBianca', J(p.fase)),
+    });
+
+    // ------------------------------------------------------------------ casi 35-46: la voce «Tutti» (0.45.0)
+    // Il codice che viaggia è `Tutti` (lo stesso dei sottocentri), al posto del
+    // piano, dell'unità o del prospetto; «Tutti i lotti» (TN1) non manda niente
+    // nella colonna del lotto, e il livello dice `Tutti`. Dove l'edificio è uno
+    // solo, la voce «Tutti» c'è lo stesso e il lotto non si chiede.
+    await tabella(35, 'TN1 · Strutture · «Tutti i piani», lotto 4', {
+      commessa: 'TN1', fase: 'Strutture', passi: [['piano', 'Tutti'], ['scala', '4']], atteso: ['Tutti', null, null, '4'],
+    });
+    await tabella(36, 'TN1 · Strutture · «Tutti i piani», «Tutti i lotti»', {
+      commessa: 'TN1', fase: 'Strutture', passi: [['piano', 'Tutti'], ['scala', 'Tutti']], atteso: ['Tutti', null, null, null],
+      verifica: async s => {
+        const lotti = await pagina.$$eval('#scala option', o => o.filter(e => e.value).map(e => [e.value, e.textContent.trim()]));
+        registro.controlla('col piano «Tutti» il menù del lotto ha i quattro lotti e «Tutti i lotti» in fondo',
+          lotti.length === 5 && lotti[4][0] === 'Tutti' && lotti[4][1] === 'Tutti i lotti', J(lotti));
+        registro.controlla('e Invia è acceso: «Tutti i lotti» non è un livello mancante', s.invia === false);
+      },
+    });
+    await tabella(37, 'TN1 · FinituraAlloggi · «Tutti gli alloggi», lotto 5', {
+      commessa: 'TN1', fase: 'FinituraAlloggi', passi: [['unita', 'Tutti'], ['scala', '5']], atteso: [null, 'Tutti', null, '5'],
+      verifica: async s => registro.controlla('nessun piano da chiedere: «Tutti gli alloggi» non ne ha uno',
+        !visibile(s, 'piano') && visibile(s, 'scala')),
+    });
+    await tabella(38, 'TN1 · FinituraAlloggi · «Tutti gli alloggi», «Tutti i lotti»', {
+      commessa: 'TN1', fase: 'FinituraAlloggi', passi: [['unita', 'Tutti'], ['scala', 'Tutti']], atteso: [null, 'Tutti', null, null],
+    });
+    await tabella(39, 'TN1 · FinituraFacciata · lotto 6, «Tutti i prospetti»', {
+      commessa: 'TN1', fase: 'FinituraFacciata', passi: [['prospetto', 'Tutti'], ['scala', '6']], atteso: [null, null, 'Tutti', '6'],
+    });
+    await tabella(40, 'TN1 · FinituraFacciata · «Tutti i prospetti», «Tutti i lotti»', {
+      commessa: 'TN1', fase: 'FinituraFacciata', passi: [['prospetto', 'Tutti'], ['scala', 'Tutti']], atteso: [null, null, 'Tutti', null],
+      verifica: async s => registro.controlla('Invia è acceso con «Tutti i lotti»', s.invia === false),
+    });
+    await tabella(41, 'MNG · Strutture · «Tutti i piani» (edificio solo: niente lotto)', {
+      commessa: 'MNG', fase: 'Strutture', passi: [['piano', 'Tutti']], atteso: ['Tutti', null, null, null],
+      verifica: async s => registro.controlla('nessun menù del lotto', !visibile(s, 'scala')),
+    });
+    await tabella(42, 'MNG · FinituraAlloggi · «Tutti gli alloggi»', {
+      commessa: 'MNG', fase: 'FinituraAlloggi', passi: [['unita', 'Tutti']], atteso: [null, 'Tutti', null, null],
+    });
+    await tabella(43, 'MNG · FinituraFacciata · «Tutti i prospetti»', {
+      commessa: 'MNG', fase: 'FinituraFacciata', passi: [['prospetto', 'Tutti']], atteso: [null, null, 'Tutti', null],
+    });
+    await caso(44, 'SNZ2.2 · 49 alloggi, e «Tutti gli alloggi» in fondo', async () => {
+      await apri();
+      await scegli('commessa', 'SNZ2.2');
+      await scegli('fase', 'FinituraAlloggi');
+      const voci = await pagina.$$eval('#unita option', o => o.filter(e => e.value).map(e => e.value));
+      registro.controlla('50 voci: 49 alloggi e «Tutti»', voci.length === 50 && voci[49] === 'Tutti', `${voci.length} · ${voci.slice(-2).join(' ')}`);
+      const alloggi = voci.slice(0, 49);
+      registro.controlla('al piano terra 0A, 0C e 0D, non più 0B', ['0A', '0C', '0D'].every(u => alloggi.includes(u)) && !alloggi.includes('0B'));
+      registro.controlla('al dodicesimo 12A e 12B, non più 12C né 12D',
+        alloggi.includes('12A') && alloggi.includes('12B') && !alloggi.includes('12C') && !alloggi.includes('12D'));
+    });
+    await caso(45, 'TN1 · «Tutti i piani» senza lotto: l’invio si blocca e nomina il lotto', async () => {
+      await apri();
+      await scegli('commessa', 'TN1');
+      await scegli('fase', 'Strutture');
+      await scegli('piano', 'Tutti');
+      const s = await aggiungi();
+      const msg = await messaggioInvio();
+      registro.dice('avviso nella barra', msg);
+      registro.controlla('l’invio è bloccato e il messaggio nomina il lotto', s.invia === true && /lotto/i.test(msg), msg);
+      const dopo = await scegli('piano', 'P-1');
+      registro.controlla('passando a P-1 (comune a tutte le palazzine) il lotto non si chiede più',
+        !visibile(dopo, 'scala') && dopo.invia === false, J(dopo.campi));
+      await svuotaBozze();
+      // Lo stesso blocco con «Tutti gli alloggi» e «Tutti i prospetti»: il lotto resta da scegliere.
+      for (const [fase, campo] of [['FinituraAlloggi', 'unita'], ['FinituraFacciata', 'prospetto']]) {
+        await scegli('fase', fase);
+        await scegli(campo, 'Tutti');
+        const t = await aggiungi();
+        const m = await messaggioInvio();
+        registro.controlla(`${fase} · «Tutti» senza lotto: Invia spento e il messaggio nomina il lotto`,
+          t.invia === true && /lotto/i.test(m), m);
+        await svuotaBozze();
+      }
+    });
+    await caso(47, 'la riga della coda legge «Tutti i piani · Tutti i lotti», non i codici', async () => {
+      await apri();
+      await scegli('commessa', 'TN1');
+      await scegli('fase', 'Strutture');
+      await scegli('piano', 'Tutti');
+      await scegli('scala', 'Tutti');
+      await aggiungi();
+      await manda();
+      const riga = await pagina.$eval('#lista-coda .foto-voce', v => v.textContent.replace(/\s+/g, ' ').trim());
+      registro.dice('riga in coda', riga);
+      registro.controlla('dice «Tutti i lotti · Tutti i piani»', riga.includes('Tutti i lotti · Tutti i piani'), riga);
+      registro.controlla('e non «· Tutti» da solo', !/ · Tutti(?! i| gli)/.test(riga), riga);
+      await attendiQuiete();
+    });
+    await caso(46, '«Rimanda» · un record con «Tutti i piani» e «Tutti i lotti» riparte dalle stesse voci', async () => {
+      await apri();
+      await scegli('commessa', 'TN1');
+      await scegli('fase', 'Strutture');
+      await scegli('piano', 'Tutti');
+      await scegli('scala', 'Tutti');
+      await aggiungi();
+      const a = await manda();
+      registro.controlla('è partito con Tutti e nessun lotto', J(quattro(a)) === J(['Tutti', null, null, null]), J(quattro(a)));
+      await aiuto.attendi(pagina, () => Boolean(document.querySelector('.foto-rimanda')), 'pulsante Rimanda', 20000);
+      await pagina.click('.foto-rimanda');
+      await pagina.waitForSelector('#r-manda');
+      const riparte = await aiuto.attendi(pagina, () => document.querySelector('#r-piano').value === 'Tutti'
+        && document.querySelector('#r-scala').value === 'Tutti', 'il riquadro riparte da «Tutti i piani» e «Tutti i lotti»', 8000)
+        .then(() => true, () => false);
+      const s = await assesta('r-');
+      registro.controlla('il riquadro ripropone «Tutti i piani» e «Tutti i lotti»', riparte, J(s.campi));
+      registro.controlla('«Rimanda la stessa» è acceso senza toccare niente',
+        (await pagina.$eval('#r-manda', e => e.textContent.trim())) === 'Rimanda la stessa'
+        && !(await pagina.$eval('#r-manda', e => e.disabled)));
+      await attendiQuiete();
     });
 
     // ------------------------------------------------------------------ i numeri attesi
     registro.titolo('I numeri');
-    registro.dice('casi verdi', `${verdi.length} su 34${rossi.length ? ` — rossi: ${rossi.join(', ')}` : ''}`);
-    registro.controlla('34 casi verdi su 34', verdi.length === 34 && rossi.length === 0, rossi.length ? `rossi: ${rossi.join(', ')}` : 'tutti');
+    registro.dice('casi verdi', `${verdi.length} su 47${rossi.length ? ` — rossi: ${rossi.join(', ')}` : ''}`);
+    registro.controlla('47 casi verdi su 47', verdi.length === 47 && rossi.length === 0, rossi.length ? `rossi: ${rossi.join(', ')}` : 'tutti');
 
     await apri();
     const menuFoto = await pagina.$$eval('#commessa option', o => o.filter(e => e.value).map(e => e.value));
@@ -715,8 +833,10 @@ module.exports = {
 
     await scegli('commessa', 'TN1');
     await scegli('fase', 'Strutture');
-    const piani = await pagina.$$eval('#piano option', o => o.filter(e => e.value).map(e => e.value));
-    registro.controlla('TN1: 6 piani', piani.length === 6, piani.join(' '));
+    const vociPiani = await pagina.$$eval('#piano option', o => o.filter(e => e.value).map(e => e.value));
+    registro.controlla('TN1: 6 piani più «Tutti i piani» (dalla 0.45.0)',
+      vociPiani.length === 7 && vociPiani[6] === 'Tutti', vociPiani.join(' '));
+    const piani = vociPiani.filter(p => p !== 'Tutti');
     const lottiPerPiano = {};
     for (const piano of piani) {
       const s = await scegli('piano', piano);
@@ -729,13 +849,14 @@ module.exports = {
     await scegli('fase', 'FinituraAlloggi');
     const unita = await pagina.$$eval('#unita option', o => o.filter(e => e.value).length);
     const gruppi = await pagina.$$eval('#unita optgroup', g => g.map(x => x.label));
-    registro.controlla('TN1: 64 unità in 16 gruppi (4 lotti × 4 piani)', unita === 64 && gruppi.length === 16, `${unita} unità in ${gruppi.length} gruppi`);
+    registro.controlla('TN1: 64 unità in 16 gruppi (4 lotti × 4 piani), più «Tutti gli alloggi» fuori dai gruppi',
+      unita === 65 && gruppi.length === 16, `${unita} voci in ${gruppi.length} gruppi`);
     registro.controlla('nell’ordine del dato: Lotto 4 · Piano terra … Lotto 7 · Piano terzo',
       gruppi[0] === 'Lotto 4 · Piano terra' && gruppi[3] === 'Lotto 4 · Piano terzo'
       && gruppi[4] === 'Lotto 5 · Piano terra' && gruppi[15] === 'Lotto 7 · Piano terzo', `${gruppi[0]} … ${gruppi[15]}`);
     await scegli('fase', 'ImpiantoIdrosanitario');
     const idrosanitario = await pagina.$$eval('#unita option', o => o.filter(e => e.value).length);
-    registro.controlla('in ImpiantoIdrosanitario 65 voci nel menù delle unità (64 più «Parti comuni»)', idrosanitario === 65, String(idrosanitario));
+    registro.controlla('in ImpiantoIdrosanitario 66 voci nel menù delle unità (64 più «Parti comuni» e «Tutti gli alloggi»)', idrosanitario === 66, String(idrosanitario));
 
     const codici = await pagina.evaluate(async () => {
       const a = await import('./core/anagrafica.js');
