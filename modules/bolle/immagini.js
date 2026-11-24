@@ -56,9 +56,22 @@ async function ridimensiona(file, latoMax, qualita) {
 // **HEIC** (dalla 0.45.0): dove il browser non lo disegna (Chrome per Android)
 // lo si decodifica con libheif (`core/heic.js`, caricato solo qui) e si prosegue
 // col canvas ottenuto; a valle viaggia sempre e solo il JPEG. L'immagine
-// decodificata si tiene per file: leggibilità, bolla e miniatura sono tre
-// passaggi sullo stesso file, e una decodifica HEIC non è gratis.
+// decodificata si tiene per file mentre la bolla viene elaborata: leggibilità,
+// bolla e miniatura sono tre passaggi sullo stesso file, e una decodifica HEIC non è
+// gratis. **Ma una foto alla volta:** una tela di 12 Mpx pesa 48 MB, e con otto
+// HEIC scelti insieme tenerle tutte vive fino alla fine del gruppo fa finire la
+// memoria del telefono. Chi elabora un file chiama `rilasciaDecodifica(file)` quando
+// ha finito (comunque sia andata): la tela si azzera e si toglie dalla tabella.
 const heicDecodificati = new WeakMap();
+
+export function rilasciaDecodifica(file) {
+  const decodifica = heicDecodificati.get(file);
+  heicDecodificati.delete(file);
+  if (!decodifica) return;
+  decodifica.then(canvas => {
+    if (canvas && typeof canvas.width === 'number') { canvas.width = 0; canvas.height = 0; }
+  }, () => { /* decodifica fallita: non c'è niente da azzerare */ });
+}
 
 async function decodifica(file) {
   try {

@@ -100,6 +100,7 @@ export function memoriaPiena(errore) {
 // `MOTIVI_HEIC` e il collaudo 30 verifica che ognuno abbia la sua frase.
 export const FRASI_HEIC = {
   libreria: 'Questa foto è in formato HEIC e per leggerla serve scaricare un programma, ma ora non è stato possibile: riprova quando c’è rete, oppure scattala con «Scatta foto».',
+  avvio: 'Questa foto è in formato HEIC e il programma che la legge è stato scaricato ma su questo telefono non parte: scattala con «Scatta foto».',
   lettura: 'Il telefono non lascia leggere questa foto (il file non è più accessibile): sceglila di nuovo dalla galleria, oppure scattala con «Scatta foto».',
   decodifica: 'Questa foto HEIC non si riesce ad aprire (file rovinato o di un tipo non supportato): scattala di nuovo con «Scatta foto».',
   'troppo-grande': 'Questa foto HEIC è troppo grande per essere preparata su questo telefono: scattala con «Scatta foto».',

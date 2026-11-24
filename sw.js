@@ -121,7 +121,12 @@ self.addEventListener('fetch', evento => {
       if (inCache) return inCache;
       try {
         const risposta = await fetch(request);
-        if (risposta.ok) await cache.put(request.url.split('?')[0], risposta.clone());
+        // Una scrittura in cache che fallisce (memoria del telefono piena) non deve
+        // buttare una risposta di rete buona: il decodificatore parte lo stesso,
+        // solo non resta in cache.
+        if (risposta.ok) {
+          try { await cache.put(request.url.split('?')[0], risposta.clone()); } catch { /* cache piena */ }
+        }
         return risposta;
       } catch {
         return new Response('Offline', { status: 503, statusText: 'Offline' });

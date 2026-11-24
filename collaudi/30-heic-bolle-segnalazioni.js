@@ -58,8 +58,8 @@ module.exports = {
     });
     registro.dice('motivi', frasi.motivi);
     frasi.frasi.forEach((f, i) => registro.dice(frasi.motivi[i], f));
-    registro.controlla('i motivi sono libreria, lettura, decodifica, troppo-grande',
-      frasi.motivi.join(',') === 'libreria,lettura,decodifica,troppo-grande', frasi.motivi.join(','));
+    registro.controlla('i motivi sono libreria, avvio, lettura, decodifica, troppo-grande',
+      frasi.motivi.join(',') === 'libreria,avvio,lettura,decodifica,troppo-grande', frasi.motivi.join(','));
     registro.controlla('a ogni motivo corrisponde una frase scritta apposta',
       frasi.motivi.every(m => frasi.chiavi.includes(m)) && frasi.chiavi.length === frasi.motivi.length,
       `motivi ${frasi.motivi.length} · frasi ${frasi.chiavi.length}`,
